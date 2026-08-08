@@ -1,4 +1,4 @@
-﻿## Split-panel jackknife on the concentrated FE estimators, INCLUDING the
+## Split-panel jackknife on the concentrated FE estimators, INCLUDING the
 ## validity gate. The assumption-violating scenarios are tested explicitly:
 ## a time-homogeneous panel must be corrected, a dispersion-regime-change panel
 ## must be REFUSED (the Dhaene-Jochmans time-homogeneity requirement), and

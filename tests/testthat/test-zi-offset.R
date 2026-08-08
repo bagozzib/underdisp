@@ -1,4 +1,4 @@
-﻿## Offset support for the ZI mixtures. The decisive check is reparameterization
+## Offset support for the ZI mixtures. The decisive check is reparameterization
 ## invariance: a CONSTANT log-offset c must shift the count intercept by
 ## exactly -c, leave slopes/alpha/zero coefficients essentially unchanged, and
 ## leave the maximized log-likelihood identical.
