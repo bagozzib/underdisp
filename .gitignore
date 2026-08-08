@@ -1,0 +1,6 @@
+﻿src/*.o
+src/*.dll
+*.Rcheck/
+.Rproj.user/
+.Rhistory
+.RData
