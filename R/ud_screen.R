@@ -100,14 +100,22 @@
 #'   COM-Poisson comparator (defaults 30 and 5000).
 #' @param ztp_threshold How to set the at-risk test's underdispersion cutoff.
 #'   `"calibrated"` (default) uses the simulation-calibrated rule
-#'   \eqn{1 - 2.27/\sqrt{n_+}}, whose size was established on designs without
-#'   fixed effects; `"bootstrap"` calibrates the cutoff on the data at hand by
-#'   a parametric bootstrap of the fitted zero-truncated Poisson null
+#'   \eqn{1 - 2.27/\sqrt{n_+}}, whose constant is an estimated standard
+#'   deviation fitted to one calibration grid (no fixed effects, and that
+#'   grid's rate profile); `"bootstrap"` calibrates the cutoff on the data at
+#'   hand by a parametric bootstrap of the fitted zero-truncated Poisson null
 #'   (simulate `ztp_boot_B` at-risk panels at the fitted rates, refit, and take
-#'   the empirical 5\% quantile of the statistic). The bootstrap is the
-#'   recommended choice when the mean model's parameter count is a nontrivial
-#'   share of the positive observations (dummy-heavy fixed-effects screens),
-#'   where the calibrated rule is anti-conservative.
+#'   the empirical 5\% quantile of the statistic). The calibrated rule is
+#'   anti-conservative in two separable regimes: when the mean model's
+#'   parameter count is a nontrivial share of the positive observations
+#'   (dummy-heavy fixed-effects screens, where the null's center drifts with
+#'   the parameter share), and when the fitted rates concentrate at small
+#'   values (roughly \eqn{\lambda} below 2, and the more severely the smaller
+#'   the rates), where the null's spread exceeds the fitted constant even
+#'   without fixed effects (simulated size roughly 0.07--0.10 against the
+#'   nominal 0.05). The bootstrap absorbs both
+#'   departures by construction and is the recommended choice in either
+#'   regime.
 #' @param ztp_boot_B Number of parametric-bootstrap replicates (default 199).
 #' @param digits Printing precision.
 #' @return An object of class `"ud_screen"` with `verdict_marginal`, `verdict_atrisk`,
