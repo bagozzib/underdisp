@@ -1,6 +1,15 @@
 ## Regression tests for held-out / cross-validated scoring (score(newdata=), cv_score).
 
+test_that("score(fit, newdata = training data) reproduces the in-sample score (quick)", {
+  set.seed(1); n <- 200; x <- rnorm(n)
+  d <- data.frame(y = rcpb(n, exp(1 + 0.4 * x), 0.5, truncated = FALSE), x = x)
+  same <- function(fit, dat) expect_equal(unname(score(fit, newdata = dat)), unname(score(fit)), tolerance = 1e-8)
+  same(cpb(y ~ x, d, truncated = FALSE, se = "none"), d)
+  same(count_reg(y ~ x, d, "poisson", se = "none"), d)
+})
+
 test_that("score(fit, newdata = training data) reproduces the in-sample score", {
+  skip_on_cran()
   set.seed(1); n <- 400; x <- rnorm(n); z <- rnorm(n); u <- factor(sample(15, n, replace = TRUE))
   yc <- rcpb(n, exp(1 + 0.4 * x), 0.5, truncated = FALSE); d <- data.frame(y = yc, x = x, z = z, u = u)
   yh <- ifelse(rbinom(n, 1, plogis(0.3 + 0.6 * z)) == 1, 0L, 1L + rpois(n, exp(0.6 + 0.4 * x)))
@@ -25,6 +34,7 @@ test_that("score(fit, newdata = training data) reproduces the in-sample score", 
 })
 
 test_that("held-out scoring tolerates fixed-effect units unseen in training", {
+  skip_on_cran()
   ## Regression: units present only in a held-out fold (dissolved or newly created
   ## states in contiguous year-block CV) used to crash the participation/inflation
   ## dummy design and drop the whole fold. Unseen units now score at the average
@@ -54,6 +64,7 @@ test_that("held-out scoring tolerates fixed-effect units unseen in training", {
 })
 
 test_that("cv_score is genuinely out of sample (>= in-sample) and returns per-obs scores", {
+  skip_on_cran()
   set.seed(2); n <- 500; x <- rnorm(n); z <- rnorm(n); u <- factor(sample(20, n, replace = TRUE))
   yh <- ifelse(rbinom(n, 1, plogis(0.3 + 0.6 * z)) == 1, 0L, 1L + rpois(n, exp(0.6 + 0.4 * x)))
   dh <- data.frame(y = yh, x = x, z = z, u = u)

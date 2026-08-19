@@ -16,6 +16,7 @@ test_that("EM FE-ZI recovers parameters and does not collapse pi -> 0", {
 })
 
 test_that("FE-ZI accepts per-unit inflation fixed effects (zero_fe) for a symmetric comparison", {
+  skip_on_cran()
   set.seed(4); nu <- 25; per <- 16; n <- nu * per
   u <- factor(rep(seq_len(nu), each = per)); x <- rnorm(n)
   fe <- rnorm(nu, 1.0, 0.4)[as.integer(u)]; zfe <- rnorm(nu, -0.3, 0.6)[as.integer(u)]
@@ -33,6 +34,7 @@ test_that("EM FE-ZI handles units with no positive counts (all-zero units)", {
   ## crashed ('names' attribute must be the same length as the vector). The fix
   ## expands fe_hat to every level with the EM's mean-effect fallback and counts
   ## only the genuinely estimated unit effects toward df.
+  skip_on_cran()
   set.seed(5); nu <- 20; per <- 12; n <- nu * per
   u <- factor(rep(seq_len(nu), each = per)); x <- rnorm(n)
   fe <- rnorm(nu, 1.0, 0.4)[as.integer(u)]

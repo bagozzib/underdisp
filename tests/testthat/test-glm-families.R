@@ -108,6 +108,7 @@ test_that("zero-truncated negbin does not strand below its Poisson limit on unde
 })
 
 test_that("truncated compois never fits worse than the ZT-Poisson it nests", {
+  skip_on_cran()
   ## Regression: on the peacekeeping dynamic-model data the ZT-COM-Poisson BFGS
   ## stalled exactly at its nu = 1 start (the ZT-Poisson), ~78 log-likelihood
   ## points below its profile optimum near nu = 1.5. The second dispersion start

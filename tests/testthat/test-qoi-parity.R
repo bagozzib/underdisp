@@ -30,6 +30,7 @@ test_that("predict(type='prob') conditions on Y>0 for truncated fits", {
 })
 
 test_that("zero_fe predict works on a single-level newdata (xlev stored)", {
+  skip_on_cran()
   set.seed(4); n <- 400; x <- rnorm(n); z <- rnorm(n); g <- factor(sample(5, n, replace = TRUE))
   y <- ifelse(rbinom(n, 1, plogis(-0.4 + 0.7 * z)) == 1, 0L, rzicpb(n, exp(1.1 + 0.4 * x), 0.5, 0))
   d <- data.frame(y = y, x = x, z = z, g = g)
@@ -39,6 +40,7 @@ test_that("zero_fe predict works on a single-level newdata (xlev stored)", {
 })
 
 test_that("GEC irr/first_difference expose bootstrap CIs and the FE/two-part QoIs exist", {
+  skip_on_cran()
   set.seed(5); n <- 300; x <- rnorm(n); z <- rnorm(n); g <- factor(sample(6, n, replace = TRUE))
   d <- data.frame(y = rpois(n, exp(0.6 + 0.5 * x)), x = x)
   gb <- gec(y ~ x, d, se = "bootstrap", B = 25)

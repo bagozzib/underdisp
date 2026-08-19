@@ -43,7 +43,16 @@ d_pan <- data.frame(y = rcpb(n, exp(rep(rnorm(24, 1.2, 0.3), each = 10) + 0.3 * 
 d_h   <- data.frame(y = rhurdle_cpb(n, exp(1.2 + 0.3 * x), 0.5, plogis(0.2 + 0.8 * z)),
                     x = x, z = z)
 
+test_that("simulate/fitted: quick smoke (cpb and count_reg, plus the DHARMa entry point)", {
+  f1 <- cpb(y ~ x, d_pos, truncated = TRUE, se = "none")
+  expect_sim_ok(f1, d_pos$y, zt = TRUE)
+  f5 <- count_reg(y ~ x, d_pos, family = "poisson", truncated = TRUE, se = "none")
+  expect_sim_ok(f5, d_pos$y, zt = TRUE)
+  expect_dharma_ok(f1, d_pos$y)
+})
+
 test_that("simulate/fitted: single-equation classes (cpb, cpb_fe, gec, gec_fe, count_reg)", {
+  skip_on_cran()
   f1 <- cpb(y ~ x, d_pos, truncated = TRUE, se = "none")
   expect_sim_ok(f1, d_pos$y, zt = TRUE)
   f2 <- cpb_fe(y ~ x, d_pan, fe = "unit", se = "none")
