@@ -1,6 +1,9 @@
 # underdisp
 
 <!-- badges: start -->
+[![CRAN status](https://www.r-pkg.org/badges/version/underdisp)](https://CRAN.R-project.org/package=underdisp)
+[![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/underdisp)](https://CRAN.R-project.org/package=underdisp)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 <!-- badges: end -->
 
 Tools for **detecting and modeling underdispersion** in count data — the case
@@ -50,12 +53,12 @@ collapses onto the Poisson. `underdisp` provides the missing pieces.
 ## Installation
 
 ```r
+# from CRAN
+install.packages("underdisp")
+
 # development version
 # install.packages("remotes")
 remotes::install_github("bagozzib/underdisp")
-
-# from CRAN, once accepted
-install.packages("underdisp")
 ```
 
 ## Quick start
