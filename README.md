@@ -45,7 +45,7 @@ collapses onto the Poisson. `underdisp` provides the missing pieces.
   `simulate()` methods for every model class, so any fit plugs into `DHARMa`'s
   simulated-residual diagnostics via `DHARMa::createDHARMa()`.
 - **Quantities of interest** — predicted count distributions, the implied
-  ceiling, incidence-rate ratios, and King-style first differences (including
+  ceiling, incidence-rate ratios, and first differences (including
   the exact extensive/intensive decomposition for two-part models), with
   bootstrap or profile-likelihood uncertainty; `broom`, `modelsummary`, and
   `texreg` support throughout.
