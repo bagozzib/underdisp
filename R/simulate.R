@@ -48,13 +48,8 @@
   km <- .gec_kmax_qr(rate, delta, max.support)
   as.numeric(gec_pmf_cpp(rate, delta, km, as.integer(max.support)))
 }
-.sim_pmf_count <- function(fam, mu, theta) {
-  kmax <- switch(fam$tag,
-    poisson = stats::qpois(1 - 1e-10, mu),
-    negbin  = stats::qnbinom(1 - 1e-10, mu = mu, size = theta),
-    compois = .compois_kmax(mu, theta))
-  fam$pvec(mu, theta, max(1L, as.integer(kmax)))
-}
+.sim_pmf_count <- function(fam, mu, theta)
+  fam$pvec(mu, theta, max(1L, as.integer(fam$kmax(mu, theta))))
 
 ## stats::simulate() conventions: nsim columns named sim_1.., a "seed" attribute,
 ## and the caller's RNG state restored when an explicit seed is supplied
@@ -116,7 +111,7 @@ NULL
 #' @method simulate cpb
 #' @export
 simulate.cpb <- function(object, nsim = 1, seed = NULL, ...) {
-  lam <- object$fitted.values; a <- object$alpha
+  lam <- .cpb_rate(object); a <- object$alpha
   ms  <- if (is.null(object$max.support)) 500L else object$max.support
   .sim_wrap(nsim, seed, function()
     .sim_from_pmf(object$n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms),
@@ -127,7 +122,7 @@ simulate.cpb <- function(object, nsim = 1, seed = NULL, ...) {
 #' @method simulate cpb_fe
 #' @export
 simulate.cpb_fe <- function(object, nsim = 1, seed = NULL, ...) {
-  lam <- object$fitted.values; a <- object$alpha
+  lam <- .cpb_rate(object); a <- object$alpha
   ms  <- if (is.null(object$max.support)) 500L else object$max.support
   .sim_wrap(nsim, seed, function()
     .sim_from_pmf(object$n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms),
@@ -245,7 +240,8 @@ fitted.cpb_fe <- function(object, ...) object$fitted.values
 #' @rdname fitted.underdisp
 #' @method fitted hurdle_cpb
 #' @export
-fitted.hurdle_cpb <- function(object, ...) object$p_full * object$lambda_full
+fitted.hurdle_cpb <- function(object, ...)
+  object$p_full * .cpb_ztmean(object$lambda_full, object$intensity$alpha)   # P(Y>0) * E(Y | Y>0)
 
 #' @rdname fitted.underdisp
 #' @method fitted hurdle_gec

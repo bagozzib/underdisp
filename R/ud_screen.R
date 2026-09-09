@@ -117,6 +117,8 @@
 #'   departures by construction and is the recommended choice in either
 #'   regime.
 #' @param ztp_boot_B Number of parametric-bootstrap replicates (default 199).
+#' @param cores Worker processes for the parametric-bootstrap replicates
+#'   (default 1); see [cpb()].
 #' @param digits Printing precision.
 #' @return An object of class `"ud_screen"` with `verdict_marginal`, `verdict_atrisk`,
 #'   the conditional and at-risk (ZTP-benchmarked) Pearson statistics, the NB-vs-Poisson
@@ -144,7 +146,7 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
                       run_gp = TRUE, run_comp = TRUE, comp_max_par = 30,
                       comp_max_n = 5000,
                       ztp_threshold = c("calibrated", "bootstrap"),
-                      ztp_boot_B = 199L, digits = 3) {
+                      ztp_boot_B = 199L, cores = 1L, digits = 3) {
   ztp_threshold <- match.arg(ztp_threshold)
   mf <- model.frame(formula, data, na.action = na.omit)
   y  <- model.response(mf)
@@ -176,11 +178,11 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
   ## threshold's size inflates with p/n_+ (the companion paper's App. B drift
   ## result), so the verdict is flagged and the bootstrap threshold recommended.
   atrisk_skipped <- FALSE; overconditioned <- NA; sat_ratio <- NA_real_
-  if (n_pos <= (k + 2)) {
+  if (n_pos <= (k + 2) || n_pos < 10L) {           # too few positives for an at-risk verdict
     atrisk_skipped <- TRUE; overconditioned <- TRUE
     sat_ratio <- k / max(n_pos, 1L)
   }
-  if (n_pos > (k + 2)) {
+  if (!atrisk_skipped) {
     used <- rownames(mf); data_pos <- data[used[pos], , drop = FALSE]
     ztp <- tryCatch(suppressWarnings(VGAM::vglm(formula, family = VGAM::pospoisson, data = data_pos)),
                     error = function(e) NULL)
@@ -240,15 +242,14 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
         mfz <- stats::model.frame(formula, data_pos)
         Xz  <- stats::model.matrix(attr(mfz, "terms"), mfz)
         p0  <- exp(-lam)
-        Tb  <- rep(NA_real_, ztp_boot_B)
-        for (b in seq_len(ztp_boot_B)) {
+        Tb <- unlist(.ud_lapply(seq_len(ztp_boot_B), function(b) {
           yb <- stats::qpois(p0 + stats::runif(n_pos) * (1 - p0), lam)
           fb <- .ztp_fisher_fit(Xz, yb, maxit = 500L)
-          if (is.null(fb) || !isTRUE(fb$converged)) next
-          if (max(fb$lam) > 20 * max(yb)) next
+          if (is.null(fb) || !isTRUE(fb$converged)) return(NA_real_)
+          if (max(fb$lam) > 20 * max(yb)) return(NA_real_)
           mb <- fb$lam / (1 - exp(-fb$lam)); vb <- mb * (1 + fb$lam - mb)
-          Tb[b] <- sum((yb - mb)^2 / vb) / (n_pos - fb$rank)
-        }
+          sum((yb - mb)^2 / vb) / (n_pos - fb$rank)
+        }, cores), use.names = FALSE)
         n_ok <- sum(is.finite(Tb))
         if (n_ok >= 0.8 * ztp_boot_B) {
           thr    <- as.numeric(stats::quantile(Tb, 0.05, na.rm = TRUE))

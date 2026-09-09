@@ -33,6 +33,8 @@
 #' @name cpb-distribution
 #' @export
 dcpb <- function(x, lambda, alpha, truncated = FALSE, log = FALSE) {
+  if (!length(x) || !length(lambda)) return(numeric(0))
+  if (length(alpha) != 1L) stop("'alpha' must be a single value.")
   n <- max(length(x), length(lambda)); x <- rep_len(x, n); lambda <- rep_len(lambda, n)
   out <- vapply(seq_len(n), function(i) {
     xi <- x[i]
@@ -46,6 +48,8 @@ dcpb <- function(x, lambda, alpha, truncated = FALSE, log = FALSE) {
 #' @rdname cpb-distribution
 #' @export
 pcpb <- function(q, lambda, alpha, truncated = FALSE, lower.tail = TRUE, log.p = FALSE) {
+  if (!length(q) || !length(lambda)) return(numeric(0))
+  if (length(alpha) != 1L) stop("'alpha' must be a single value.")
   n <- max(length(q), length(lambda)); q <- rep_len(q, n); lambda <- rep_len(lambda, n)
   out <- vapply(seq_len(n), function(i) {
     qi <- floor(q[i]); if (qi < 0) return(0)
@@ -59,6 +63,8 @@ pcpb <- function(q, lambda, alpha, truncated = FALSE, lower.tail = TRUE, log.p =
 #' @rdname cpb-distribution
 #' @export
 qcpb <- function(p, lambda, alpha, truncated = FALSE, lower.tail = TRUE, log.p = FALSE) {
+  if (!length(p) || !length(lambda)) return(numeric(0))
+  if (length(alpha) != 1L) stop("'alpha' must be a single value.")
   if (log.p) p <- exp(p); if (!lower.tail) p <- 1 - p
   n <- max(length(p), length(lambda)); p <- rep_len(p, n); lambda <- rep_len(lambda, n)
   vapply(seq_len(n), function(i) {
@@ -140,15 +146,20 @@ rzinbinom <- function(n, mu, pi, size)
 #' Generalized event count (Katz) distribution functions
 #'
 #' Density, distribution, quantile, and random generation for the King (1989)
-#' generalized event count model with rate `lambda` (the mean) and dispersion
-#' `delta` (the variance-to-mean ratio: `< 1` underdispersed, `= 1` Poisson,
-#' `> 1` overdispersed). Consistent with the estimator [gec()].
+#' generalized event count model with rate `lambda` and Katz dispersion
+#' `delta` (`< 1` underdispersed, `= 1` Poisson, `> 1` overdispersed).
+#' On an unbounded support (`delta >= 1`) the mean is `lambda` and the
+#' variance-to-mean ratio is `delta` exactly; for `delta < 1` the support is
+#' finite and the renormalized distribution's mean and variance equal those
+#' values only when `lambda/(1 - delta)` is an integer (the exact moments are
+#' finite sums of the pmf, as `count_reg()`'s siblings report them).
+#' Consistent with the estimator [gec()].
 #'
 #' @param x,q Vector of quantiles (non-negative integers).
 #' @param p Vector of probabilities.
 #' @param n Number of draws.
-#' @param lambda Rate/mean parameter (scalar or vector, recycled).
-#' @param delta Dispersion (variance-to-mean ratio).
+#' @param lambda Rate parameter (scalar or vector, recycled).
+#' @param delta Katz dispersion parameter (scalar).
 #' @param max.support Guard on the evaluated support.
 #' @param log,log.p Return log probabilities.
 #' @param lower.tail If `TRUE` (default), \eqn{P(X \le x)}.
@@ -161,6 +172,8 @@ rzinbinom <- function(n, mu, pi, size)
 #' @name gec-distribution
 #' @export
 dgec <- function(x, lambda, delta, max.support = 500, log = FALSE) {
+  if (!length(x) || !length(lambda)) return(numeric(0))
+  if (length(delta) != 1L) stop("'delta' must be a single value.")
   n <- max(length(x), length(lambda)); x <- rep_len(x, n); lambda <- rep_len(lambda, n)
   km <- max(0L, as.integer(max(x)))
   P <- gec_pmf_cpp(lambda, delta, km, as.integer(max.support))
@@ -170,6 +183,8 @@ dgec <- function(x, lambda, delta, max.support = 500, log = FALSE) {
 #' @rdname gec-distribution
 #' @export
 pgec <- function(q, lambda, delta, max.support = 500, lower.tail = TRUE, log.p = FALSE) {
+  if (!length(q) || !length(lambda)) return(numeric(0))
+  if (length(delta) != 1L) stop("'delta' must be a single value.")
   n <- max(length(q), length(lambda)); q <- rep_len(q, n); lambda <- rep_len(lambda, n)
   out <- vapply(seq_len(n), function(i) {
     qi <- floor(q[i]); if (qi < 0) return(0)
@@ -181,6 +196,8 @@ pgec <- function(q, lambda, delta, max.support = 500, lower.tail = TRUE, log.p =
 #' @rdname gec-distribution
 #' @export
 qgec <- function(p, lambda, delta, max.support = 500, lower.tail = TRUE, log.p = FALSE) {
+  if (!length(p) || !length(lambda)) return(numeric(0))
+  if (length(delta) != 1L) stop("'delta' must be a single value.")
   if (log.p) p <- exp(p); if (!lower.tail) p <- 1 - p
   n <- max(length(p), length(lambda)); p <- rep_len(p, n); lambda <- rep_len(lambda, n)
   vapply(seq_len(n), function(i) {
@@ -192,6 +209,8 @@ qgec <- function(p, lambda, delta, max.support = 500, lower.tail = TRUE, log.p =
 #' @rdname gec-distribution
 #' @export
 rgec <- function(n, lambda, delta, max.support = 500) {
+  if (n == 0) return(numeric(0))
+  if (length(delta) != 1L) stop("'delta' must be a single value.")
   lambda <- rep_len(lambda, n)
   vapply(seq_len(n), function(i) {
     km <- .gec_kmax_qr(lambda[i], delta, max.support)

@@ -3,11 +3,14 @@
 \name{implied_ceiling}
 \alias{implied_ceiling}
 \alias{implied_ceiling.cpb}
+\alias{implied_ceiling.cpb_fe}
 \title{Implied ceiling with a profile-likelihood interval}
 \usage{
 implied_ceiling(object, ...)
 
 \method{implied_ceiling}{cpb}(object, newdata = NULL, level = 0.95, ...)
+
+\method{implied_ceiling}{cpb_fe}(object, newdata = NULL, level = 0.95, ...)
 }
 \arguments{
 \item{object}{A \code{"cpb"} object.}

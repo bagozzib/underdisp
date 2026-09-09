@@ -25,8 +25,11 @@
 #' @param object A `"cpb"` object.
 #' @param newdata Optional data frame of new covariate profiles; if omitted, the
 #'   fitted data are used.
-#' @param type One of `"response"` (the mean lambda), `"link"` (the linear
-#'   predictor), `"ceiling"` (the implied ceiling lambda/(1-alpha)), or `"prob"`
+#' @param type One of `"response"` (the exact mean of the fitted distribution;
+#'   for a zero-truncated fit the conditional mean E(Y | Y >= 1)), `"rate"`
+#'   (the CPB rate parameter lambda = exp(x'b), which equals the mean only when
+#'   lambda/(1-alpha) is an integer), `"link"` (the linear predictor, log
+#'   lambda), `"ceiling"` (the implied ceiling lambda/(1-alpha)), or `"prob"`
 #'   (the probability that `Y` equals `at`).
 #' @param at For `type = "prob"`, the count value(s) `y` whose probability is
 #'   returned (length 1, or one per row of the prediction data).
@@ -44,7 +47,7 @@
 #' @method predict cpb
 #' @export
 predict.cpb <- function(object, newdata = NULL,
-                        type = c("response", "link", "ceiling", "prob"), at = NULL,
+                        type = c("response", "rate", "link", "ceiling", "prob"), at = NULL,
                         offset = NULL, ...) {
   type <- match.arg(type)
   if (is.null(newdata)) {
@@ -64,7 +67,8 @@ predict.cpb <- function(object, newdata = NULL,
   eta <- as.numeric(off + X %*% object$coefficients); lam <- exp(eta)
   switch(type,
     link     = eta,
-    response = lam,
+    rate     = lam,
+    response = .cpb_mean(lam, object$alpha, isTRUE(object$truncated)),
     ceiling  = lam / (1 - object$alpha),
     prob = {
       if (is.null(at)) stop("For type = \"prob\", supply 'at' (the count value y).")
@@ -98,13 +102,24 @@ implied_ceiling <- function(object, ...) UseMethod("implied_ceiling")
 #' @method implied_ceiling cpb
 #' @export
 implied_ceiling.cpb <- function(object, newdata = NULL, level = 0.95, ...) {
-  lam <- predict(object, newdata = newdata, type = "response")
+  lam <- predict(object, newdata = newdata, type = "rate")
   aci <- .cpb_alpha_profile_ci(object, level = level)
   data.frame(lambda  = lam,
              ceiling = lam / (1 - object$alpha),
              lower   = lam / (1 - aci["lower"]),
              upper   = lam / (1 - aci["upper"]),
              row.names = NULL)
+}
+
+#' @rdname implied_ceiling
+#' @method implied_ceiling cpb_fe
+#' @export
+implied_ceiling.cpb_fe <- function(object, newdata = NULL, level = 0.95, ...) {
+  ## the concentrated fit has no profile interval for alpha (the profile would
+  ## re-concentrate every unit effect at each alpha); the ceiling is reported
+  ## at the point estimate, at the average unit for newdata
+  lam <- predict(object, newdata = newdata, type = "rate")
+  data.frame(lambda = lam, ceiling = lam / (1 - object$alpha), row.names = NULL)
 }
 
 #' Profile-likelihood interval for the dispersion parameter alpha
@@ -128,7 +143,9 @@ alpha_confint <- function(object, level = 0.95) {
 
 #' Incidence rate ratios for a CPB fit
 #'
-#' @param object A `"cpb"` object fit with `se = "bootstrap"`.
+#' @param object A `"cpb"` object. With `se = "bootstrap"` at fit time the
+#'   ratios carry bootstrap percentile intervals; otherwise point estimates are
+#'   returned with `method = "none"`, as for every other `irr()` method.
 #' @param level Confidence level (default 0.95).
 #' @return A `"ud_irr"` data frame -- the package-wide rate-ratio contract
 #'   (columns `term`, `equation`, `ratio`, `estimate`, `lower`, `upper`,
@@ -149,7 +166,8 @@ irr <- function(object, ...) UseMethod("irr")
 #' @method irr cpb
 #' @export
 irr.cpb <- function(object, level = 0.95, ...) {
-  if (is.null(object$boot)) stop("Bootstrap required; refit with se = \"bootstrap\".")
+  if (is.null(object$boot))
+    return(.ud_irr_wald(object$coefficients, NULL, level, "count", "IRR"))
   ok <- object$boot[complete.cases(object$boot), , drop = FALSE]
   a  <- (1 - level) / 2
   ci <- t(apply(ok[, 1:object$p, drop = FALSE], 2, function(col) quantile(exp(col), c(a, 1 - a))))
@@ -158,16 +176,19 @@ irr.cpb <- function(object, level = 0.95, ...) {
           method = "bootstrap (stored)")
 }
 
-#' King-style first difference for a CPB fit
+#' First difference for a CPB fit
 #'
 #' The effect on a quantity of interest of moving one covariate `from` one value `to`
-#' another, holding the other covariates at their means, with a bootstrap percentile
-#' interval (Tomz, Wittenberg & King style, using the model's bootstrap draws).
+#' another, holding the other covariates at their means, with a percentile
+#' interval from the model's bootstrap draws when the fit carries them.
 #'
-#' @param object A `"cpb"` object fit with `se = "bootstrap"`.
+#' @param object A `"cpb"` object. With `se = "bootstrap"` at fit time the
+#'   difference carries a bootstrap percentile interval; otherwise the point
+#'   estimate is returned with `method = "none"`.
 #' @param variable Name of a model-matrix column to vary.
 #' @param from,to The two values of `variable` to contrast.
-#' @param quantity `"mean"` (E(Y)), `"ceiling"` (lambda/(1-alpha)), or `"prob"`
+#' @param quantity `"mean"` (E(Y); for a zero-truncated fit the conditional
+#'   mean E(Y | Y >= 1)), `"ceiling"` (lambda/(1-alpha)), or `"prob"`
 #'   (P(Y = `y`)).
 #' @param y The count value for `quantity = "prob"`.
 #' @param level Confidence level (default 0.95).
@@ -194,15 +215,16 @@ first_difference.cpb <- function(object, variable, from, to,
                              quantity = c("mean", "ceiling", "prob"), y = NULL,
                              level = 0.95, ...) {
   .fd_dots(...); quantity <- match.arg(quantity)
-  if (is.null(object$boot)) stop("Bootstrap draws required; refit with se = \"bootstrap\".")
   if (!variable %in% colnames(object$X))
     stop("'variable' must name a model-matrix column: ",
          paste(colnames(object$X), collapse = ", "))
+  .fd_check_terms(variable, colnames(object$X))
+  off <- if (is.null(object$offset)) 0 else mean(object$offset)   # offset held at its mean
   x0 <- colMeans(object$X); xf <- x0; xt <- x0
   xf[variable] <- from; xt[variable] <- to
   qfun <- function(beta, alpha) {
-    lf <- exp(sum(xf * beta)); lt <- exp(sum(xt * beta))
-    if (quantity == "mean")         c(lf, lt)
+    lf <- exp(off + sum(xf * beta)); lt <- exp(off + sum(xt * beta))
+    if (quantity == "mean")         .cpb_mean(c(lf, lt), alpha, isTRUE(object$truncated))
     else if (quantity == "ceiling") c(lf / (1 - alpha), lt / (1 - alpha))
     else {
       if (is.null(y)) stop("quantity = \"prob\" requires 'y'.")
@@ -211,6 +233,8 @@ first_difference.cpb <- function(object, variable, from, to,
     }
   }
   pt  <- qfun(object$coefficients, object$alpha)
+  if (is.null(object$boot))
+    return(.ud_fd(component = quantity, from = pt[1], to = pt[2]))
   ok  <- object$boot[complete.cases(object$boot), , drop = FALSE]
   fdb <- apply(ok, 1, function(r) { q <- qfun(r[1:object$p], r[object$p + 1]); q[2] - q[1] })
   a   <- (1 - level) / 2

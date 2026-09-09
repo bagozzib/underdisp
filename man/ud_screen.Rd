@@ -15,6 +15,7 @@ ud_screen(
   comp_max_n = 5000,
   ztp_threshold = c("calibrated", "bootstrap"),
   ztp_boot_B = 199L,
+  cores = 1L,
   digits = 3
 )
 }
@@ -58,6 +59,9 @@ departures by construction and is the recommended choice in either
 regime.}
 
 \item{ztp_boot_B}{Number of parametric-bootstrap replicates (default 199).}
+
+\item{cores}{Worker processes for the parametric-bootstrap replicates
+(default 1); see \code{\link[=cpb]{cpb()}}.}
 
 \item{digits}{Printing precision.}
 }

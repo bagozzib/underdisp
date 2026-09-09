@@ -16,8 +16,18 @@
 
 #' @method implied_ceiling hurdle_cpb
 #' @export
-implied_ceiling.hurdle_cpb <- function(object, newdata = NULL, level = 0.95, ...)
-  implied_ceiling(object$intensity, newdata = newdata, level = level)
+implied_ceiling.hurdle_cpb <- function(object, newdata = NULL, level = 0.95, ...) {
+  ## the intensity's ceiling applies to every observation (the stored intensity
+  ## rate is full-length), not only to the positives the intensity was fit on
+  int <- object$intensity
+  lam <- if (is.null(newdata)) object$lambda_full else predict(int, newdata = newdata, type = "rate")
+  out <- data.frame(lambda = lam, ceiling = lam / (1 - int$alpha), row.names = NULL)
+  if (inherits(int, "cpb")) {                         # a profile interval exists for the pooled intensity
+    aci <- .cpb_alpha_profile_ci(int, level = level)
+    out$lower <- lam / (1 - aci["lower"]); out$upper <- lam / (1 - aci["upper"])
+  }
+  out
+}
 
 #' @method implied_ceiling zi_cpb
 #' @export
@@ -39,8 +49,12 @@ irr.hurdle_cpb <- function(object, level = 0.95, ...) {
 #' @method irr zi_cpb
 #' @export
 irr.zi_cpb <- function(object, level = 0.95, ...)
-  rbind(.ud_irr_wald(object$coefficients, NULL, level, "count", "IRR"),
-        .ud_irr_wald(object$zero_coef,   NULL, level, "binary", "OR"))
+  rbind(.ud_irr_wald(object$coefficients,
+                     if (!is.null(object$se.beta) && all(is.finite(object$se.beta))) object$se.beta else NULL,
+                     level, "count", "IRR", method = "bootstrap (normal)"),
+        .ud_irr_wald(object$zero_coef,
+                     if (!is.null(object$se.zero) && all(is.finite(object$se.zero))) object$se.zero else NULL,
+                     level, "inflation", "OR", method = "bootstrap (normal)"))
 
 ## --- first-difference decompositions --------------------------------------
 
@@ -48,6 +62,7 @@ irr.zi_cpb <- function(object, level = 0.95, ...)
   a <- fit$intensity$alpha
   inx <- variable %in% names(fit$int_xref); inz <- variable %in% names(fit$part_xref)
   if (!inx && !inz) stop("'variable' is in neither the intensity nor the participation equation.")
+  .fd_check_terms(variable, c(names(fit$int_xref), names(fit$part_xref)))
   build <- function(v) {
     xr <- fit$int_xref; zr <- fit$part_xref
     if (inx && stage %in% c("both", "intensity", "count"))        xr[variable] <- v
@@ -65,6 +80,7 @@ irr.zi_cpb <- function(object, level = 0.95, ...)
   a <- fit$alpha
   inx <- variable %in% names(fit$int_xref); inz <- variable %in% names(fit$zero_xref)
   if (!inx && !inz) stop("'variable' is in neither the count nor the inflation equation.")
+  .fd_check_terms(variable, c(names(fit$int_xref), names(fit$zero_xref)))
   build <- function(v) {
     xr <- fit$int_xref; zr <- fit$zero_xref
     if (inx && stage %in% c("both", "intensity", "count"))    xr[variable] <- v
@@ -78,12 +94,12 @@ irr.zi_cpb <- function(object, level = 0.95, ...)
          from = build(from), to = build(to))
 }
 
-.boot_diff <- function(refit, decomp, data, variable, from, to, B, level, stage = "both") {
+.boot_diff <- function(refit, decomp, data, variable, from, to, B, level, stage = "both", cores = 1L) {
   n <- nrow(data); a <- (1 - level) / 2
-  D <- vapply(seq_len(B), function(b) {
+  D <- do.call(cbind, .ud_lapply(seq_len(B), function(b) {
     f2 <- tryCatch(refit(data[sample(n, replace = TRUE), , drop = FALSE]), error = function(e) NULL)
     if (is.null(f2)) rep(NA_real_, 3) else decomp(f2, variable, from, to, stage)$diff
-  }, numeric(3))
+  }, cores))
   list(lower = apply(D, 1, stats::quantile, a, na.rm = TRUE),
        upper = apply(D, 1, stats::quantile, 1 - a, na.rm = TRUE))
 }
@@ -107,6 +123,7 @@ irr.zi_cpb <- function(object, level = 0.95, ...)
 #'   the binary stage only (`"participation"`/`"zero"`), or the count stage
 #'   only (`"intensity"`/`"count"`), holding the covariate at its reference in
 #'   the other equation. All three component rows are always returned.
+#' @param cores Worker processes for the bootstrap refits (default 1); see [cpb()].
 #' @param ... Unused; unknown arguments error.
 #' @return A `"ud_fd"` data frame (the package-wide first-difference contract):
 #'   columns `component`, `from`, `to`, `diff`, `lower`, `upper`, `method`,
@@ -115,14 +132,14 @@ irr.zi_cpb <- function(object, level = 0.95, ...)
 #' @export
 first_difference.hurdle_cpb <- function(object, variable, from, to, B = 0, level = 0.95,
                                         data = NULL, stage = c("both", "participation",
-                                        "intensity", "zero", "count"), ...) {
+                                        "intensity", "zero", "count"), cores = 1L, ...) {
   .fd_dots(...); stage <- match.arg(stage)
   pt <- .hurdle_decomp(object, variable, from, to, stage)
   if (B > 0) {
     if (is.null(data)) stop("Bootstrap (B > 0) requires the original 'data'.")
     refit <- function(d) hurdle_cpb(object$formula, data = d,
                                     participation = object$part_formula, se = "none")
-    ci <- .boot_diff(refit, .hurdle_decomp, data, variable, from, to, B, level, stage)
+    ci <- .boot_diff(refit, .hurdle_decomp, data, variable, from, to, B, level, stage, cores)
     pt$lower <- ci$lower; pt$upper <- ci$upper
     pt$method <- sprintf("bootstrap (refit, B=%d)", B)
   }
@@ -134,13 +151,13 @@ first_difference.hurdle_cpb <- function(object, variable, from, to, B = 0, level
 #' @export
 first_difference.zi_cpb <- function(object, variable, from, to, B = 0, level = 0.95,
                                     data = NULL, stage = c("both", "participation",
-                                    "intensity", "zero", "count"), ...) {
+                                    "intensity", "zero", "count"), cores = 1L, ...) {
   .fd_dots(...); stage <- match.arg(stage)
   pt <- .zi_decomp(object, variable, from, to, stage)
   if (B > 0) {
     if (is.null(data)) stop("Bootstrap (B > 0) requires the original 'data'.")
     refit <- function(d) zi_cpb(object$formula, data = d, zero = object$zero_formula)
-    ci <- .boot_diff(refit, .zi_decomp, data, variable, from, to, B, level, stage)
+    ci <- .boot_diff(refit, .zi_decomp, data, variable, from, to, B, level, stage, cores)
     pt$lower <- ci$lower; pt$upper <- ci$upper
     pt$method <- sprintf("bootstrap (refit, B=%d)", B)
   }

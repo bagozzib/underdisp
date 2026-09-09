@@ -27,7 +27,7 @@ double cpb_nll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, Numer
     for (int j = 0; j < p; j++) eta += X(i, j) * params[j];
     double lam = std::exp(eta);
     double ni  = lam / (1.0 - alpha);
-    int Ki = (int)std::floor(ni);
+    int Ki = (int)std::floor(ni + 1e-9);   // tolerance: exp(log(5))/0.5 must give 10, not 9
     if (Y[i] > Ki) return 1e10;            // observation exceeds implied ceiling
     if (Ki > max_support) return 1e10;     // alpha ~ 1 guard
 
@@ -35,13 +35,15 @@ double cpb_nll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, Numer
     double g = lgni1;                       // g_k = lgamma(ni - k + 1); g_0 = lgamma(ni+1)
     double mx = -1e300;
     lw.assign(Ki + 1, 0.0);
-    for (int k = 0; k <= Ki; k++) {
+    int kend = Ki;                          // the terms are unimodal in k: stop 36 log
+    for (int k = 0; k <= Ki; k++) {         // units past the mode (and past y)
       if (k > 0) g -= std::log(ni - k + 1.0);
       lw[k] = lgni1 - lf[k] - g + k * l1a + (ni - k) * la;
       if (lw[k] > mx) mx = lw[k];
+      else if (k >= Y[i] && lw[k] < mx - 36.0) { kend = k; break; }
     }
     double s = 0.0;
-    for (int k = 0; k <= Ki; k++) s += std::exp(lw[k] - mx);
+    for (int k = 0; k <= kend; k++) s += std::exp(lw[k] - mx);
     double logD = mx + std::log(s);
 
     double contrib = lw[Y[i]] - logD;                 // log P(Y_i = y_i)
@@ -71,13 +73,15 @@ double cpb_wnll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y,
   for (int i = 0; i < n; i++) {
     double eta = offset[i]; for (int j = 0; j < p; j++) eta += X(i, j) * params[j];
     double lam = std::exp(eta), ni = lam / (1.0 - alpha);
-    int Ki = (int)std::floor(ni);
+    int Ki = (int)std::floor(ni + 1e-9);
     if (Y[i] > Ki || Ki > max_support) return 1e10;
     double lgni1 = R::lgammafn(ni + 1.0), g = lgni1, mx = -1e300;
     lw.assign(Ki + 1, 0.0);
+    int kend = Ki;                          // unimodal terms: stop 36 log units past the mode (and y)
     for (int k = 0; k <= Ki; k++) { if (k > 0) g -= std::log(ni - k + 1.0);
-      lw[k] = lgni1 - lf[k] - g + k * l1a + (ni - k) * la; if (lw[k] > mx) mx = lw[k]; }
-    double s = 0.0; for (int k = 0; k <= Ki; k++) s += std::exp(lw[k] - mx);
+      lw[k] = lgni1 - lf[k] - g + k * l1a + (ni - k) * la; if (lw[k] > mx) mx = lw[k];
+      else if (k >= Y[i] && lw[k] < mx - 36.0) { kend = k; break; } }
+    double s = 0.0; for (int k = 0; k <= kend; k++) s += std::exp(lw[k] - mx);
     double logD = mx + std::log(s);
     double contrib = lw[Y[i]] - logD;
     if (truncated) { double e = std::exp(lw[0] - logD); if (e >= 1.0 - 1e-15) return 1e10;
@@ -102,13 +106,15 @@ NumericMatrix cpb_lp0_cpp(NumericVector params, NumericMatrix X, IntegerVector Y
   for (int i = 0; i < n; i++) {
     double eta = offset[i]; for (int j = 0; j < p; j++) eta += X(i, j) * params[j];
     double lam = std::exp(eta), ni = lam / (1.0 - alpha);
-    int Ki = (int)std::floor(ni);
+    int Ki = (int)std::floor(ni + 1e-9);
     if (Ki > max_support || Y[i] > Ki) { out(i, 0) = -1e300; out(i, 1) = 0.0; continue; }
     double lgni1 = R::lgammafn(ni + 1.0), g = lgni1, mx = -1e300;
     lw.assign(Ki + 1, 0.0);
+    int kend = Ki;                          // unimodal terms: stop 36 log units past the mode (and y)
     for (int k = 0; k <= Ki; k++) { if (k > 0) g -= std::log(ni - k + 1.0);
-      lw[k] = lgni1 - lf[k] - g + k * l1a + (ni - k) * la; if (lw[k] > mx) mx = lw[k]; }
-    double s = 0.0; for (int k = 0; k <= Ki; k++) s += std::exp(lw[k] - mx);
+      lw[k] = lgni1 - lf[k] - g + k * l1a + (ni - k) * la; if (lw[k] > mx) mx = lw[k];
+      else if (k >= Y[i] && lw[k] < mx - 36.0) { kend = k; break; } }
+    double s = 0.0; for (int k = 0; k <= kend; k++) s += std::exp(lw[k] - mx);
     double logD = mx + std::log(s);
     double lp = lw[Y[i]] - logD, p0 = std::exp(lw[0] - logD);
     if (truncated) { if (p0 >= 1.0 - 1e-15) lp = -1e300; else lp -= std::log1p(-p0); }

@@ -13,7 +13,9 @@ cpb_fe(
   B = 500,
   cluster = NULL,
   offset = NULL,
-  max.support = 500L,
+  weights = NULL,
+  cores = 1L,
+  max.support = NULL,
   inner_it = 30L,
   maxit = 3000L,
   reltol = 1e-07,
@@ -48,9 +50,16 @@ likelihood treats them as distinct units.}
 \item{offset}{Optional offset on the log-mean scale (an exposure): a numeric
 vector or the name of a column in \code{data}.}
 
-\item{max.support}{Guard on the maximum evaluated support.}
+\item{weights}{Optional frequency weights (a numeric vector or a column name);
+see \code{\link[=cpb]{cpb()}}.}
 
-\item{inner_it}{Golden-section iterations for each unit's inner maximization.}
+\item{cores}{Worker processes for the bootstrap; see \code{\link[=cpb]{cpb()}}.}
+
+\item{max.support}{Guard on the maximum evaluated support; \code{NULL} (default)
+sets \code{max(500, 10 * max(y))}. See \code{\link[=cpb]{cpb()}}.}
+
+\item{inner_it}{Golden-section iterations refining each unit's inner
+maximization after the grid scans (see Details).}
 
 \item{maxit, reltol}{Outer optimizer controls.}
 
@@ -68,7 +77,24 @@ out the unit intercepts. Each unit's intercept is solved by a one-dimensional
 inner maximization, so the outer optimizer handles only the covariate coefficients
 and the dispersion parameter. This avoids an explicit unit-dummy design matrix and
 scales to thousands of units, where dummy-based fitting exhausts memory. The
-concentrated log-likelihood equals the full-dummy log-likelihood exactly.
+concentrated log-likelihood equals the full-dummy log-likelihood to the
+tolerance of the inner search, which is solved exactly. Each unit's objective
+is a saw-tooth in its intercept: whenever the intercept crosses
+\eqn{\log(k(1-\alpha)) - o_{it}} for an integer \eqn{k} the support of
+observation \eqn{t} gains the point \eqn{k}, its normalizing constant grows,
+and the objective drops by about \eqn{(1-\alpha)^k}; between such
+breakpoints it is smooth and unimodal. Its supremum is therefore attained at
+an interior critical point of one tooth or as the left limit at a breakpoint,
+and the inner search evaluates every breakpoint within a window of the
+envelope's peak (located on a coarse grid around the unit's Poisson intercept)
+and refines inside whole teeth by golden section; every evaluation of the
+concentrated likelihood searches each unit afresh, so the objective is a
+function of the parameters alone. Solving the inner problem to its supremum
+makes the concentrated likelihood smooth in \code{alpha} and continuous in the
+slopes, so the outer optimizer (BFGS with the analytic envelope gradient from
+the Poisson slopes and two dispersion starts, polished by Nelder-Mead) is
+reliable; the solution is
+re-evaluated with every unit searched from cold before it is returned.
 }
 \details{
 Short panels: the dispersion parameter \code{alpha} and the fixed effects are subject to

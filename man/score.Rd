@@ -17,7 +17,10 @@ evaluated on these rows; fixed-effect units unseen in training fall back to
 the mean fixed effect. Offsets are assumed absent on \code{newdata}.}
 
 \item{kmax}{Highest count to evaluate; defaults to the maximum observed count
-in the fitting data.}
+in the fitting data, raised to the maximum held-out count when \code{newdata}
+contains larger values. Predicted probabilities are floored at 1e-12 in
+the log score, so an observation outside a hard-ceiling model's support
+contributes 27.6 to it.}
 }
 \value{
 A named numeric vector \code{c(logscore, rps)}.

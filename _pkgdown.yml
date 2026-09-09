@@ -1,0 +1,131 @@
+url: https://bagozzib.github.io/underdisp/
+
+template:
+  bootstrap: 5
+  bslib:
+    primary: "#2C3E50"
+
+home:
+  title: "underdisp: Diagnostics and Models for Underdispersed Count Data"
+  description: >
+    Detect and model underdispersion in count data: a zero-truncated-Poisson
+    at-risk screen, regression-adjusted dispersion tests and profiles, the
+    continuous parameter binomial and generalized event count families with
+    high-dimensional fixed effects, matched Poisson, negative binomial,
+    COM-Poisson, generalized Poisson, gamma-count and double Poisson
+    regressions, hurdle and zero-inflated forms, proper scores, and one set
+    of quantities of interest for every model.
+
+navbar:
+  structure:
+    left: [intro, reference, articles, news]
+    right: [search, github]
+  components:
+    intro:
+      text: Get started
+      href: articles/underdisp.html
+    articles:
+      text: Articles
+      menu:
+        - text: Getting started with underdisp
+          href: articles/underdisp.html
+
+reference:
+  - title: Package overview
+    contents:
+      - underdisp-package
+  - title: Screening and diagnostics
+    contents:
+      - ud_screen
+      - compare_dispersion
+      - dispersion_test
+      - dispersion_profile
+      - zi_test
+      - rootogram
+      - pit_hist
+  - title: Estimators
+    desc: >
+      One formula interface, one class per model, one set of methods.
+    contents:
+      - cpb
+      - gec
+      - count_reg
+  - title: High-dimensional fixed effects
+    contents:
+      - cpb_fe
+      - gec_fe
+  - title: Hurdle models
+    contents:
+      - hurdle_cpb
+      - hurdle_gec
+      - hurdle_count
+  - title: Zero-inflated models
+    contents:
+      - zi_cpb
+      - zi_gec
+      - zi_count
+  - title: Inference and summaries
+    contents:
+      - summary.cpb
+      - confint.cpb
+      - confint.underdisp
+      - alpha_confint
+      - vcov.cpb_fe
+      - fitted.underdisp
+  - title: Predictions
+    contents:
+      - predict.cpb
+      - predict.cpb_fe
+      - predict.gec
+      - predict.count_reg
+      - predict.hurdle_cpb
+      - predict.hurdle_gec
+      - predict.hurdle_count
+      - predict.zi_cpb
+      - predict.zi_gec
+      - predict.zi_count
+  - title: Quantities of interest
+    contents:
+      - first_difference
+      - first_difference.count
+      - first_difference.hurdle_cpb
+      - implied_ceiling
+      - irr
+      - irr.count
+  - title: Model comparison and scoring
+    contents:
+      - compare_models
+      - score
+      - cv_score
+  - title: Panel tools
+    contents:
+      - mundlak
+  - title: Simulation and distribution functions
+    contents:
+      - simulate.underdisp
+      - cpb-distribution
+      - rcpb
+      - rhurdle_cpb
+      - rzicpb
+      - gec-distribution
+      - compois-distribution
+      - gammacount-distribution
+      - doublepois-distribution
+      - genpois-distribution
+  - title: broom methods
+    contents:
+      - tidy.cpb
+      - glance.cpb
+      - augment.cpb
+  - title: Data
+    contents:
+      - peacekeeping
+
+articles:
+  - title: Using underdisp
+    navbar: ~
+    contents:
+      - underdisp
+
+news:
+  one_page: true

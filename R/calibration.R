@@ -8,7 +8,7 @@
 ## core, so the numerics cannot drift apart. kcap bounds the allocation against
 ## a pathological ceiling (alpha -> 1); at 1e5 it never binds in real use.
 .cpb_pmf_core <- function(lambda, alpha, kcap = 100000L) {
-  nn <- lambda / (1 - alpha); K <- min(floor(nn), kcap); k <- 0:K
+  nn <- lambda / (1 - alpha); K <- min(floor(nn + 1e-9), kcap); k <- 0:K   # tolerance matches the C++ core
   lw <- lgamma(nn + 1) - lgamma(k + 1) - lgamma(nn - k + 1) +
         k * log(1 - alpha) + (nn - k) * log(alpha)
   pr <- exp(lw - max(lw))
@@ -28,6 +28,26 @@
   out <- numeric(kmax + 1); m <- min(K + 1, kmax + 1); out[seq_len(m)] <- pr[seq_len(m)]
   out
 }
+
+## Exact moments of the (possibly zero-truncated) CPB at rate lambda from its
+## normalized pmf. The CPB is a binomial with non-integer N = lambda/(1-alpha)
+## renormalized over 0..floor(N), so its mean equals lambda and its variance
+## alpha*lambda only when N is an integer; the fitted mean, the residuals, the
+## first differences, and the dispersion profile all use the exact values.
+.cpb_moments <- function(lambda, alpha, truncated = FALSE) {
+  out <- vapply(lambda, function(l) {
+    pr <- .cpb_pmf_core(l, alpha); k <- seq_along(pr) - 1
+    if (truncated) { if (length(pr) < 2L) return(c(1, 0)); pr[1] <- 0; pr <- pr / sum(pr) }
+    m <- sum(k * pr); c(m, max(sum(k * k * pr) - m * m, 0))
+  }, numeric(2))
+  list(mean = out[1, ], var = out[2, ])
+}
+.cpb_mean <- function(lambda, alpha, truncated = FALSE) .cpb_moments(lambda, alpha, truncated)$mean
+## conditional mean E(Y | Y >= 1) at rate lambda
+.cpb_ztmean <- function(lambda, alpha) .cpb_mean(lambda, alpha, TRUE)
+
+## the CPB rate of a fit: stored as $rate; older objects carry it in fitted.values
+.cpb_rate <- function(fit) if (!is.null(fit$rate)) fit$rate else fit$fitted.values
 
 ## internal: observed y and an n x (kmax+1) predicted-pmf matrix for a fit
 .pmf_and_y <- function(fit, kmax) {
@@ -50,7 +70,7 @@
     y <- fit$y
   } else if (inherits(fit, "hurdle_gec")) {
     U <- gec_pmf_cpp(fit$lambda_full, fit$delta, kmax, fit$max.support)
-    U[, 1] <- 0; U <- U / pmax(rowSums(U), 1e-12)   # zero-truncate the intensity
+    p0 <- U[, 1]; U[, 1] <- 0; U <- U / pmax(1 - p0, 1e-12)   # zero-truncate over the full support
     P <- U * fit$p_full; P[, 1] <- 1 - fit$p_full
     y <- fit$y
   } else if (inherits(fit, "zi_gec")) {
@@ -58,24 +78,23 @@
     P <- U * (1 - fit$pi_full); P[, 1] <- fit$pi_full + (1 - fit$pi_full) * U[, 1]
     y <- fit$y
   } else if (inherits(fit, "cpb")) {
-    y <- fit$Y
-    lambda <- as.numeric(exp(fit$X %*% fit$coefficients))
-    P <- t(vapply(lambda, .cpb_pmf1, numeric(kmax + 1),
+    y <- fit$Y                                   # the stored rate carries the offset
+    P <- t(vapply(.cpb_rate(fit), .cpb_pmf1, numeric(kmax + 1),
                   alpha = fit$alpha, kmax = kmax, truncated = isTRUE(fit$truncated)))
   } else if (inherits(fit, "cpb_fe")) {
-    y <- fit$Y                                   # fitted.values already carry the fixed effects
-    P <- t(vapply(fit$fitted.values, .cpb_pmf1, numeric(kmax + 1),
+    y <- fit$Y                                   # the rate already carries the fixed effects
+    P <- t(vapply(.cpb_rate(fit), .cpb_pmf1, numeric(kmax + 1),
                   alpha = fit$alpha, kmax = kmax, truncated = isTRUE(fit$truncated)))
   } else if (inherits(fit, "gec_fe")) {
     y <- fit$Y                                   # rate already carries the fixed effects
     P <- gec_pmf_cpp(fit$rate, fit$delta, kmax, fit$max.support)
   } else if (inherits(fit, "gec")) {
-    y <- fit$Y
-    P <- gec_pmf_cpp(as.numeric(exp(fit$X %*% fit$coefficients)), fit$delta, kmax, fit$max.support)
+    y <- fit$Y                                   # the linear predictor carries the offset
+    P <- gec_pmf_cpp(as.numeric(exp(fit$linear.predictors)), fit$delta, kmax, fit$max.support)
   } else if (inherits(fit, "hurdle_count")) {
     fam <- .count_fam(fit$family)
     P <- t(mapply(function(pi, li) {
-      zt <- fam$pvec(li, fit$theta, kmax); zt[1] <- 0; zt <- zt / max(sum(zt), 1e-12)
+      zt <- fam$pvec(li, fit$theta, kmax); zt[1] <- 0; zt <- zt / max(1 - fam$p0(li, fit$theta), 1e-12)
       row <- pi * zt; row[1] <- 1 - pi; row
     }, fit$p_full, fit$lambda_full))
     y <- fit$y
@@ -184,8 +203,9 @@
   } else if (inherits(fit, "hurdle_count")) {
     fam  <- .count_fam(fit$family)
     p    <- as.numeric(stats::predict(fit$participation, newdata = newdata, type = "response"))
-    lam  <- as.numeric(predict(fit$intensity, newdata = newdata, type = "response"))
-    P <- t(mapply(function(pi, li) { zt <- fam$pvec(li, fit$theta, kmax); zt[1] <- 0; zt <- zt / max(sum(zt), 1e-12)
+    lam  <- exp(as.numeric(predict(fit$intensity, newdata = newdata, type = "link")))   # natural parameter
+    P <- t(mapply(function(pi, li) { zt <- fam$pvec(li, fit$theta, kmax); zt[1] <- 0
+                                     zt <- zt / max(1 - fam$p0(li, fit$theta), 1e-12)
                                      row <- pi * zt; row[1] <- 1 - pi; row }, p, lam))
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "zi_count")) {
@@ -199,12 +219,13 @@
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "gec_fe")) {                  # check before "gec": gec_fe inherits gec
     Tm  <- stats::delete.response(stats::terms(fit$formula))
-    X   <- stats::model.matrix(Tm, newdata)[, names(fit$coefficients), drop = FALSE]
+    X   <- stats::model.matrix(Tm, newdata, xlev = fit$levels)[, names(fit$coefficients), drop = FALSE]
     fe  <- fit$fe[as.character(newdata[[fit$fe_var]])]; fe[is.na(fe)] <- mean(fit$fe)
     P   <- gec_pmf_cpp(as.numeric(exp(fe + X %*% fit$coefficients)), fit$delta, kmax, fit$max.support)
     y   <- yof(fit$formula)
   } else if (inherits(fit, "gec")) {
-    X   <- stats::model.matrix(stats::delete.response(fit$terms), newdata)
+    X   <- stats::model.matrix(stats::delete.response(fit$terms), newdata, xlev = fit$levels,
+                               contrasts.arg = fit$contrasts)
     lam <- as.numeric(exp(X[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
     P   <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support)
     y   <- yof(fit$terms)
@@ -212,7 +233,7 @@
     p    <- as.numeric(stats::predict(fit$participation, newdata = newdata, type = "response"))
     Xall <- stats::model.matrix(stats::delete.response(stats::terms(fit$formula)), newdata)
     lam  <- as.numeric(exp(Xall[, names(fit$int_beta), drop = FALSE] %*% fit$int_beta))
-    U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support); U[, 1] <- 0; U <- U / pmax(rowSums(U), 1e-12)
+    U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support); p0 <- U[, 1]; U[, 1] <- 0; U <- U / pmax(1 - p0, 1e-12)
     P <- U * p; P[, 1] <- 1 - p
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "zi_gec")) {
@@ -252,7 +273,10 @@
 #'   evaluated on these rows; fixed-effect units unseen in training fall back to
 #'   the mean fixed effect. Offsets are assumed absent on `newdata`.
 #' @param kmax Highest count to evaluate; defaults to the maximum observed count
-#'   in the fitting data.
+#'   in the fitting data, raised to the maximum held-out count when `newdata`
+#'   contains larger values. Predicted probabilities are floored at 1e-12 in
+#'   the log score, so an observation outside a hard-ceiling model's support
+#'   contributes 27.6 to it.
 #' @return A named numeric vector `c(logscore, rps)`.
 #' @seealso [cv_score()]
 #' @examples
@@ -264,6 +288,10 @@
 score <- function(fit, newdata = NULL, kmax = NULL) {
   if (is.null(kmax)) kmax <- max(.obs_counts(fit))
   pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax)
+  if (max(pu$y) > kmax) {                       # held-out counts above the in-sample maximum
+    kmax <- max(pu$y)
+    pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax)
+  }
   y <- pu$y; P <- pu$P
   yk <- pmin(y, kmax)
   py <- P[cbind(seq_along(y), yk + 1L)]
@@ -296,6 +324,7 @@ score <- function(fit, newdata = NULL, kmax = NULL) {
 #' @param folds Optional integer vector of length `nrow(data)` giving a fixed
 #'   fold assignment (so two models can be scored on identical folds). If `NULL`,
 #'   folds are drawn at random.
+#' @param cores Worker processes for the fold refits (default 1); see [cpb()].
 #' @return An object of class `"cv_score"`: a list with the mean held-out
 #'   `logscore` and `rps`, the per-observation vectors `logscore_i`/`rps_i`, and
 #'   the `folds` used.
@@ -308,7 +337,7 @@ score <- function(fit, newdata = NULL, kmax = NULL) {
 #' cv$logscore
 #' }
 #' @export
-cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL) {
+cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L) {
   n <- nrow(data)
   if (is.null(folds)) folds <- sample(rep(seq_len(k), length.out = n))
   if (length(folds) != n) stop("'folds' must have length nrow(data).")
@@ -317,16 +346,19 @@ cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL) {
     kmax <- max(.obs_counts(f0))
   }
   ls_i <- rps_i <- rep(NA_real_, n)
-  for (kk in sort(unique(folds))) {
+  one <- function(kk) {
     idx <- which(folds == kk)
     fit <- tryCatch(fitfun(data[-idx, , drop = FALSE]), error = function(e) NULL)
-    if (is.null(fit)) { warning("fold ", kk, " fit failed; its rows are dropped."); next }
+    if (is.null(fit)) return(list(idx = idx, msg = paste0("fold ", kk, " fit failed; its rows are dropped.")))
     pu <- tryCatch(.pmf_and_y_newdata(fit, data[idx, , drop = FALSE], kmax), error = function(e) NULL)
-    if (is.null(pu)) { warning("fold ", kk, " scoring failed; its rows are dropped."); next }
+    if (is.null(pu)) return(list(idx = idx, msg = paste0("fold ", kk, " scoring failed; its rows are dropped.")))
     y <- pu$y; P <- pu$P; yk <- pmin(y, kmax)
-    ls_i[idx]  <- -log(pmax(P[cbind(seq_along(y), yk + 1L)], 1e-12))
     cdf <- t(apply(P, 1, cumsum)); ind <- outer(yk, 0:kmax, function(a, b) as.numeric(a <= b))
-    rps_i[idx] <- rowSums((cdf - ind)^2)
+    list(idx = idx, ls = -log(pmax(P[cbind(seq_along(y), yk + 1L)], 1e-12)), rps = rowSums((cdf - ind)^2))
+  }
+  for (r in .ud_lapply(sort(unique(folds)), one, cores)) {
+    if (!is.null(r$msg)) { warning(r$msg); next }
+    ls_i[r$idx] <- r$ls; rps_i[r$idx] <- r$rps
   }
   ok <- is.finite(ls_i)
   structure(list(logscore = mean(ls_i[ok]), rps = mean(rps_i[ok]),

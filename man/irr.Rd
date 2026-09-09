@@ -10,7 +10,9 @@ irr(object, ...)
 \method{irr}{cpb}(object, level = 0.95, ...)
 }
 \arguments{
-\item{object}{A \code{"cpb"} object fit with \code{se = "bootstrap"}.}
+\item{object}{A \code{"cpb"} object. With \code{se = "bootstrap"} at fit time the
+ratios carry bootstrap percentile intervals; otherwise point estimates are
+returned with \code{method = "none"}, as for every other \code{irr()} method.}
 
 \item{...}{Further arguments passed to methods.}
 

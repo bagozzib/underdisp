@@ -63,15 +63,21 @@
 #' Conway--Maxwell--Poisson distribution functions
 #'
 #' Density, distribution, quantile, and random generation for the COM-Poisson
-#' with rate `lambda` and dispersion `nu` (`nu > 1` underdispersed, `nu = 1`
-#' Poisson, `nu < 1` overdispersed). Complements the estimator
-#' `count_reg(..., family = "compois")`.
+#' with rate `lambda` (or mean `mu`) and dispersion `nu` (`nu > 1`
+#' underdispersed, `nu = 1` Poisson, `nu < 1` overdispersed). Complements the
+#' estimators `count_reg(..., family = "compois")` (rate parameterization) and
+#' `count_reg(..., family = "mpcmp")` (mean parameterization).
 #'
 #' @param x,q Vector of quantiles (non-negative integers).
 #' @param p Vector of probabilities.
 #' @param n Number of draws.
-#' @param lambda Rate parameter (scalar or vector, recycled).
+#' @param lambda Rate parameter (scalar or vector, recycled). Give `mu`
+#'   instead to specify the distribution by its mean.
 #' @param nu Dispersion parameter (scalar).
+#' @param mu Optional mean (scalar or vector, recycled); when supplied, the rate
+#'   `lambda` solving \eqn{\mathrm{E}(Y) = \mu} is found numerically (Huang's
+#'   2017 mean parameterization, the one `count_reg(family = "mpcmp")` fits)
+#'   and `lambda` is ignored.
 #' @param log,log.p Return log probabilities.
 #' @param lower.tail If `TRUE` (default), \eqn{P(X \le x)}.
 #' @return `dcompois` a density, `pcompois` a CDF, `qcompois` a quantile,
@@ -81,7 +87,9 @@
 #' mean(rcompois(1000, lambda = 3, nu = 1.5))
 #' @name compois-distribution
 #' @export
-dcompois <- function(x, lambda, nu, log = FALSE) {
+dcompois <- function(x, lambda, nu, log = FALSE, mu = NULL) {
+  if (!is.null(mu)) lambda <- exp(cmp_loglambda_cpp(mu, nu))
+  if (!length(x) || !length(lambda)) return(numeric(0))
   n <- max(length(x), length(lambda)); x <- rep_len(x, n); lambda <- rep_len(lambda, n)
   logZ <- .compois_logZ(lambda, nu)
   ld <- ifelse(x < 0 | x != floor(x), -Inf, x * log(lambda) - nu * lgamma(x + 1) - logZ)
@@ -89,7 +97,9 @@ dcompois <- function(x, lambda, nu, log = FALSE) {
 }
 #' @rdname compois-distribution
 #' @export
-pcompois <- function(q, lambda, nu, lower.tail = TRUE, log.p = FALSE) {
+pcompois <- function(q, lambda, nu, lower.tail = TRUE, log.p = FALSE, mu = NULL) {
+  if (!is.null(mu)) lambda <- exp(cmp_loglambda_cpp(mu, nu))
+  if (!length(q) || !length(lambda)) return(numeric(0))
   n <- max(length(q), length(lambda)); q <- rep_len(q, n); lambda <- rep_len(lambda, n)
   out <- vapply(seq_len(n), function(i) {
     qi <- floor(q[i]); if (qi < 0) return(0)
@@ -100,7 +110,9 @@ pcompois <- function(q, lambda, nu, lower.tail = TRUE, log.p = FALSE) {
 }
 #' @rdname compois-distribution
 #' @export
-qcompois <- function(p, lambda, nu, lower.tail = TRUE, log.p = FALSE) {
+qcompois <- function(p, lambda, nu, lower.tail = TRUE, log.p = FALSE, mu = NULL) {
+  if (!is.null(mu)) lambda <- exp(cmp_loglambda_cpp(mu, nu))
+  if (!length(p) || !length(lambda)) return(numeric(0))
   if (log.p) p <- exp(p); if (!lower.tail) p <- 1 - p
   n <- max(length(p), length(lambda)); p <- rep_len(p, n); lambda <- rep_len(lambda, n)
   vapply(seq_len(n), function(i) {
@@ -110,7 +122,9 @@ qcompois <- function(p, lambda, nu, lower.tail = TRUE, log.p = FALSE) {
 }
 #' @rdname compois-distribution
 #' @export
-rcompois <- function(n, lambda, nu) {
+rcompois <- function(n, lambda, nu, mu = NULL) {
+  if (!is.null(mu)) lambda <- exp(cmp_loglambda_cpp(mu, nu))
+  if (n == 0) return(numeric(0))
   lambda <- rep_len(lambda, n)
   vapply(seq_len(n), function(i) {
     K <- .compois_kmax(lambda[i], nu); cdf <- cumsum(.compois_pmf1(lambda[i], nu, K))

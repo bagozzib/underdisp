@@ -70,6 +70,9 @@ rzicpb <- function(n, lambda, alpha, pi) {
 #'   path's plug-in unit effects have no offset handling yet, and errors
 #'   loudly). The bootstrap carries the offset through every replicate.
 #' @param tol Relative convergence tolerance on the observed-data log-likelihood.
+#' @param weights Optional frequency weights (a numeric vector or a column name);
+#'   see [cpb()]. Supported for `method = "ml"`.
+#' @param cores Worker processes for the bootstrap; see [cpb()].
 #' @return An object of class `"zi_cpb"`.
 #' @examples
 #' \donttest{
@@ -81,8 +84,15 @@ rzicpb <- function(n, lambda, alpha, pi) {
 #' @export
 zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method = c("ml", "em"),
                    se = c("none", "bootstrap"), B = 500, cluster = NULL, max.support = 500,
-                   maxit = 200, tol = 1e-6, offset = NULL) {
+                   maxit = 200, tol = 1e-6, offset = NULL, weights = NULL, cores = 1L) {
   se <- match.arg(se); method <- match.arg(method)
+  if (!is.null(weights)) {
+    if (identical(method, "em")) stop("'weights' is supported for method = \"ml\" only.")
+    if (!(is.character(weights) && length(weights) == 1L)) {
+      if (length(weights) != nrow(data)) stop("'weights' must have one value per row of 'data'.")
+      data[[".zi_w"]] <- as.numeric(weights); weights <- ".zi_w"   # vector -> column, subsets with data
+    }
+  }
   if (!is.null(offset)) {
     if (!is.null(fe))
       stop("'offset' with 'fe' is not yet supported for zi_cpb (the fixed effects enter as ",
@@ -90,20 +100,31 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
     if (identical(method, "em"))
       stop("'offset' is supported for method = \"ml\" only.")
     if (!(is.character(offset) && length(offset) == 1L)) {
+      if (length(offset) != nrow(data)) stop("'offset' must have one value per row of 'data'.")
       data[[".zi_off"]] <- as.numeric(offset); offset <- ".zi_off"   # vector -> column, so it subsets with data
     }
   }
-  res <- .zi_cpb_fit(formula, data, zero, fe, zero_fe, max.support, maxit, tol, method, offset)
+  if (!is.null(cluster) && se != "bootstrap")
+    warning("'cluster' only affects the bootstrap; it is ignored with se = \"none\" (use se = \"bootstrap\").")
+  ## reduce to complete cases on every model variable so the count design, the
+  ## inflation design, the offset, and the weights stay aligned
+  zrhs0 <- if (is.null(zero)) formula[-2L] else zero
+  mv <- unique(c(all.vars(formula), all.vars(zrhs0), fe, zero_fe, offset, weights))
+  keep <- stats::complete.cases(data[, intersect(mv, names(data)), drop = FALSE])
+  if (!is.null(cluster) && !is.character(cluster)) cluster <- cluster[keep]
+  data <- data[keep, , drop = FALSE]
+  res <- .zi_cpb_fit(formula, data, zero, fe, zero_fe, max.support, maxit, tol, method, offset, weights)
+  res$call <- match.call()
   if (se == "bootstrap")
     res <- .zi_cpb_boot(res, formula, data, zero, fe, zero_fe, cluster, B, max.support, maxit, tol,
-                        method, offset)
+                        method, offset, weights, cores)
   res
 }
 
 ## cluster/pairs bootstrap for the zero-inflated CPB (resample clusters, or the
 ## fixed-effects units by default; each replicate refits the EM).
 .zi_cpb_boot <- function(res, formula, data, zero, fe, zero_fe, cluster, B, max.support, maxit, tol,
-                         method = "ml", offset = NULL) {
+                         method = "ml", offset = NULL, weights = NULL, cores = 1L) {
   use_fe <- !is.null(fe)
   cvar <- if (!is.null(cluster)) cluster else if (use_fe) fe else NULL
   if (!is.null(cvar)) {
@@ -112,8 +133,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
     fev  <- if (use_fe) as.character(data[[fe]]) else NULL
   }
   nb <- length(res$coefficients); nz <- length(res$zero_coef)
-  Bc <- matrix(NA_real_, B, nb); Zc <- matrix(NA_real_, B, nz)
-  for (b in seq_len(B)) {
+  one <- function(b) {
     if (is.null(cvar)) { bd <- data[sample.int(nrow(data), nrow(data), replace = TRUE), , drop = FALSE]; ffe <- fe }
     else {
       gs <- sample.int(length(grp), length(grp), replace = TRUE)
@@ -123,10 +143,13 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
           function(k) paste0(k, "_", fev[grp[[gs[k]]]])), use.names = FALSE); ffe <- ".bootunit"
       } else ffe <- NULL
     }
-    fb <- tryCatch(.zi_cpb_fit(formula, bd, zero, ffe, zero_fe, max.support, maxit, tol, method, offset),
+    fb <- tryCatch(.zi_cpb_fit(formula, bd, zero, ffe, zero_fe, max.support, maxit, tol, method, offset, weights),
                    error = function(e) NULL)
-    if (!is.null(fb)) { Bc[b, ] <- fb$coefficients; Zc[b, ] <- fb$zero_coef }
+    if (!is.null(fb)) c(fb$coefficients, fb$zero_coef) else rep(NA_real_, nb + nz)
   }
+  BZ <- do.call(rbind, .ud_lapply(seq_len(B), one, cores))
+  Bc <- BZ[, seq_len(nb), drop = FALSE]; Zc <- BZ[, nb + seq_len(nz), drop = FALSE]
+  res$boot <- BZ
   okB <- Bc[stats::complete.cases(Bc), , drop = FALSE]
   okZ <- Zc[stats::complete.cases(Zc), , drop = FALSE]
   if (nrow(okB) >= 2) {
@@ -142,11 +165,14 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
 }
 
 .zi_cpb_fit <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, max.support = 500, maxit = 200,
-                        tol = 1e-6, method = "ml", offset = NULL) {
+                        tol = 1e-6, method = "ml", offset = NULL, weights = NULL) {
   mf <- stats::model.frame(formula, data)
-  y  <- as.integer(stats::model.response(mf))
+  y  <- stats::model.response(mf)
+  if (!is.numeric(y)) stop("Response must be a numeric count; got ", class(y)[1L], ".")
+  y  <- as.integer(y)
   if (any(y < 0)) stop("The response must be nonnegative integer counts.")
   X  <- stats::model.matrix(formula, data)
+  w  <- .ud_w1(.ud_weights(weights, data, seq_len(nrow(data))), nrow(X))
   zrhs <- if (is.null(zero)) formula[-2L] else zero
   if (!is.null(zero_fe))                                          # fixed effects in the zero equation
     zrhs <- stats::reformulate(c(labels(stats::terms(zrhs)), paste0("factor(", zero_fe, ")")))
@@ -173,14 +199,14 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   ## with participation fixed effects).
   if (!is.null(fe)) {
     ord  <- order(data[[fe]]); data <- data[ord, , drop = FALSE]
-    y    <- y[ord]; is0 <- is0[ord]; Z <- Z[ord, , drop = FALSE]
+    y    <- y[ord]; is0 <- is0[ord]; Z <- Z[ord, , drop = FALSE]; w <- w[ord]
     Xall <- stats::model.matrix(stats::delete.response(stats::terms(formula)), data)
     Xcov <- Xall[, setdiff(colnames(Xall), "(Intercept)"), drop = FALSE]
     uf   <- factor(data[[fe]]); nu <- nlevels(uf)
     ustart <- as.integer(c(0, cumsum(tabulate(as.integer(uf), nu))))
     pcov <- ncol(Xcov); pg <- ncol(Z); ms <- as.integer(max.support); iit <- 20L
     cf <- tryCatch(cpb_fe(formula, data = data[y > 0, , drop = FALSE], fe = fe, truncated = TRUE,
-                          max.support = max.support), error = function(e) NULL)
+                          max.support = max.support, weights = weights), error = function(e) NULL)
     b0 <- if (!is.null(cf)) cf$coefficients[colnames(Xcov)] else stats::setNames(rep(0, pcov), colnames(Xcov))
     b0[!is.finite(b0)] <- 0
     a0 <- if (!is.null(cf)) cf$alpha else 0.5
@@ -216,7 +242,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
       }
       if (is.null(best)) stop("zi_cpb (EM): the log-likelihood was non-finite at every iteration; ",
                               "the count component may not cover the data (try method = \"ml\").")
-      b <- best$b; a <- best$a; fe_hat <- best$fe_hat; g <- best$g; ll <- best$ll
+      b <- best$b; a <- best$a; fe_hat <- best$fe_hat; g <- best$g; ll <- best$ll; conv_fe <- TRUE
       ## Units whose rows are all classified structural (e.g. units with no
       ## positive counts) never enter the count fit, so fe_hat covers only the
       ## units it was estimated on. Expand to all levels with the mean-effect
@@ -243,7 +269,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
       nll <- function(par) {
         m   <- cpb_lp0_cpp(c(1, par[1:pcov], par[pcov + 1]), Xoff, y, rep(0, nrow(Xoff)), ms, FALSE)
         pit <- as.numeric(stats::plogis(Z %*% par[(pcov + 2):(pcov + 1 + pg)]))
-        v <- -sum(ifelse(is0, log(pit + (1 - pit) * m[, 2]), log(1 - pit) + pmax(m[, 1], -700)))
+        v <- -sum(w * ifelse(is0, log(pit + (1 - pit) * m[, 2]), log(1 - pit) + pmax(m[, 1], -700)))
         if (is.finite(v)) v else 1e10
       }
       best <- NULL
@@ -255,14 +281,15 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
       }
       if (is.null(best)) stop("zi_cpb (fe): all optimization starts failed.")
       b <- best$par[1:pcov]; a <- stats::plogis(best$par[pcov + 1]); g <- best$par[(pcov + 2):(pcov + 1 + pg)]
-      ll <- -best$value; iters <- as.integer(best$counts[1]); fe_hat <- off_lvl
+      ll <- -best$value; iters <- as.integer(best$counts[1]); fe_hat <- off_lvl; conv_fe <- isTRUE(best$convergence == 0)
       fe_df <- length(fe_hat)                       # every offset level enters the plug-in likelihood
     }
     names(b) <- colnames(Xcov); names(g) <- colnames(Z); names(fe_hat) <- levels(uf)
     fi <- fe_hat[as.character(data[[fe]])]; fi[is.na(fi)] <- mean(fe_hat)
     lambda_full <- as.numeric(exp(fi + Xcov %*% b))
     return(structure(list(coefficients = b, alpha = a, zero_coef = g, zero.coefficients = g, loglik = ll, iterations = iters,
-        df = length(b) + fe_df + 1L + length(g), n = length(y), y = y,
+        df = length(b) + fe_df + 1L + length(g), n = length(y), y = y, converged = conv_fe,
+        weights = if (is.null(weights)) NULL else w, nobs_weighted = if (is.null(weights)) length(y) else sum(w),
         pi_full = as.numeric(stats::plogis(Z %*% g)), lambda_full = lambda_full,
         ceiling = lambda_full / (1 - a), fe = fe, fe_hat = fe_hat, Z = Z,
         int_beta = b, int_xref = colMeans(Xcov), int_fe_ref = mean(fe_hat),
@@ -289,13 +316,11 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   ## under heavy zero-inflation. (This mirrors how pscl::zeroinfl seeds ZIP/ZINB.)
   pb <- ncol(X); pg <- ncol(Z)
   ## exposure offset (log scale), column-name form only by the time we get here
-  off <- if (is.null(offset)) rep(0, nrow(X))
-         else as.numeric(data[[offset]][match(rownames(stats::model.frame(formula, data)),
-                                              rownames(data))])
+  off <- if (is.null(offset)) rep(0, nrow(X)) else as.numeric(data[[offset]])
   if (anyNA(off)) stop("'offset' has missing values on the estimation rows.")
   pf <- tryCatch(cpb(formula, data[y > 0, , drop = FALSE], truncated = TRUE, se = "none",
                      max.support = max.support,
-                     offset = if (is.null(offset)) NULL else offset),
+                     offset = if (is.null(offset)) NULL else offset, weights = weights),
                  error = function(e) NULL)
   b0 <- if (!is.null(pf)) as.numeric(pf$coefficients)
         else { v <- stats::glm.fit(X, y, offset = off, family = stats::poisson())$coefficients
@@ -306,28 +331,28 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   nll <- function(par) {
     m   <- cpb_lp0_cpp(par[1:(pb + 1)], X, y, off, ms, FALSE)
     pit <- as.numeric(stats::plogis(Z %*% par[(pb + 2):(pb + 1 + pg)]))
-    -sum(ifelse(is0, log(pit + (1 - pit) * m[, 2]), log(1 - pit) + pmax(m[, 1], -700)))
+    -sum(w * ifelse(is0, log(pit + (1 - pit) * m[, 2]), log(1 - pit) + pmax(m[, 1], -700)))
   }
   run_em <- function() {
     ## Expectation-maximization from the same seeds. The default "ml" branch also
     ## calls this as a cross-check: both climb the same observed-data likelihood
     ## by different routes, and on some data each escapes a basin that strands
-    ## the other.
+    ## the other. Frequency weights multiply the responsibilities in both M-steps.
     b <- b0; a <- a0; g <- g0; ll_old <- -Inf; bestem <- NULL
     for (it in seq_len(maxit)) {
       pit <- as.numeric(stats::plogis(Z %*% g)); cl <- cpb_lp(b, a)
-      w <- ifelse(is0, pit / (pit + (1 - pit) * cl$p0), 0)                # E-step
-      g <- suppressWarnings(stats::glm.fit(Z, w, family = stats::quasibinomial()))$coefficients
+      wr <- ifelse(is0, pit / (pit + (1 - pit) * cl$p0), 0)               # E-step: responsibilities
+      g <- suppressWarnings(stats::glm.fit(Z, wr, weights = w, family = stats::quasibinomial()))$coefficients
       g[!is.finite(g)] <- 0                                              # M-step: zero-inflation
       op <- stats::optim(c(b, stats::qlogis(a)),                         # M-step: weighted CPB
-                         function(par) cpb_wnll_cpp(par, X, y, 1 - w, rep(0, nrow(X)), ms, FALSE),
+                         function(par) cpb_wnll_cpp(par, X, y, (1 - wr) * w, off, ms, FALSE),
                          method = "Nelder-Mead", control = list(maxit = 400, reltol = 1e-7))
       b <- op$par[-length(op$par)]; a <- stats::plogis(op$par[length(op$par)])
       pit <- as.numeric(stats::plogis(Z %*% g)); cl <- cpb_lp(b, a)
       ## floored as in the FE branch: an unfloored zero-branch log() can hit -Inf
       ## and turn the convergence test into if (NaN)
-      ll <- sum(ifelse(is0, log(pmax(pit + (1 - pit) * cl$p0, 1e-12)),
-                       log(pmax(1 - pit, 1e-12)) + cl$lp))
+      ll <- sum(w * ifelse(is0, log(pmax(pit + (1 - pit) * cl$p0, 1e-12)),
+                           log(pmax(1 - pit, 1e-12)) + cl$lp))
       if (is.finite(ll) && (is.null(bestem) || ll > bestem$ll)) bestem <- list(ll = ll, b = b, a = a, g = g, it = it)
       if (is.finite(ll) && is.finite(ll_old) && abs(ll - ll_old) < tol * (abs(ll_old) + tol)) break
       ll_old <- ll
@@ -338,7 +363,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
     bestem <- run_em()
     if (is.null(bestem)) stop("zi_cpb (EM): the log-likelihood was non-finite at every iteration; ",
                               "the count component may not cover the data (try method = \"ml\").")
-    b <- bestem$b; a <- bestem$a; g <- bestem$g; ll <- bestem$ll; it <- bestem$it
+    b <- bestem$b; a <- bestem$a; g <- bestem$g; ll <- bestem$ll; it <- bestem$it; conv <- TRUE
   } else {
     best <- NULL                                                          # direct joint ML (default)
     for (as0 in unique(c(a0, 0.3, 0.7))) {
@@ -366,7 +391,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
     ## strand every Nelder-Mead start (observed: all three ML starts returned a
     ## basin 17 log-lik units below the EM's optimum). Evaluate its solution
     ## under the ML objective, polish, and keep the better optimum.
-    bestem <- if (is.null(offset)) tryCatch(run_em(), error = function(e) NULL) else NULL
+    bestem <- tryCatch(run_em(), error = function(e) NULL)
     if (!is.null(bestem)) {
       st <- c(bestem$b, stats::qlogis(min(max(bestem$a, 1e-6), 1 - 1e-6)), bestem$g)
       v0 <- tryCatch(nll(st), error = function(e) Inf)
@@ -379,7 +404,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
       if (!is.null(cand) && cand$value < best$value) best <- cand
     }
     b <- best$par[1:pb]; a <- stats::plogis(best$par[pb + 1]); g <- best$par[(pb + 2):(pb + 1 + pg)]
-    ll <- -best$value; it <- as.integer(best$counts[1])
+    ll <- -best$value; it <- as.integer(best$counts[1]); conv <- isTRUE(best$convergence == 0)
   }
   ## degeneracy guard: the untruncated CPB cannot always satisfy its feasibility
   ## constraint under heavy zero-inflation with a wide count range
@@ -391,7 +416,8 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   names(b) <- colnames(X); names(g) <- colnames(Z)
   lambda_full <- as.numeric(exp(off + X %*% b))
   structure(list(coefficients = b, alpha = a, zero_coef = g, zero.coefficients = g, loglik = ll,
-                 iterations = it, offset = off, df = length(b) + 1L + length(g), n = n, y = y,
+                 iterations = it, offset = off, df = length(b) + 1L + length(g), n = n, y = y, converged = conv,
+                 weights = if (is.null(weights)) NULL else w, nobs_weighted = if (is.null(weights)) n else sum(w),
                  pi_full = as.numeric(stats::plogis(Z %*% g)), lambda_full = lambda_full,
                  ceiling = lambda_full / (1 - a), X = X, Z = Z, fe = NULL,
                  int_beta = b, int_xref = colMeans(X), int_fe_ref = 0,
@@ -414,6 +440,7 @@ print.zi_cpb <- function(x, ...) {
   cat("\nZero-inflation (logit link) -- positive coefficients raise P(structural zero), i.e. lower the\nchance of a positive count (the opposite direction from a hurdle participation model):\n")
   print(round(x$zero_coef, 4))
   cat("Mean structural-zero probability:", round(mean(x$pi_full), 3), "\n")
+  if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
   invisible(x)
 }
 

@@ -1,0 +1,70 @@
+## dispersion_test() and dispersion_profile()
+
+set.seed(2); n <- 400; x <- rnorm(n)
+d_gc <- data.frame(y = rgammacount(n, exp(1 + 0.4 * x), alpha = 2), x = x)
+d_po <- data.frame(y = rpois(n, exp(1 + 0.4 * x)), x = x)
+
+test_that("the LR test equals twice the log-likelihood gap to the Poisson refit", {
+  m <- count_reg(y ~ x, d_gc, family = "gammacount")
+  g <- glm(y ~ x, d_gc, family = poisson())
+  dt <- dispersion_test(m)
+  expect_equal(unname(dt$statistic), 2 * (m$loglik - as.numeric(logLik(g))), tolerance = 1e-4)
+  expect_equal(dt$p.value, pchisq(unname(dt$statistic), 1, lower.tail = FALSE), tolerance = 1e-8)
+  du <- dispersion_test(m, alternative = "under")
+  expect_equal(du$p.value, pnorm(sqrt(unname(dt$statistic)), lower.tail = FALSE), tolerance = 1e-8)
+  expect_lt(du$p.value, 0.01)                                # regular timing is detected
+  do <- dispersion_test(m, alternative = "over")
+  expect_gt(do$p.value, 0.5)
+  expect_s3_class(dt, "htest")
+  expect_output(print(dt), "Likelihood-ratio")
+})
+
+test_that("boundary nulls use the Self-Liang mixture and force the one-sided alternative", {
+  f <- cpb(y ~ x, d_gc, truncated = FALSE, se = "none")
+  dt <- dispersion_test(f)
+  expect_true(dt$boundary)
+  expect_equal(dt$p.value, 0.5 * pchisq(unname(dt$statistic), 1, lower.tail = FALSE))
+  expect_warning(dispersion_test(f, alternative = "over"), "one-sided")
+  nb <- count_reg(y ~ x, d_po, family = "negbin")
+  dn <- dispersion_test(nb)
+  expect_true(dn$boundary); expect_match(dn$alternative, "over")
+})
+
+test_that("the fixed-effects null carries the same unit effects", {
+  skip_on_cran()
+  set.seed(4)
+  d <- do.call(rbind, lapply(1:20, function(i) { xx <- rnorm(12); data.frame(unit = i, x = xx,
+    y = rcpb(12, exp(rnorm(1, 0.5, 0.4) + 0.4 * xx), 0.6)) }))
+  fe <- cpb_fe(y ~ x, d, fe = "unit")
+  dt <- dispersion_test(fe)
+  g <- glm(y ~ x + factor(unit), d, family = poisson())
+  expect_equal(unname(dt$loglik["poisson"]), as.numeric(logLik(g)), tolerance = 1e-4)
+  expect_lt(dt$p.value, 0.01)
+  ge <- gec_fe(y ~ x, d, fe = "unit")
+  expect_equal(unname(dispersion_test(ge)$loglik["poisson"]), as.numeric(logLik(g)), tolerance = 1e-4)
+})
+
+test_that("the auxiliary regression test reproduces the by-hand Cameron-Trivedi statistic", {
+  p <- count_reg(y ~ x, d_gc, family = "poisson")
+  dt <- dispersion_test(p, method = "auxiliary", alternative = "under")
+  mu <- fitted(p); zz <- ((d_gc$y - mu)^2 - d_gc$y) / mu
+  t_hand <- summary(lm(zz ~ mu + 0))$coefficients[1, 3]
+  expect_equal(unname(dt$statistic), t_hand, tolerance = 1e-10)
+  expect_equal(dt$p.value, pnorm(t_hand))
+  expect_error(dispersion_test(p), "no dispersion parameter")
+})
+
+test_that("the dispersion profile recovers a constant ratio for CPB data", {
+  set.seed(9); m <- 800; xx <- rnorm(m)
+  d <- data.frame(y = rcpb(m, exp(1.5 + 0.5 * xx), 0.5), x = xx)
+  f <- cpb(y ~ x, d, truncated = FALSE, se = "none")
+  pr <- dispersion_profile(f, negbin = count_reg(y ~ x, d, family = "negbin"), plot = FALSE)
+  expect_s3_class(pr, "dispersion_profile")
+  expect_equal(nrow(pr), 10L)
+  expect_true(all(c("ratio_empirical", "ratio_cpb", "ratio_negbin") %in% names(pr)))
+  expect_equal(median(pr$ratio_empirical), 0.5, tolerance = 0.25)
+  expect_true(all(pr$ratio_cpb < 0.75))
+  expect_output(print(pr), "Dispersion profile")
+  pdf(NULL); on.exit(dev.off())
+  expect_invisible(plot(pr))
+})

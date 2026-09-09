@@ -10,6 +10,8 @@ print.cpb <- function(x, ...) {
   cat("Coefficients:\n"); print(round(x$coefficients, 4))
   cat("\nalpha (shape parameter):", round(x$alpha, 4),
       "  median implied bound:", round(stats::median(x$ceiling), 2), "\n")
+  if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
+  if (isTRUE(x$support_binding)) cat("Note: the fitted ceiling reaches max.support; alpha is bounded by the guard, not the data.\n")
   invisible(x)
 }
 
@@ -20,19 +22,18 @@ coef.cpb <- function(object, ...) object$coefficients
 #' @method vcov cpb
 #' @export
 vcov.cpb <- function(object, ...) {
-  if (is.null(object$vcov))
-    stop("No covariance available; refit with se = \"bootstrap\".")
+  if (is.null(object$vcov)) return(NULL)                 # no bootstrap requested
   object$vcov
 }
 
 #' @method logLik cpb
 #' @export
 logLik.cpb <- function(object, ...)
-  structure(object$loglik, df = object$df, nobs = object$n, class = "logLik")
+  structure(object$loglik, df = object$df, nobs = nobs(object), class = "logLik")
 
 #' @method nobs cpb
 #' @export
-nobs.cpb <- function(object, ...) object$n
+nobs.cpb <- function(object, ...) if (is.null(object$nobs_weighted)) object$n else object$nobs_weighted
 
 #' @method fitted cpb
 #' @export
@@ -43,7 +44,10 @@ fitted.cpb <- function(object, ...) object$fitted.values
 residuals.cpb <- function(object, type = c("response", "pearson"), ...) {
   type <- match.arg(type)
   r <- object$Y - object$fitted.values
-  if (type == "pearson") r <- r / sqrt(object$alpha * object$fitted.values)
+  if (type == "pearson") {                          # exact variance of the fitted pmf
+    v <- .cpb_moments(.cpb_rate(object), object$alpha, isTRUE(object$truncated))$var
+    r <- r / sqrt(pmax(v, 1e-12))
+  }
   r
 }
 
@@ -62,12 +66,17 @@ summary.cpb <- function(object, ...) {
                 `z value` = z, `Pr(>|z|)` = 2 * pnorm(-abs(z)))
   aci <- .cpb_alpha_profile_ci(object)
   LR  <- if (is.na(object$loglik.null)) NA_real_ else -2 * (object$loglik.null - object$loglik)
+  ## a negative statistic means the CPB fit sits below its own Poisson nest (the
+  ## data are not underdispersed and/or max.support binds): reported, no p-value
+  ## a negative statistic means the CPB fit sits below its own Poisson nest (the
+  ## data are not underdispersed and/or max.support binds): reported, no p-value
   out <- list(call = object$call, truncated = object$truncated, coefficients = ctab,
               alpha = object$alpha, alpha.ci = aci, ceiling = object$ceiling,
               loglik = object$loglik, aic = -2 * object$loglik + 2 * object$df,
               # alpha = 1 is on the parameter boundary: null is 0.5*chi2_0 + 0.5*chi2_1 (Self & Liang 1987)
-              LR = LR, LR.p = if (is.na(LR)) NA_real_ else 0.5 * pchisq(LR, 1, lower.tail = FALSE),
-              n = object$n, se.type = object$se.type,
+              LR = LR, LR.p = if (is.na(LR) || LR < 0) NA_real_ else 0.5 * pchisq(LR, 1, lower.tail = FALSE),
+              support_binding = isTRUE(object$support_binding), converged = object$converged,
+              n = object$n, nobs = nobs(object), se.type = object$se.type,
               nboot_ok = if (!is.null(object$boot)) attr(object$boot, "nboot_ok") else NA)
   class(out) <- "summary.cpb"
   out
@@ -77,7 +86,8 @@ summary.cpb <- function(object, ...) {
 print.summary.cpb <- function(x, ...) {
   cat("\nContinuous Parameter Binomial regression",
       if (x$truncated) "(zero-truncated)\n" else "(untruncated)\n")
-  cat("N =", x$n, "   inference:", x$se.type, "\n\n")
+  cat("N =", x$n, if (!is.null(x$nobs) && x$nobs != x$n) paste0(" (weight total ", format(x$nobs), ")"),
+      "   inference:", x$se.type, "\n\n")
   printCoefmat(x$coefficients, P.values = TRUE, has.Pvalue = TRUE, na.print = "NA")
   cat("\nalpha =", round(x$alpha, 4),
       sprintf("  (profile %d%% CI: %.3f to %.3f%s)\n", 95L, x$alpha.ci["lower"],
@@ -85,11 +95,17 @@ print.summary.cpb <- function(x, ...) {
   cat("Implied ceiling lambda/(1-alpha): median", round(stats::median(x$ceiling), 2),
       "  range", paste(round(range(x$ceiling), 2), collapse = " to "), "\n")
   cat("logLik =", round(x$loglik, 2), "   AIC =", round(x$aic, 2), "\n")
-  if (!is.na(x$LR))
+  if (!is.na(x$LR) && x$LR >= 0)
     cat(sprintf("LR vs %sPoisson (H0: alpha = 1): %.2f, p %s\n",
                 if (x$truncated) "ZT-" else "", x$LR, format.pval(x$LR.p)))
+  else if (!is.na(x$LR))
+    cat(sprintf("LR vs %sPoisson: %.2f -- the CPB fit does not attain its Poisson nest: the data are not\nunderdispersed in the CPB sense (compare gec()); no p-value is reported.\n",
+                if (x$truncated) "ZT-" else "", x$LR))
+  if (isTRUE(x$support_binding))
+    cat("Note: the fitted ceiling reaches max.support; alpha is bounded by the guard, not the data.\n")
   if (!is.na(x$nboot_ok))
     cat("(", x$nboot_ok, " bootstrap resamples converged)\n", sep = "")
+  if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
   invisible(x)
 }
 

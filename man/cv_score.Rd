@@ -4,7 +4,7 @@
 \alias{cv_score}
 \title{Cross-validated proper scores for a count model}
 \usage{
-cv_score(fitfun, data, k = 5, kmax = NULL, folds = NULL)
+cv_score(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L)
 }
 \arguments{
 \item{fitfun}{A function of one argument (a training data frame) returning a
@@ -21,6 +21,8 @@ data (one extra fit).}
 \item{folds}{Optional integer vector of length \code{nrow(data)} giving a fixed
 fold assignment (so two models can be scored on identical folds). If \code{NULL},
 folds are drawn at random.}
+
+\item{cores}{Worker processes for the fold refits (default 1); see \code{\link[=cpb]{cpb()}}.}
 }
 \value{
 An object of class \code{"cv_score"}: a list with the mean held-out

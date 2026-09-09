@@ -27,7 +27,7 @@ predict.hurdle_count <- function(object, newdata = NULL,
   if (is.null(newdata)) { p <- object$p_full; mu <- object$lambda_full }
   else {
     p  <- as.numeric(stats::predict(object$participation, newdata = newdata, type = "response"))
-    mu <- predict(object$intensity, newdata = newdata, type = "response", offset = offset)
+    mu <- exp(predict(object$intensity, newdata = newdata, type = "link", offset = offset))   # natural parameter
   }
   if (type == "participation") return(as.numeric(p))
   ztmean <- fam$meanfun(mu, object$theta) / (1 - fam$p0(mu, object$theta))   # E(Y | Y > 0)
@@ -86,10 +86,17 @@ predict.zi_count <- function(object, newdata = NULL, type = c("response", "count
 #' @param level Confidence level.
 #' @param ... Unused.
 #' @return A `"ud_irr"` data frame -- the package-wide ratio contract shared by
-#'   every `irr()` method: columns `term`, `equation` (`"count"` or
-#'   `"binary"`), `ratio` (`"IRR"` or `"OR"`), `estimate`, `lower`, `upper`,
-#'   and `method` (the interval source; `"none"` with `NA` bounds when no
-#'   covariance is available). Two-part models stack both equations.
+#'   every `irr()` method: columns `term`, `equation` (`"count"`,
+#'   `"participation"` for a hurdle's binary stage, or `"inflation"` for a
+#'   zero-inflated model's structural-zero stage; the two point in opposite
+#'   directions, an odds ratio above one raising P(Y > 0) in the first and
+#'   P(structural zero) in the second), `ratio` (`"IRR"` or `"OR"`),
+#'   `estimate`, `lower`, `upper`, and `method` (the interval source; `"none"`
+#'   with `NA` bounds when no covariance is available). Two-part models stack
+#'   both equations. The `IRR` rows are ratios of the rate parameter
+#'   \eqn{\exp(\beta)}; for the CPB and the underdispersed GEC the ratio of
+#'   fitted means differs from it by the support renormalization, and
+#'   [first_difference()] reports the exact mean contrast.
 #' @name irr.count
 NULL
 
@@ -98,7 +105,7 @@ NULL
   sm <- summary(glmfit)$coefficients
   keep <- !grepl("^factor\\(", rownames(sm))
   b <- stats::setNames(sm[keep, 1], rownames(sm)[keep])
-  .ud_irr_wald(b, sm[keep, 2], level, "binary", "OR")
+  .ud_irr_wald(b, sm[keep, 2], level, "participation", "OR")
 }
 
 #' @rdname irr.count
@@ -114,7 +121,9 @@ irr.zi_count <- function(object, level = 0.95, ...)
   rbind(.ud_irr_wald(object$coefficients,
                      if (!is.null(object$vcov)) sqrt(diag(object$vcov)) else NULL,
                      level, "count", "IRR"),
-        .ud_irr_wald(object$zero.coefficients, NULL, level, "binary", "OR"))
+        .ud_irr_wald(object$zero.coefficients,
+                     if (!is.null(object$se.zero) && all(is.finite(object$se.zero))) object$se.zero else NULL,
+                     level, "inflation", "OR"))
 
 ## --- first-difference (discrete change), equation-decomposed for two-part ---
 
@@ -157,8 +166,11 @@ first_difference.count_reg <- function(object, variable, from, to, level = 0.95,
   .fd_dots(...)
   fam <- .count_fam(object$family); xr <- colMeans(object$X); b <- object$coefficients
   if (!variable %in% names(b)) stop("'variable' is not a covariate in the model.")
+  .fd_check_terms(variable, names(b))
+  off <- mean(.ud_w1(object$offset, 1))                       # offset held at its mean
   mk <- function(v) { x <- xr; if (variable %in% names(x)) x[variable] <- v; x }
-  mfun <- function(bb, v) fam$meanfun(exp(sum(mk(v) * bb)), object$theta)
+  mfun <- function(bb, v) { mu <- exp(off + sum(mk(v) * bb)); m <- fam$meanfun(mu, object$theta)
+    if (isTRUE(object$truncated)) m / pmax(1 - fam$p0(mu, object$theta), 1e-12) else m }
   ci <- .fd_delta_ci(function(bb) mfun(bb, to) - mfun(bb, from), b, object$vcov, level)
   .ud_fd(component = "mean", from = mfun(b, from), to = mfun(b, to),
          lower = ci[1], upper = ci[2],
@@ -204,6 +216,7 @@ first_difference.hurdle_count <- function(object, variable, from, to, level = 0.
   fam <- .count_fam(object$family); linkinv <- stats::make.link(object$link)$linkinv
   inx <- variable %in% names(object$int_xref); inz <- variable %in% names(object$part_xref)
   if (!inx && !inz) stop("'variable' is in neither the intensity nor the participation equation.")
+  .fd_check_terms(variable, c(names(object$int_xref), names(object$part_xref)))
   zr0 <- object$part_xref; xr0 <- object$int_xref
   pfun <- function(g, v) { zr <- zr0
     if (inz && stage %in% c("both", "participation", "zero")) zr[variable] <- v
@@ -228,6 +241,7 @@ first_difference.zi_count <- function(object, variable, from, to, level = 0.95,
   linkinv <- stats::make.link(object$link)$linkinv; fam <- .count_fam(object$family)
   inx <- variable %in% names(object$xref); inz <- variable %in% names(object$zref)
   if (!inx && !inz) stop("'variable' is in neither the count nor the inflation equation.")
+  .fd_check_terms(variable, c(names(object$xref), names(object$zref)))
   zr0 <- object$zref; xr0 <- object$xref
   ## rows: P(structural zero) level, count-component mean, marginal (1-pi)*m
   pfun <- function(g, v) { zr <- zr0

@@ -13,7 +13,15 @@
 #' binomial). Unlike [cpb()], which fixes the direction of dispersion to
 #' under, `gec()` lets the data choose. The Katz recursion delivers exact first
 #' and second moments---the Winkelmann--Signorino--King correction realized
-#' directly---and the likelihood is evaluated in C++.
+#' directly on an unbounded support---and the likelihood is evaluated in C++.
+#' For `delta < 1` the support is finite and the renormalized distribution's
+#' mean and variance equal `exp(x'b)` and `delta * exp(x'b)` only when
+#' `exp(x'b)/(1 - delta)` is an integer, so `exp(x'b)` is the rate parameter of
+#' the recursion, the fitted mean is computed exactly from the pmf, and `delta`
+#' is the Katz dispersion parameter (the variance-to-mean ratio on an unbounded
+#' support). The optimizer works on covariates scaled to unit standard
+#' deviation and maps the coefficients back, so the fit does not depend on the
+#' covariates' units.
 #'
 #' @param formula A model formula.
 #' @param data A data frame.
@@ -25,6 +33,9 @@
 #'   vector) for a cluster/block bootstrap; see [cpb()].
 #' @param offset Optional offset on the log-mean scale (an exposure): a numeric
 #'   vector or the name of a column in `data`.
+#' @param weights Optional frequency weights (a numeric vector or a column name);
+#'   see [cpb()].
+#' @param cores Worker processes for the bootstrap; see [cpb()].
 #' @param max.support Guard on the maximum evaluated support.
 #' @param maxit,reltol Optimizer controls.
 #' @return An object of class `"gec"` with `coefficients`, `delta` (the estimated
@@ -33,50 +44,69 @@
 #' set.seed(1); x <- rnorm(400)
 #' y <- rpois(400, exp(1 + 0.5 * x))
 #' gec(y ~ x, data = data.frame(y = y, x = x), se = "none")
-#' @seealso [cpb()], [compare_dispersion()]
+#' @seealso [cpb()], [compare_dispersion()], [dispersion_test()]
 #' @export
 gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B = 500, cluster = NULL,
-                offset = NULL, max.support = 500, maxit = 20000, reltol = 1e-8) {
+                offset = NULL, weights = NULL, cores = 1L, max.support = 500, maxit = 20000, reltol = 1e-8) {
   se <- match.arg(se); cl <- match.call()
   mf <- stats::model.frame(formula, data, na.action = stats::na.omit)
-  Y  <- as.integer(stats::model.response(mf)); X <- stats::model.matrix(formula, mf)
-  n  <- length(Y); p <- ncol(X)
+  Y  <- stats::model.response(mf); X <- stats::model.matrix(formula, mf)
+  n  <- length(Y); p <- ncol(X); rows <- .ud_kept_rows(mf, data)
+  if (!is.numeric(Y)) stop("Response must be a numeric count; got ", class(Y)[1L], ".")
+  if (n == 0L) stop("No complete cases on the model variables.")
   if (any(Y < 0) || any(Y != floor(Y))) stop("Response must be non-negative integer counts.")
   if (truncated && any(Y < 1)) stop("truncated = TRUE requires all Y >= 1.")
+  Y <- as.integer(Y)
+  .ud_rank_check(X)
   off <- rep_len(0, n)                                          # log-scale exposure offset
   if (!is.null(offset)) {
     ov <- if (is.character(offset) && length(offset) == 1L) data[[offset]] else offset
-    off <- as.numeric(ov[match(rownames(mf), rownames(data))])
+    if (is.null(ov)) stop("'offset' must name a column of 'data' or be a numeric vector.")
+    if (length(ov) != nrow(data)) stop("'offset' must have one value per row of 'data'.")
+    off <- as.numeric(ov[rows])
     if (anyNA(off)) stop("'offset' has missing values on the estimation rows.")
   }
+  w <- .ud_weights(weights, data, rows); wv <- .ud_w1(w, n)
   clid <- NULL
   if (!is.null(cluster)) {
-    cv <- if (is.character(cluster) && length(cluster) == 1L) data[[cluster]] else cluster
-    if (is.null(cv)) stop("'cluster' must be a column name in 'data' or a vector.")
-    clid <- cv[match(rownames(mf), rownames(data))]
-    if (anyNA(clid)) stop("'cluster' has missing values on the estimation rows.")
+    if (se != "bootstrap") {
+      warning("'cluster' only affects the bootstrap; it is ignored with se = \"none\" (use se = \"bootstrap\").")
+    } else {
+      cv <- if (is.character(cluster) && length(cluster) == 1L) data[[cluster]] else cluster
+      if (is.null(cv)) stop("'cluster' must be a column name in 'data' or a vector.")
+      if (length(cv) != nrow(data)) stop("'cluster' must have one value per row of 'data'.")
+      clid <- cv[rows]
+      if (anyNA(clid)) stop("'cluster' has missing values on the estimation rows.")
+    }
   }
   ms <- as.integer(max.support)
-  objf <- if (!truncated) function(par, Xm, Ym, om) gec_nll_cpp(par, Xm, Ym, om, ms)
-          else function(par, Xm, Ym, om) {           # zero-truncated Katz likelihood (P(Y>=1))
+  objf <- if (!truncated) function(par, Xm, Ym, om, wm) gec_wnll_cpp(par, Xm, Ym, wm, om, ms)
+          else function(par, Xm, Ym, om, wm) {       # zero-truncated Katz likelihood (P(Y>=1))
             m <- gec_lp0_cpp(par, Xm, Ym, om, ms)
-            if (any(m[, 2] >= 1 - 1e-12)) return(1e10)
-            v <- -sum(pmax(m[, 1], -700) - log1p(-m[, 2])); if (is.finite(v)) v else 1e10
+            if (any(m[, 2] >= 1 - 1e-12) || any(m[, 1] <= -1e299)) return(1e10)   # infeasible point
+            v <- -sum(wm * (m[, 1] - log1p(-m[, 2]))); if (is.finite(v)) v else 1e10
           }
-  fitone <- function(Xm, Ym, om) {
-    b0 <- tryCatch({ v <- stats::glm.fit(Xm, Ym, offset = om, family = stats::poisson())$coefficients
+  fitone <- function(Xm, Ym, om, wm) {
+    s <- .ud_colscale(Xm); Xs <- sweep(Xm, 2, s, "/")
+    b0 <- tryCatch({ v <- stats::glm.fit(Xs, Ym, weights = wm, offset = om, family = stats::poisson())$coefficients
                      v[!is.finite(v)] <- 0; v }, error = function(e) rep(0, p))
     best <- NULL
     for (ld in c(-0.5, 0, 0.5)) {                     # under / Poisson / over starts
-      op <- tryCatch(stats::optim(c(b0, ld), function(par) objf(par, Xm, Ym, om),
+      op <- tryCatch(stats::optim(c(b0, ld), function(par) objf(par, Xs, Ym, om, wm),
                                   method = "Nelder-Mead", control = list(maxit = maxit, reltol = reltol)),
                      error = function(e) NULL)
       if (!is.null(op) && op$value < 1e9 && (is.null(best) || op$value < best$value)) best <- op
     }
+    if (!is.null(best)) {
+      best <- .ud_nm_polish(best, function(par) objf(par, Xs, Ym, om, wm), maxit, reltol)
+      best$par[seq_len(p)] <- best$par[seq_len(p)] / s
+    }
     best
   }
-  fit <- fitone(X, Y, off)
-  if (is.null(fit)) stop("All optimization starts failed.")
+  fit <- fitone(X, Y, off, wv)
+  if (is.null(fit) || fit$value >= 1e9)
+    stop("no feasible fit: every start left some count outside the model's support (raise max.support, ",
+         "currently ", ms, ", or check the data).")
   beta   <- setNames(fit$par[1:p], colnames(X)); delta <- exp(fit$par[p + 1]); loglik <- -fit$value
   mu     <- as.numeric(exp(off + X %*% beta))
   fitted <- if (!truncated) gec_mean_cpp(mu, delta, ms)
@@ -84,14 +114,15 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
 
   se.beta <- setNames(rep(NA_real_, p), colnames(X)); se.delta <- NA_real_; boot <- NULL; ci.beta <- NULL
   if (se == "bootstrap") {
+    if (!is.null(clid)) .ud_cluster_guard(clid)
     grp <- if (!is.null(clid)) split(seq_len(n), clid) else NULL
-    boot <- matrix(NA_real_, B, p + 1)
-    for (b in seq_len(B)) {
+    one <- function(b) {
       idx <- if (is.null(grp)) sample.int(n, n, replace = TRUE)
              else unlist(grp[sample.int(length(grp), length(grp), replace = TRUE)], use.names = FALSE)
-      fb <- fitone(X[idx, , drop = FALSE], Y[idx], off[idx])
-      if (!is.null(fb)) boot[b, ] <- c(fb$par[1:p], exp(fb$par[p + 1]))
+      fb <- fitone(X[idx, , drop = FALSE], Y[idx], off[idx], wv[idx])
+      if (!is.null(fb)) c(fb$par[1:p], exp(fb$par[p + 1])) else rep(NA_real_, p + 1L)
     }
+    boot <- do.call(rbind, .ud_lapply(seq_len(B), one, cores))
     ok <- boot[stats::complete.cases(boot), , drop = FALSE]
     if (nrow(ok) >= 2) {
       se.beta  <- setNames(apply(ok[, 1:p, drop = FALSE], 2, stats::sd), colnames(X))
@@ -99,13 +130,17 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
       ci.beta  <- t(apply(ok[, 1:p, drop = FALSE], 2, stats::quantile, c(.025, .975)))
       rownames(ci.beta) <- colnames(X)
     } else warning("Too few bootstrap resamples converged for stable inference.")
+    attr(boot, "nboot_ok") <- nrow(ok)
   }
 
   structure(list(coefficients = beta, delta = delta, dispersion = delta, loglik = loglik,
                  se.beta = se.beta, se.delta = se.delta, boot = boot, ci.beta = ci.beta,
                  fitted.values = fitted, linear.predictors = as.numeric(off + X %*% beta), offset = off,
+                 weights = w, nobs_weighted = if (is.null(w)) n else sum(w),
                  n = n, df = p + 1, p = p, se.type = se, clustered = !is.null(clid),
+                 converged = fit$convergence == 0,
                  truncated = truncated, max.support = ms, formula = formula, terms = attr(mf, "terms"),
+                 levels = .cpb_xlevels(mf), contrasts = attr(X, "contrasts"),
                  X = X, Y = Y, call = cl), class = "gec")
 }
 
@@ -118,9 +153,10 @@ print.gec <- function(x, ...) {
   if (!is.null(x$se.beta) && any(is.finite(x$se.beta)))
     print(round(cbind(Estimate = x$coefficients, `Std. Error` = x$se.beta), 4))
   else print(round(x$coefficients, 4))
-  cat(sprintf("\ndispersion delta (Var/Mean) = %.3f  [%s]", x$delta, disp))
+  cat(sprintf("\ndispersion delta (Katz; Var/Mean on an unbounded support) = %.3f  [%s]", x$delta, disp))
   if (is.finite(x$se.delta)) cat(sprintf("  (SE %.3f)", x$se.delta))
   cat(sprintf("\nlogLik = %.2f,  n = %d\n", x$loglik, x$n))
+  if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
   invisible(x)
 }
 
@@ -131,13 +167,13 @@ coef.gec <- function(object, ...) object$coefficients
 #' @method logLik gec
 #' @export
 logLik.gec <- function(object, ...) {
-  val <- object$loglik; attr(val, "df") <- object$df; attr(val, "nobs") <- object$n
+  val <- object$loglik; attr(val, "df") <- object$df; attr(val, "nobs") <- nobs(object)
   class(val) <- "logLik"; val
 }
 
 #' @method nobs gec
 #' @export
-nobs.gec <- function(object, ...) object$n
+nobs.gec <- function(object, ...) if (is.null(object$nobs_weighted)) object$n else object$nobs_weighted
 
 #' @method fitted gec
 #' @export
@@ -175,14 +211,18 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
     Terms <- stats::delete.response(object$terms)
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
-    X <- stats::model.matrix(Terms, newdata)
+    X <- stats::model.matrix(Terms, newdata, xlev = object$levels, contrasts.arg = object$contrasts)
+    X <- X[, names(object$coefficients), drop = FALSE]
     off <- if (is.null(offset)) rep_len(0, nrow(X))
            else as.numeric(if (is.character(offset) && length(offset) == 1L) newdata[[offset]] else offset)
   }
   mu <- as.numeric(exp(off + X %*% object$coefficients))
   switch(type,
     link = log(mu),
-    response = gec_mean_cpp(mu, object$delta, object$max.support),
+    response = if (isTRUE(object$truncated)) {
+      p0 <- gec_lp0_cpp(c(object$coefficients, log(object$delta)), X, rep(0L, length(mu)), off, object$max.support)[, 2]
+      mu / pmax(1 - p0, 1e-8)                                    # E(Y | Y > 0) for a zero-truncated fit
+    } else gec_mean_cpp(mu, object$delta, object$max.support),
     prob = {
       if (is.null(at)) stop("For type = \"prob\", supply 'at' (the count value).")
       yv <- if (length(at) == 1) rep(as.integer(at), length(mu)) else as.integer(at)
@@ -206,6 +246,15 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
 #' dispersion parameter `delta`. This is the [cpb_fe()] concentration generalized
 #' to the whole Katz family: the panel can be under-, equi-, or overdispersed and
 #' the direction is estimated, not presumed.
+#' For `delta < 1` the Katz support is finite, but the likelihood is continuous across an
+#' integer ceiling (the entering support point's mass grows from zero) and only kinks
+#' there, so each unit's objective is unimodal in its intercept and is maximized by golden
+#' section on a bracket around the unit's Poisson intercept, expanded while the maximum
+#' sits at an edge; a maximum at a kink is tracked in the analytic gradient of the
+#' concentrated likelihood, which the outer BFGS uses. The feasibility floor is exact:
+#' every count must lie in `0..ceiling(mu/(1-delta))`.
+#' Runtime: about twice that of [cpb_fe()] on the same panel (the Katz recursion
+#' runs the whole support), so a 2,600-row panel in 146 units takes about two minutes.
 #'
 #' Limitation: unlike [cpb_fe()], `gec_fe()` has no `truncated` argument -- a
 #' concentrated zero-truncated GEC is not currently implemented. For a
@@ -235,6 +284,9 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
 #'   fixed-effects units. See [cpb_fe()].
 #' @param offset Optional offset on the log-mean scale (an exposure): a numeric
 #'   vector or the name of a column in `data`.
+#' @param weights Optional frequency weights (a numeric vector or a column name);
+#'   see [cpb()].
+#' @param cores Worker processes for the bootstrap; see [cpb()].
 #' @param max.support Guard on the maximum evaluated support.
 #' @param inner_it Golden-section iterations for each unit's inner maximization.
 #' @param maxit,reltol Outer optimizer controls.
@@ -253,60 +305,77 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
 #' @seealso [gec()], [cpb_fe()]
 #' @export
 gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, cluster = NULL,
-                   offset = NULL, max.support = 500L, inner_it = 30L, maxit = 3000L, reltol = 1e-7,
-                   bias_correct = c("none", "jackknife")) {
+                   offset = NULL, weights = NULL, cores = 1L, max.support = NULL, inner_it = 30L,
+                   maxit = 3000L, reltol = 1e-7, bias_correct = c("none", "jackknife")) {
   se <- match.arg(se); bias_correct <- match.arg(bias_correct)
-  if (!fe %in% names(data)) stop("'fe' must name a column of 'data'.")
+  if (!is.character(fe) || length(fe) != 1L || !fe %in% names(data)) stop("'fe' must name a column of 'data'.")
+  if (!is.null(cluster) && se != "bootstrap")
+    warning("'cluster' only affects the bootstrap; it is ignored with se = \"none\" (use se = \"bootstrap\").")
   if (!is.null(offset) && !(is.character(offset) && length(offset) == 1L)) {
+    if (length(offset) != nrow(data)) stop("'offset' must have one value per row of 'data'.")
     data[[".gec_off"]] <- as.numeric(offset); offset <- ".gec_off"   # vector -> column, sorts with data
+  }
+  if (!is.null(weights) && !(is.character(weights) && length(weights) == 1L)) {
+    if (length(weights) != nrow(data)) stop("'weights' must have one value per row of 'data'.")
+    data[[".gec_w"]] <- as.numeric(weights); weights <- ".gec_w"
   }
   data <- data[order(data[[fe]]), , drop = FALSE]
   mf <- stats::model.frame(formula, data, na.action = stats::na.omit)
-  Y  <- as.integer(stats::model.response(mf))
+  rows <- .ud_kept_rows(mf, data)
+  Y  <- stats::model.response(mf)
+  if (!is.numeric(Y)) stop("Response must be a numeric count; got ", class(Y)[1L], ".")
   if (any(Y < 0) || any(Y != floor(Y))) stop("Response must be non-negative integer counts.")
-  off <- if (is.null(offset)) rep_len(0, length(Y))
-         else as.numeric(data[[offset]][match(rownames(mf), rownames(data))])
+  Y <- as.integer(Y)
+  off <- if (is.null(offset)) rep_len(0, length(Y)) else as.numeric(data[[offset]][rows])
   if (anyNA(off)) stop("'offset' has missing values on the estimation rows.")
+  w <- .ud_weights(weights, data, rows); wv <- .ud_w1(w, length(Y))
   Xf <- stats::model.matrix(formula, mf)
   keep <- setdiff(colnames(Xf), "(Intercept)")
   if (!length(keep))
     stop("Provide at least one covariate in 'formula'; the fixed effects are the intercepts.")
   X  <- Xf[, keep, drop = FALSE]
-  uf <- factor(data[[fe]]); nu <- nlevels(uf)
+  uf <- factor(data[[fe]][rows]); nu <- nlevels(uf)
+  .ud_rank_check_fe(X, as.integer(uf))
+  if (is.null(max.support)) max.support <- max(500L, 10L * max(Y))
   ustart <- as.integer(c(0, cumsum(tabulate(as.integer(uf), nu))))
   p  <- ncol(X); ms <- as.integer(max.support); it <- as.integer(inner_it)
-  bs <- tryCatch({ v <- stats::glm.fit(cbind(1, X), Y, offset = off, family = stats::poisson())$coefficients[-1]
+  s  <- .ud_colscale(X); Xs <- sweep(X, 2, s, "/")
+  bs <- tryCatch({ v <- stats::glm.fit(cbind(1, Xs), Y, weights = wv, offset = off, family = stats::poisson())$coefficients[-1]
                    v[!is.finite(v)] <- 0; v }, error = function(e) rep(0, p))
-  nll <- function(par) gec_fe_nll_cpp(par, X, Y, off, ustart, nu, ms, it)
-  cand <- lapply(c(-0.5, 0, 0.5), function(ld)
-    tryCatch(stats::optim(c(bs, ld), nll, method = "Nelder-Mead",
-                          control = list(maxit = maxit, reltol = reltol)), error = function(e) NULL))
-  cand <- cand[!vapply(cand, is.null, logical(1))]
-  if (!length(cand)) stop("All optimization starts failed.")
-  best <- cand[[which.min(vapply(cand, function(f) f$value, numeric(1)))]]
-  beta <- setNames(best$par[1:p], keep); delta <- exp(best$par[p + 1])
-  fe_hat <- gec_fe_intercepts_cpp(best$par, X, Y, off, ustart, nu, ms, it)
+  ## concentrated objective, every unit searched from cold (src/gec_fe.cpp);
+  ## .fe_outer() runs the starts, the polish, and the cold re-evaluation
+  nll_raw <- function(par, awarm) gec_fe_nll_cpp(par, Xs, Y, off, wv, ustart, nu, ms, it, awarm)
+  grad_raw <- function(par, a, edge) gec_fe_grad_cpp(par, Xs, Y, off, wv, ustart, nu, ms, a, edge)
+  best <- .fe_outer(nll_raw, grad_raw, bs, c(-0.5, 0.2), maxit, reltol)
+  if (is.null(best)) stop("All optimization starts failed.")
+  if (best$value >= 1e9)
+    stop("no feasible fit: every start left some count outside the model's support (raise max.support, ",
+         "currently ", ms, ", or check the data).")
+  beta <- setNames(best$par[1:p] / s, keep); delta <- exp(best$par[p + 1])
+  fe_hat <- best$a
   rate <- as.numeric(exp(off + fe_hat[as.integer(uf)] + X %*% beta))
   fitted <- gec_mean_cpp(rate, delta, ms)
 
   se.beta <- setNames(rep(NA_real_, p), keep); ci.beta <- NULL; boot <- NULL; clab <- NULL
   if (se == "bootstrap") {
-    fev  <- as.character(data[[fe]])
+    fev  <- as.character(data[[fe]][rows]); dest <- data[rows, , drop = FALSE]
     cval <- if (is.null(cluster)) fev
-            else if (is.character(cluster) && length(cluster) == 1L) as.character(data[[cluster]])
-            else as.character(cluster)
+            else if (is.character(cluster) && length(cluster) == 1L) as.character(dest[[cluster]])
+            else as.character(cluster[rows])
     clab <- if (is.null(cluster)) fe else if (is.character(cluster) && length(cluster) == 1L) cluster else "custom"
-    grp  <- split(seq_along(Y), cval); boot <- matrix(NA_real_, B, p)
-    for (b in seq_len(B)) {
+    .ud_cluster_guard(cval)
+    grp  <- split(seq_along(Y), cval)
+    one <- function(b) {
       gs   <- sample.int(length(grp), length(grp), replace = TRUE)
-      rows <- unlist(grp[gs], use.names = FALSE)
+      rws  <- unlist(grp[gs], use.names = FALSE)
       bunit <- unlist(lapply(seq_along(gs), function(k) paste0(k, "_", fev[grp[[gs[k]]]])), use.names = FALSE)
-      bd <- data[rows, , drop = FALSE]; bd[[".bootunit"]] <- bunit
-      fb <- tryCatch(gec_fe(formula, data = bd, fe = ".bootunit", se = "none", offset = offset,
+      bd <- dest[rws, , drop = FALSE]; bd[[".bootunit"]] <- bunit
+      fb <- tryCatch(gec_fe(formula, data = bd, fe = ".bootunit", se = "none", offset = offset, weights = weights,
                             max.support = max.support, inner_it = inner_it, maxit = maxit, reltol = reltol),
                      error = function(e) NULL)
-      if (!is.null(fb)) boot[b, ] <- fb$coefficients[keep]
+      if (!is.null(fb)) fb$coefficients[keep] else rep(NA_real_, p)
     }
+    boot <- do.call(rbind, .ud_lapply(seq_len(B), one, cores))
     ok <- boot[stats::complete.cases(boot), , drop = FALSE]
     if (nrow(ok) >= 2) {
       se.beta <- setNames(apply(ok, 2, stats::sd), keep)
@@ -320,9 +389,9 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
   ## leading 1/T incidental-parameters bias term (see .fe_jackknife)
   uncorrected <- NULL
   if (bias_correct == "jackknife") {
-    dest <- data[match(rownames(mf), rownames(data)), , drop = FALSE]
+    dest <- data[rows, , drop = FALSE]
     refit <- function(dd) tryCatch({
-      f <- gec_fe(formula, data = dd, fe = fe, se = "none", offset = offset,
+      f <- gec_fe(formula, data = dd, fe = fe, se = "none", offset = offset, weights = weights,
                   max.support = max.support, inner_it = inner_it, maxit = maxit, reltol = reltol)
       c(f$coefficients[keep], f$delta)
     }, error = function(e) NULL)
@@ -335,11 +404,11 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
               ". Returning the uncorrected maximum-likelihood estimates.")
       bias_correct <- "none"
     } else {
-      for (w in jk$warn) warning("bias_correct = \"jackknife\": ", w, ".")
+      for (wmsg in jk$warn) warning("bias_correct = \"jackknife\": ", wmsg, ".")
       uncorrected <- list(coefficients = beta, delta = delta)
       beta  <- setNames(jk$par[seq_len(p)], keep)
       delta <- unname(jk$par[p + 1L])
-      fe_hat <- gec_fe_intercepts_cpp(c(beta, log(delta)), X, Y, off, ustart, nu, ms, it)
+      fe_hat <- gec_fe_intercepts_cpp(c(beta, log(delta)), X, Y, off, wv, ustart, nu, ms, it)
       rate   <- as.numeric(exp(off + fe_hat[as.integer(uf)] + X %*% beta))
       fitted <- gec_mean_cpp(rate, delta, ms)
       if (!is.null(ci.beta)) {                        # recenter the normal-approx interval
@@ -353,9 +422,12 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
   structure(list(coefficients = beta, delta = delta, dispersion = delta, loglik = -best$value,
                  se.beta = se.beta, ci.beta = ci.beta, boot = boot, se.type = se, cluster = clab,
                  fe = setNames(fe_hat, levels(uf)), fitted.values = fitted, rate = rate, offset = off,
+                 weights = w, nobs_weighted = if (is.null(w)) length(Y) else sum(w),
                  xref = colMeans(X), fe_ref = mean(fe_hat),
                  linear.predictors = log(rate), n = length(Y), n_units = nu, Y = Y,
                  df = p + nu + 1L, max.support = ms, formula = formula, fe_var = fe,
+                 X = X, unit = as.integer(uf), levels = .cpb_xlevels(mf), contrasts = attr(Xf, "contrasts"),
+                 converged = best$convergence == 0,
                  bias_correct = bias_correct, uncorrected = uncorrected,
                  call = match.call()), class = c("gec_fe", "gec"))
 }
@@ -369,11 +441,12 @@ print.gec_fe <- function(x, ...) {
     cat("Coefficients (", x$cluster, "-clustered bootstrap SEs):\n", sep = "")
     print(round(cbind(Estimate = x$coefficients, `Std. Error` = x$se.beta[names(x$coefficients)]), 4))
   } else { cat("Coefficients:\n"); print(round(x$coefficients, 4)) }
-  cat(sprintf("\ndispersion delta (Var/Mean) = %.3f  [%s],  n = %d\n", x$delta, disp, x$n))
+  cat(sprintf("\ndispersion delta (Katz; Var/Mean on an unbounded support) = %.3f  [%s],  n = %d\n", x$delta, disp, x$n))
   if (identical(x$bias_correct, "jackknife"))
     cat("Estimates are split-panel jackknife bias-corrected; logLik/AIC refer to the\nuncorrected maximum-likelihood fit. See ?gec_fe.\n")
   else
     cat("Note: delta is subject to incidental-parameters bias for short panels; see ?gec_fe.\n")
+  if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
   invisible(x)
 }
 
@@ -385,7 +458,7 @@ predict.gec_fe <- function(object, newdata = NULL, type = c("response", "link"),
     Terms <- stats::delete.response(stats::terms(object$formula))
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
-    X <- stats::model.matrix(Terms, newdata)[, names(object$coefficients), drop = FALSE]
+    X <- stats::model.matrix(Terms, newdata, xlev = object$levels)[, names(object$coefficients), drop = FALSE]
     rate <- as.numeric(exp(mean(object$fe) + X %*% object$coefficients))
   }
   switch(type, link = log(rate), response = gec_mean_cpp(rate, object$delta, object$max.support))
