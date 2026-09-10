@@ -384,7 +384,7 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
     vals <- vapply(cand, function(a) fn(c(par[seq_len(p)], qlogis(a))), numeric(1))
     j <- which.min(vals); best <- list(par = c(par[seq_len(p)], qlogis(cand[j])), value = vals[j])
     if (j > 1L) {                                            # the interior of the winning tooth
-      o <- optimize(function(a) fn(c(par[seq_len(p)], qlogis(a))), c(bp[j - 1L] + 1e-9, cand[j]), tol = 1e-10)
+      o <- stats::optimize(function(a) fn(c(par[seq_len(p)], qlogis(a))), c(bp[j - 1L] + 1e-9, cand[j]), tol = 1e-10)
       if (o$objective < best$value) best <- list(par = c(par[seq_len(p)], qlogis(o$minimum)), value = o$objective)
     }
     if (best$value >= fit$value - 1e-8) break

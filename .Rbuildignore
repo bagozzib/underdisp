@@ -6,3 +6,6 @@
 ^cran-comments\.md$
 ^.*\.Rproj$
 ^\.Rproj\.user$
+^src/.*\.o$
+^src/.*\.dll$
+^src/.*\.so$
