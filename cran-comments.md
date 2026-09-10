@@ -11,11 +11,15 @@ review round (see NEWS.md).
 * GitHub Actions (r-lib/actions): ubuntu-latest (R release, devel, oldrel-1),
   macOS-latest (release), windows-latest (release), with NOT_CRAN = true so the
   full test suite runs.
-* win-builder R-devel and R-release.
+* win-builder R-devel and R-release (submitted 2026-09-10).
 
 ## R CMD check results
 
-0 errors | 0 warnings | 0 notes (fill in from the final local check)
+Local (Windows 11, R 4.6.1, `R CMD check --as-cran`, 2026-09-10):
+0 errors | 0 warnings | 1 note. The note is "Files 'README.md' or 'NEWS.md'
+cannot be checked without 'pandoc' being installed", a property of the local
+check environment. With NOT_CRAN=true (the full validation batteries) the
+suite is 835 tests, 0 failures.
 
 ## Notes for the reviewer
 
