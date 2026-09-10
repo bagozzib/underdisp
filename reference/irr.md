@@ -43,7 +43,7 @@ N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)
 fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 100)
 irr(fit)
 #>         term equation ratio estimate lower upper             method
-#>  (Intercept)    count   IRR    4.486 4.265 4.655 bootstrap (stored)
-#>            x    count   IRR    1.538 1.475 1.607 bootstrap (stored)
+#>  (Intercept)    count   IRR    4.484 4.266 4.660 bootstrap (stored)
+#>            x    count   IRR    1.539 1.476 1.612 bootstrap (stored)
 # }
 ```

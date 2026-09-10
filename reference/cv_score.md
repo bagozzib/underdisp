@@ -66,6 +66,6 @@ set.seed(1)
 d <- data.frame(y = rcpb(500, lambda = 3, alpha = 0.5))
 cv <- cv_score(function(tr) cpb(y ~ 1, tr, truncated = FALSE, se = "none"), d, k = 5)
 cv$logscore
-#> [1] 1.613497
+#> [1] 1.613494
 # }
 ```

@@ -63,7 +63,7 @@ N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)
 fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "none")
 predict(fit, newdata = data.frame(x = 0), type = "ceiling")
 #>          
-#> 9.543659 
+#> 9.543256 
 predict(fit, newdata = data.frame(x = c(-1, 1)), type = "prob", at = 5)
-#> [1] 0.08791085 0.05969875
+#> [1] 0.08812504 0.05952484
 ```

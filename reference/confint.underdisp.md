@@ -20,9 +20,11 @@ and
 [`zi_count()`](https://bagozzib.github.io/underdisp/reference/zi_count.md)
 (the dispersion parameter's interval is mapped from its estimation scale
 to the natural scale); and, for the hurdles, the participation model's
-Wald intervals (prefixed `part:`) stacked over the intensity model's
-intervals (prefixed `int:`). A fit without inference errors
-informatively.
+Wald intervals (prefixed `participation:`) stacked over the intensity
+model's intervals (prefixed `intensity:`); the zero-inflated classes
+prefix `count:` and `zero:`. The same names label
+[`vcov()`](https://rdrr.io/r/stats/vcov.html), `tidy()`, and the texreg
+tables. A fit without inference errors informatively.
 
 ## Usage
 

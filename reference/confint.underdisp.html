@@ -8,8 +8,9 @@ gec_fe()) and the zero-inflated mixtures (zi_cpb(), zi_gec()); Wald
 intervals from the analytic covariance for count_reg() and zi_count()
 (the dispersion parameter's interval is mapped from its estimation scale to
 the natural scale); and, for the hurdles, the participation model's Wald
-intervals (prefixed part:) stacked over the intensity model's intervals
-(prefixed int:). A fit without inference errors informatively."><meta property="og:description" content="confint() methods for the whole family, one interval rule per inference
+intervals (prefixed participation:) stacked over the intensity model's intervals
+(prefixed intensity:); the zero-inflated classes prefix count: and zero:.
+The same names label vcov(), tidy(), and the texreg tables. A fit without inference errors informatively."><meta property="og:description" content="confint() methods for the whole family, one interval rule per inference
 type: bootstrap percentile intervals for cpb() (coefficients; the
 dispersion parameter gets its profile-likelihood interval) and gec()
 (coefficients and delta); normal-approximation intervals from the
@@ -18,8 +19,9 @@ gec_fe()) and the zero-inflated mixtures (zi_cpb(), zi_gec()); Wald
 intervals from the analytic covariance for count_reg() and zi_count()
 (the dispersion parameter's interval is mapped from its estimation scale to
 the natural scale); and, for the hurdles, the participation model's Wald
-intervals (prefixed part:) stacked over the intensity model's intervals
-(prefixed int:). A fit without inference errors informatively."></head><body>
+intervals (prefixed participation:) stacked over the intensity model's intervals
+(prefixed intensity:); the zero-inflated classes prefix count: and zero:.
+The same names label vcov(), tidy(), and the texreg tables. A fit without inference errors informatively."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -68,8 +70,9 @@ bootstrap standard errors for the fixed-effects fits (<code><a href="cpb_fe.html
 intervals from the analytic covariance for <code><a href="count_reg.html">count_reg()</a></code> and <code><a href="zi_count.html">zi_count()</a></code>
 (the dispersion parameter's interval is mapped from its estimation scale to
 the natural scale); and, for the hurdles, the participation model's Wald
-intervals (prefixed <code>part:</code>) stacked over the intensity model's intervals
-(prefixed <code>int:</code>). A fit without inference errors informatively.</p>
+intervals (prefixed <code>participation:</code>) stacked over the intensity model's intervals
+(prefixed <code>intensity:</code>); the zero-inflated classes prefix <code>count:</code> and <code>zero:</code>.
+The same names label <code><a href="https://rdrr.io/r/stats/vcov.html" class="external-link">vcov()</a></code>, <code>tidy()</code>, and the texreg tables. A fit without inference errors informatively.</p>
     </div>
 
     <div class="section level2">

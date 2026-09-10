@@ -142,7 +142,10 @@ vector aligned to its rows) for <code>se = "cluster"</code>; supplying it select
 dispersion parameter on its natural scale (the negative-binomial size, the
 COM-Poisson \(\nu\), the generalized-Poisson \(\lambda\), the
 gamma-count \(\alpha\), the double-Poisson \(\theta\); <code>NA</code> for the
-Poisson).</p>
+Poisson); <code>$fitted.values</code> and <code>$residuals</code> are on the mean scale (the
+conditional mean E(Y | Y &gt;= 1) for a zero-truncated fit), as <code><a href="https://rdrr.io/r/stats/fitted.values.html" class="external-link">fitted()</a></code> and
+<code><a href="https://rdrr.io/r/stats/residuals.html" class="external-link">residuals()</a></code> return them, and <code>$mu</code> is the family's natural parameter
+<code>exp(offset + x'b)</code>.</p>
     </div>
     <div class="section level2">
     <h2 id="families">Families<a class="anchor" aria-label="anchor" href="#families"></a></h2>
@@ -173,6 +176,12 @@ constant, \(\theta &gt; 1\) underdispersed (see <a href="doublepois-distribution
 <code><a href="dispersion_test.html">dispersion_test()</a></code> tests each family's dispersion parameter against it, and
 <code><a href="dispersion_profile.html">dispersion_profile()</a></code> compares the families' implied variance-to-mean curves
 against the data.</p>
+<p>Runtime: the Poisson, negative binomial, gamma-count, and double Poisson and
+generalized Poisson families fit in under a second at a few hundred rows; the
+COM-Poisson families evaluate a normalizing sum per observation (and the
+mean parameterization solves a root per observation), so they take seconds
+at a few hundred rows and minutes at several thousand; <code>se = "robust"</code> and
+<code>"cluster"</code> add numerical scores at the same cost per parameter.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>

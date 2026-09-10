@@ -190,17 +190,17 @@ covers the binary stage.</p>
 <span class="r-in"><span><span class="fu">zi_cpb</span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, data <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">y</span>, x <span class="op">=</span> <span class="va">x</span>, z <span class="op">=</span> <span class="va">z</span><span class="op">)</span>, zero <span class="op">=</span> <span class="op">~</span> <span class="va">z</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Zero-Inflated Continuous Parameter Binomial</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Call:  zi_cpb(formula = y ~ x, data = data.frame(y = y, x = x, z = z),     zero = ~z)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> N: 800   EM iterations: 152   logLik: -1239.2</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N: 800   EM iterations: 236   logLik: -1239.2</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Intensity (CPB) coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)           x </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>      1.2932      0.5011 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intensity alpha (shape): 0.5038 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>      1.2967      0.5011 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intensity alpha (shape): 0.5021 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Zero-inflation (logit link) -- positive coefficients raise P(structural zero), i.e. lower the</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> chance of a positive count (the opposite direction from a hurdle participation model):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)           z </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     -0.3682      0.7069 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     -0.3674      0.7065 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Mean structural-zero probability: 0.418 </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

@@ -106,7 +106,8 @@ comparator.</p>
 
 
 <dt id="arg-run-gp">run_gp<a class="anchor" aria-label="anchor" href="#arg-run-gp"></a></dt>
-<dd><p>Logical; fit the generalized-Poisson comparator (default <code>TRUE</code>).</p></dd>
+<dd><p>Logical; fit the generalized-Poisson comparator (default
+<code>TRUE</code>); gated by <code>comp_max_par</code> and <code>comp_max_n</code> like the COM-Poisson.</p></dd>
 
 
 <dt id="arg-run-comp">run_comp<a class="anchor" aria-label="anchor" href="#arg-run-comp"></a></dt>
@@ -118,7 +119,7 @@ dummy-heavy screens would be slow) or when <code>n</code> exceeds <code>comp_max
 
 <dt id="arg-comp-max-par-comp-max-n">comp_max_par, comp_max_n<a class="anchor" aria-label="anchor" href="#arg-comp-max-par-comp-max-n"></a></dt>
 <dd><p>Parameter and sample-size gates for the
-COM-Poisson comparator (defaults 30 and 5000).</p></dd>
+generalized-Poisson and COM-Poisson comparators (defaults 30 and 5000).</p></dd>
 
 
 <dt id="arg-ztp-threshold">ztp_threshold<a class="anchor" aria-label="anchor" href="#arg-ztp-threshold"></a></dt>
@@ -170,6 +171,16 @@ verdict as diagnostic rather than probative and recommends
 <code>ztp_threshold = "bootstrap"</code>).</p>
     </div>
     <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>Runtime: the marginal and at-risk arms take seconds. <code>ztp_threshold = "bootstrap"</code>
+refits the zero-truncated Poisson <code>ztp_boot_B</code> times (use <code>cores</code>); the CPB
+comparator is fit only up to <code>cpb_max_n</code> rows, and the generalized-Poisson and
+COM-Poisson comparators only when the mean model carries at most
+<code>comp_max_par</code> parameters and at most <code>comp_max_n</code> rows, beyond which their
+rows print <code>NA</code>; each is a full model fit (the two soft-tail families have no
+concentrated fixed-effects path, so a dummy-heavy screen would take minutes).</p>
+    </div>
+    <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
     <p>King, G. (1989). Variance specification in event count models.
 <em>AJPS</em> 33(3):762-784.</p>
@@ -200,7 +211,7 @@ Companion manuscript.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Model comparison (log-lik):</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  Poisson       NB       GP     COMP      CPB </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> -450.900 -450.901 -450.900 -404.542 -403.106 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> -450.900 -450.901 -403.130 -404.542 -403.106 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> COM-Poisson (full data): nu = 2.91  (&gt; 1 = underdispersed, soft tail)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>

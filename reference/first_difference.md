@@ -73,6 +73,6 @@ N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1); y <- rbinom(400, N, 0.5)
 fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 200)
 first_difference(fit, "x", from = -1, to = 1, quantity = "mean")
 #>  component  from    to  diff lower upper             method
-#>       mean 3.038 7.952 4.913 4.567 5.207 bootstrap (stored)
+#>       mean 3.027 7.964 4.937 4.567 5.205 bootstrap (stored)
 # }
 ```

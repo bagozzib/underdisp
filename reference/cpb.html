@@ -174,15 +174,28 @@ jumps, by about \((1-\alpha)^{k}\) at ceiling \(k\). The maximizer is
 found by a deterministic multistart, BFGS from the Poisson solution at each
 value of <code>alpha.start</code> polished by Nelder-Mead with feasibility-repaired
 restarts, on covariates scaled to unit standard deviation (the coefficients
-are mapped back, so the fit does not depend on the covariates' units). Two
-parameterizations of the same design (say, treatment and sum contrasts) can
-settle on different teeth of this surface, with log-likelihoods differing by
-the order of the jumps, which is far inside the sampling variability of the
-estimates; the fixed-effects estimator <code><a href="cpb_fe.html">cpb_fe()</a></code> solves the corresponding
-problem in the unit intercepts exactly. The numerical Hessian is unreliable on
+are mapped back, so the fit does not depend on the covariates' units), and
+the reported maximum is the maximum of the fit's own profile in <code>alpha</code>: the
+profile is traced by continuation on both sides of the estimate (the slopes
+re-maximized at each step from the neighbouring solution) until it has
+dropped four log-likelihood units, and a trace point above the multistart's
+value restarts the fit from there. The same trace gives the profile interval
+of <code><a href="confint.cpb.html">confint.cpb()</a></code>. Two parameterizations of the same design (say, treatment
+and sum contrasts) can still settle on different teeth of this surface, with
+log-likelihoods differing by the order of the jumps; unit intercepts belong
+in the fixed-effects estimator <code><a href="cpb_fe.html">cpb_fe()</a></code>, which solves each of them exactly
+(a pooled fit with many dummy columns can stop short of it). The numerical
+Hessian is unreliable on
 such a surface, so inference uses a cold-multistart bootstrap for the
 coefficients (validated to nominal coverage) and a profile-likelihood interval
 for \(\alpha\) (see <code><a href="confint.cpb.html">confint.cpb()</a></code>).</p>
+<p>Runtime: a fit with <code>se = "none"</code> takes a few seconds at 500 rows and about
+fifteen at 2,000 on one core, the nine starts, the profile trace, and the
+scan in <code>alpha</code> included. The bootstrap
+replicates are maximized by the multistart without the profile trace (about
+a third of a second each at 500 rows), so a replicate can sit on a different
+tooth from the point estimate by the order of the jumps; <code>cores</code> runs them in
+parallel.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
@@ -209,13 +222,13 @@ for \(\alpha\) (see <code><a href="confint.cpb.html">confint.cpb()</a></code>).<
 <span class="r-out co"><span class="r-pr">#&gt;</span> N = 298    inference: none </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             Estimate Std. Error z value Pr(&gt;|z|)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.58947         NA      NA       NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> x            0.50646         NA      NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.58998         NA      NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> x            0.50639         NA      NA       NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alpha = 0.4864   (profile 95% CI: 0.458 to 0.591)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Implied ceiling lambda/(1-alpha): median 9.37   range 2.21 to 36.51 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alpha = 0.4862   (profile 95% CI: 0.457 to 0.591)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Implied ceiling lambda/(1-alpha): median 9.37   range 2.21 to 36.5 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> logLik = -559.53    AIC = 1125.06 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> LR vs ZT-Poisson (H0: alpha = 1): 51.09, p 4.4129e-13</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> LR vs ZT-Poisson (H0: alpha = 1): 51.09, p 4.4046e-13</span>
 </code></pre></div>
     </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

@@ -121,6 +121,6 @@ hurdle_gec(y ~ x, data.frame(y = y, x = x, z = z), participation = ~ z)
 #> Intensity (zero-truncated GEC) coefficients:
 #> (Intercept)           x 
 #>      1.3504      0.2550 
-#> Intensity dispersion delta: 0.683  [underdispersed]
+#> Intensity dispersion delta: 0.683  [underdispersed (point estimate)]
 # }
 ```

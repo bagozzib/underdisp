@@ -11,7 +11,9 @@ there, so each unit's objective is unimodal in its intercept and is maximized by
 section on a bracket around the unit's Poisson intercept, expanded while the maximum
 sits at an edge; a maximum at a kink is tracked in the analytic gradient of the
 concentrated likelihood, which the outer BFGS uses. The feasibility floor is exact:
-every count must lie in 0..ceiling(mu/(1-delta))."><meta property="og:description" content="Fits gec() with a full set of unit fixed effects, concentrating (profiling)
+every count must lie in 0..ceiling(mu/(1-delta)).
+Runtime: about twice that of cpb_fe() on the same panel (the Katz recursion
+runs the whole support), so a 2,600-row panel in 146 units takes about two minutes."><meta property="og:description" content="Fits gec() with a full set of unit fixed effects, concentrating (profiling)
 out the unit intercepts by a one-dimensional inner maximization per unit, so
 the outer optimizer handles only the covariate coefficients and the free
 dispersion parameter delta. This is the cpb_fe() concentration generalized
@@ -23,7 +25,9 @@ there, so each unit's objective is unimodal in its intercept and is maximized by
 section on a bracket around the unit's Poisson intercept, expanded while the maximum
 sits at an edge; a maximum at a kink is tracked in the analytic gradient of the
 concentrated likelihood, which the outer BFGS uses. The feasibility floor is exact:
-every count must lie in 0..ceiling(mu/(1-delta))."></head><body>
+every count must lie in 0..ceiling(mu/(1-delta)).
+Runtime: about twice that of cpb_fe() on the same panel (the Katz recursion
+runs the whole support), so a 2,600-row panel in 146 units takes about two minutes."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
 
@@ -75,7 +79,9 @@ there, so each unit's objective is unimodal in its intercept and is maximized by
 section on a bracket around the unit's Poisson intercept, expanded while the maximum
 sits at an edge; a maximum at a kink is tracked in the analytic gradient of the
 concentrated likelihood, which the outer BFGS uses. The feasibility floor is exact:
-every count must lie in <code>0..ceiling(mu/(1-delta))</code>.</p>
+every count must lie in <code>0..ceiling(mu/(1-delta))</code>.
+Runtime: about twice that of <code><a href="cpb_fe.html">cpb_fe()</a></code> on the same panel (the Katz recursion
+runs the whole support), so a 2,600-row panel in 146 units takes about two minutes.</p>
     </div>
 
     <div class="section level2">
@@ -201,7 +207,7 @@ and the maximum-likelihood fit is returned (see <code><a href="cpb_fe.html">cpb_
 <span class="r-out co"><span class="r-pr">#&gt;</span>      x </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> 0.2897 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.488  [underdispersed],  n = 300</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.488  [underdispersed (point estimate)],  n = 300</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Note: delta is subject to incidental-parameters bias for short panels; see ?gec_fe.</span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>

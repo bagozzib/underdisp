@@ -114,6 +114,6 @@ gec(y ~ x, data = data.frame(y = y, x = x), se = "none")
 #> (Intercept)           x 
 #>      0.9760      0.4751 
 #> 
-#> dispersion delta (Katz; Var/Mean on an unbounded support) = 1.131  [overdispersed]
+#> dispersion delta (Katz; Var/Mean on an unbounded support) = 1.131  [equidispersion not rejected (LR p = 0.07)]
 #> logLik = -764.34,  n = 400
 ```

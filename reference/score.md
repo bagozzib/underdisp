@@ -61,5 +61,5 @@ y <- rcpb(400, lambda = 3, alpha = 0.5)
 fit <- cpb(y ~ 1, data = data.frame(y = y), truncated = FALSE, se = "none")
 score(fit)
 #>  logscore       rps 
-#> 1.6095598 0.6678615 
+#> 1.6095598 0.6678597 
 ```

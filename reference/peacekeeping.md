@@ -22,7 +22,7 @@ A data frame with 4,448 rows and 9 variables:
 
 - year:
 
-  Calendar year, 1990–2024.
+  Calendar year, 1990–2016.
 
 - contributions:
 
@@ -83,7 +83,7 @@ fit
 #> 
 #> Intensity (zero-truncated CPB) coefficients:
 #>  lgdppc  milper 
-#>  0.5800 -0.0005 
-#> Intensity alpha (shape): 0.7575 
+#>  0.5799 -0.0005 
+#> Intensity alpha (shape): 0.7574 
 # }
 ```

@@ -137,17 +137,17 @@ y <- rzicpb(n, lambda = exp(1.3 + 0.5 * x), alpha = 0.5, pi = plogis(-0.5 + 0.8 
 zi_cpb(y ~ x, data = data.frame(y = y, x = x, z = z), zero = ~ z)
 #> Zero-Inflated Continuous Parameter Binomial
 #> Call:  zi_cpb(formula = y ~ x, data = data.frame(y = y, x = x, z = z),     zero = ~z)
-#> N: 800   EM iterations: 152   logLik: -1239.2
+#> N: 800   EM iterations: 236   logLik: -1239.2
 #> 
 #> Intensity (CPB) coefficients:
 #> (Intercept)           x 
-#>      1.2932      0.5011 
-#> Intensity alpha (shape): 0.5038 
+#>      1.2967      0.5011 
+#> Intensity alpha (shape): 0.5021 
 #> 
 #> Zero-inflation (logit link) -- positive coefficients raise P(structural zero), i.e. lower the
 #> chance of a positive count (the opposite direction from a hurdle participation model):
 #> (Intercept)           z 
-#>     -0.3682      0.7069 
+#>     -0.3674      0.7065 
 #> Mean structural-zero probability: 0.418 
 # }
 ```

@@ -54,7 +54,7 @@ ud_screen(y ~ x, data = d, run_cpb = FALSE)
 #> 
 #> Model comparison (log-lik):
 #>  Poisson       NB       GP     COMP      CPB 
-#> -798.901 -798.904 -798.901 -772.010       NA 
+#> -798.901 -798.904 -770.154 -772.010       NA 
 #> 
 #> COM-Poisson (full data): nu = 1.84  (> 1 = underdispersed, soft tail)
 ```
@@ -75,13 +75,13 @@ summary(fit)
 #> N = 393    inference: none 
 #> 
 #>             Estimate Std. Error z value Pr(>|z|)
-#> (Intercept)  1.58388         NA      NA       NA
-#> x            0.48948         NA      NA       NA
+#> (Intercept)  1.58279         NA      NA       NA
+#> x            0.49215         NA      NA       NA
 #> 
-#> alpha = 0.5364   (profile 95% CI: 0.493 to 0.614)
-#> Implied ceiling lambda/(1-alpha): median 10.47   range 2.56 to 38.45 
-#> logLik = -745.08    AIC = 1496.16 
-#> LR vs ZT-Poisson (H0: alpha = 1): 58.60, p 9.6764e-15
+#> alpha = 0.5256   (profile 95% CI: 0.487 to 0.613)
+#> Implied ceiling lambda/(1-alpha): median 10.22   range 2.48 to 37.8 
+#> logLik = -745.05    AIC = 1496.1 
+#> LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15
 ```
 
 The dispersion parameter `alpha` summarizes the compression, and each
@@ -101,13 +101,13 @@ available for user-specified covariate profiles.
 ``` r
 
 predict(fit, newdata = data.frame(x = c(-1, 0, 1)), type = "response")
-#> [1] 3.038253 4.880511 7.951650
+#> [1] 3.027411 4.875001 7.964198
 implied_ceiling(fit, newdata = data.frame(x = 0))
 #>     lambda  ceiling    lower    upper
-#> 1 4.873821 10.51349 9.619503 12.61268
+#> 1 4.868501 10.26202 9.491782 12.57789
 first_difference(fit, "x", from = -1, to = 1)
 #>  component  from    to  diff
-#>       mean 3.038 7.952 4.913
+#>       mean 3.027 7.964 4.937
 ```
 
 ## Testing equidispersion
@@ -131,9 +131,9 @@ dispersion_test(fit)
 #> Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null, Self-Liang mixture)
 #> 
 #> data: y ~ x
-#> LR = 58.5968  (logLik: fitted family = -745.08, Poisson = -774.38),  p-value = 9.676e-15
+#> LR = 58.6579  (logLik: fitted family = -745.05, Poisson = -774.38),  p-value = 9.381e-15
 #> alternative hypothesis: underdispersion
-#> estimate: alpha = 0.5364  (Poisson value 1)
+#> estimate: alpha = 0.5256  (Poisson value 1)
 dispersion_test(count_reg(y ~ x, data = d, family = "poisson"),
                 method = "auxiliary", alternative = "under")
 #> 
@@ -163,25 +163,25 @@ summary(fit_b)
 #> N = 393    inference: bootstrap 
 #> 
 #>             Estimate Std. Error z value  Pr(>|z|)    
-#> (Intercept) 1.583878   0.017408  90.983 < 2.2e-16 ***
-#> x           0.489478   0.018386  26.622 < 2.2e-16 ***
+#> (Intercept) 1.582786   0.017445  90.731 < 2.2e-16 ***
+#> x           0.492152   0.018314  26.872 < 2.2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
-#> alpha = 0.5364   (profile 95% CI: 0.493 to 0.614)
-#> Implied ceiling lambda/(1-alpha): median 10.47   range 2.56 to 38.45 
-#> logLik = -745.08    AIC = 1496.16 
-#> LR vs ZT-Poisson (H0: alpha = 1): 58.60, p 9.6764e-15
+#> alpha = 0.5256   (profile 95% CI: 0.487 to 0.613)
+#> Implied ceiling lambda/(1-alpha): median 10.22   range 2.48 to 37.8 
+#> logLik = -745.05    AIC = 1496.1 
+#> LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15
 #> (99 bootstrap resamples converged)
 irr(fit_b)             # rate ratios with percentile intervals
 #>         term equation ratio estimate lower upper             method
-#>  (Intercept)    count   IRR    4.874 4.721 5.045 bootstrap (stored)
-#>            x    count   IRR    1.631 1.579 1.686 bootstrap (stored)
+#>  (Intercept)    count   IRR    4.869 4.722 5.045 bootstrap (stored)
+#>            x    count   IRR    1.636 1.578 1.686 bootstrap (stored)
 confint(fit_b)         # coefficients (percentile) and alpha (profile likelihood)
 #>                  2.5%     97.5%
-#> (Intercept) 1.5519882 1.6183956
-#> x           0.4566045 0.5224254
-#> alpha       0.4933396 0.6135776
+#> (Intercept) 1.5521549 1.6183956
+#> x           0.4561561 0.5224254
+#> alpha       0.4870825 0.6129318
 ```
 
 ## The free-dispersion GEC
@@ -200,7 +200,7 @@ gec(y ~ x, data = d, se = "none")                                  # delta ~ 0.5
 #> (Intercept)           x 
 #>      1.5768      0.4964 
 #> 
-#> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.553  [underdispersed]
+#> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.553  [underdispersed (LR p = 2.3e-14)]
 #> logLik = -769.78,  n = 400
 gec(y ~ x, data = data.frame(y = rpois(n, exp(1 + 0.4 * x)), x = x),
     se = "none")                                                   # delta ~ 1
@@ -209,7 +209,7 @@ gec(y ~ x, data = data.frame(y = rpois(n, exp(1 + 0.4 * x)), x = x),
 #> (Intercept)           x 
 #>      0.9649      0.3493 
 #> 
-#> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.954  [underdispersed]
+#> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.954  [equidispersion not rejected (LR p = 0.52)]
 #> logLik = -740.83,  n = 400
 ```
 
@@ -249,7 +249,7 @@ dispersion_test(fe_fit)      # against a Poisson with the same unit effects
 #> Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null, Self-Liang mixture)
 #> 
 #> data: y ~ x
-#> LR = 216.3067  (logLik: fitted family = -599.47, Poisson = -707.63),  p-value = < 2.2e-16
+#> LR = 216.3068  (logLik: fitted family = -599.47, Poisson = -707.63),  p-value = < 2.2e-16
 #> alternative hypothesis: underdispersion
 #> estimate: alpha = 0.4735  (Poisson value 1)
 ```
@@ -268,7 +268,7 @@ compare_dispersion(y ~ x, data = d)$table
 #> Poisson      2 -798.9009 1601.802 1609.785 1.997252 0.9855061 0.024243957
 #> NegBinomial  3 -798.9042 1603.808 1615.783 1.997261 0.9855095 0.024244780
 #> COM-Poisson  3 -772.0096 1550.019 1561.994 1.930024 0.9631112 0.009312565
-#> CPB          3 -769.2023 1544.405 1556.379 1.923006 0.9642762 0.010281054
+#> CPB          3 -769.2022 1544.404 1556.379 1.923006 0.9642686 0.010295571
 #> GEC          3 -769.7769 1545.554 1557.528 1.924442 0.9644015 0.010538440
 ```
 
@@ -302,7 +302,7 @@ fits <- list(
 )
 do.call(compare_models, fits)
 #>             df    logLik      AIC      BIC logscore       rps
-#> CPB          3 -769.2023 1544.405 1556.379 1.923006 0.9642762
+#> CPB          3 -769.2022 1544.404 1556.379 1.923006 0.9642686
 #> GenPoisson   3 -770.1544 1546.309 1558.283 1.925386 0.9643720
 #> GammaCount   3 -771.8363 1549.673 1561.647 1.929591 0.9632720
 #> COM-Poisson  3 -772.6416 1551.283 1563.258 1.931604 0.9646314
@@ -390,8 +390,8 @@ h <- hurdle_cpb(y ~ x, data = dh, participation = ~ z)
 zi <- zi_cpb(y ~ x, data = dh, zero = ~ z)
 compare_models(hurdle = h, mixture = zi)
 #>         df    logLik      AIC      BIC logscore      rps
-#> hurdle   5 -609.9920 1229.984 1249.941 1.524980 1.039178
-#> mixture  5 -610.1171 1230.234 1250.192 1.525293 1.040128
+#> hurdle   5 -609.9920 1229.984 1249.941 1.524980 1.039174
+#> mixture  5 -610.1175 1230.235 1250.192 1.525294 1.040124
 ```
 
 The hurdle’s
@@ -437,7 +437,7 @@ ml <- cpb_fe(y ~ x, data = short, fe = "unit")
 jk <- cpb_fe(y ~ x, data = short, fe = "unit", bias_correct = "jackknife")
 c(ml = ml$alpha, jackknife = jk$alpha)   # truth is 0.5; ML is biased downward
 #>        ml jackknife 
-#> 0.3873911 0.4799668
+#> 0.3874510 0.4800524
 ```
 
 The correction is only valid when the two half-panels estimate the same

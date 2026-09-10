@@ -51,7 +51,8 @@ ud_screen(
 
 - run_gp:
 
-  Logical; fit the generalized-Poisson comparator (default `TRUE`).
+  Logical; fit the generalized-Poisson comparator (default `TRUE`);
+  gated by `comp_max_par` and `comp_max_n` like the COM-Poisson.
 
 - run_comp:
 
@@ -62,8 +63,8 @@ ud_screen(
 
 - comp_max_par, comp_max_n:
 
-  Parameter and sample-size gates for the COM-Poisson comparator
-  (defaults 30 and 5000).
+  Parameter and sample-size gates for the generalized-Poisson and
+  COM-Poisson comparators (defaults 30 and 5000).
 
 - ztp_threshold:
 
@@ -112,6 +113,18 @@ that share reaches 0.10, the region where the calibrated threshold is
 anti-conservative; the printout then flags the verdict as diagnostic
 rather than probative and recommends `ztp_threshold = "bootstrap"`).
 
+## Details
+
+Runtime: the marginal and at-risk arms take seconds.
+`ztp_threshold = "bootstrap"` refits the zero-truncated Poisson
+`ztp_boot_B` times (use `cores`); the CPB comparator is fit only up to
+`cpb_max_n` rows, and the generalized-Poisson and COM-Poisson
+comparators only when the mean model carries at most `comp_max_par`
+parameters and at most `comp_max_n` rows, beyond which their rows print
+`NA`; each is a full model fit (the two soft-tail families have no
+concentrated fixed-effects path, so a dummy-heavy screen would take
+minutes).
+
 ## References
 
 King, G. (1989). Variance specification in event count models. *AJPS*
@@ -145,7 +158,7 @@ ud_screen(y ~ x, data = data.frame(y = y, x = x))
 #> 
 #> Model comparison (log-lik):
 #>  Poisson       NB       GP     COMP      CPB 
-#> -450.900 -450.901 -450.900 -404.542 -403.106 
+#> -450.900 -450.901 -403.130 -404.542 -403.106 
 #> 
 #> COM-Poisson (full data): nu = 2.91  (> 1 = underdispersed, soft tail)
 #> 

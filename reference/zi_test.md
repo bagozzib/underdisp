@@ -58,8 +58,8 @@ y <- rzicpb(500, lambda = exp(1.2 + 0.4 * x), alpha = 0.5, pi = 0.3)
 zi_test(y ~ x, data = data.frame(y = y, x = x))
 #> Warning: the fitted ceiling reaches max.support (500): alpha is bounded by the guard, not the data. The data may not be underdispersed (compare gec(), which lets the dispersion go either way), or raise max.support.
 #> Boundary-corrected LR test for zero-inflation (CPB vs ZI-CPB)
-#>   logLik: CPB = -1089.75, ZI-CPB = -855.77
-#>   LR = 467.97,  p = 4.435e-104   (0.5 chi^2_0 + 0.5 chi^2_1 mixture)
+#>   logLik: CPB = -1089.75, ZI-CPB = -855.76
+#>   LR = 467.97,  p = 4.426e-104   (0.5 chi^2_0 + 0.5 chi^2_1 mixture)
 #>   Reject: a structural-zero component improves fit.
 # }
 ```

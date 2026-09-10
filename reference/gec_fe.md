@@ -16,7 +16,10 @@ bracket around the unit's Poisson intercept, expanded while the maximum
 sits at an edge; a maximum at a kink is tracked in the analytic gradient
 of the concentrated likelihood, which the outer BFGS uses. The
 feasibility floor is exact: every count must lie in
-`0..ceiling(mu/(1-delta))`.
+`0..ceiling(mu/(1-delta))`. Runtime: about twice that of
+[`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md)
+on the same panel (the Katz recursion runs the whole support), so a
+2,600-row panel in 146 units takes about two minutes.
 
 ## Usage
 
@@ -151,7 +154,7 @@ gec_fe(y ~ x, data = d, fe = "unit")   # delta ~ 0.5: underdispersed
 #>      x 
 #> 0.2897 
 #> 
-#> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.488  [underdispersed],  n = 300
+#> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.488  [underdispersed (point estimate)],  n = 300
 #> Note: delta is subject to incidental-parameters bias for short panels; see ?gec_fe.
 # }
 ```

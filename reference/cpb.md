@@ -126,17 +126,32 @@ normalizing constant jumps, by about \\(1-\alpha)^{k}\\ at ceiling
 the Poisson solution at each value of `alpha.start` polished by
 Nelder-Mead with feasibility-repaired restarts, on covariates scaled to
 unit standard deviation (the coefficients are mapped back, so the fit
-does not depend on the covariates' units). Two parameterizations of the
-same design (say, treatment and sum contrasts) can settle on different
-teeth of this surface, with log-likelihoods differing by the order of
-the jumps, which is far inside the sampling variability of the
-estimates; the fixed-effects estimator
-[`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md)
-solves the corresponding problem in the unit intercepts exactly. The
-numerical Hessian is unreliable on such a surface, so inference uses a
-cold-multistart bootstrap for the coefficients (validated to nominal
-coverage) and a profile-likelihood interval for \\\alpha\\ (see
+does not depend on the covariates' units), and the reported maximum is
+the maximum of the fit's own profile in `alpha`: the profile is traced
+by continuation on both sides of the estimate (the slopes re-maximized
+at each step from the neighbouring solution) until it has dropped four
+log-likelihood units, and a trace point above the multistart's value
+restarts the fit from there. The same trace gives the profile interval
+of
+[`confint.cpb()`](https://bagozzib.github.io/underdisp/reference/confint.cpb.md).
+Two parameterizations of the same design (say, treatment and sum
+contrasts) can still settle on different teeth of this surface, with
+log-likelihoods differing by the order of the jumps; unit intercepts
+belong in the fixed-effects estimator
+[`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md),
+which solves each of them exactly (a pooled fit with many dummy columns
+can stop short of it). The numerical Hessian is unreliable on such a
+surface, so inference uses a cold-multistart bootstrap for the
+coefficients (validated to nominal coverage) and a profile-likelihood
+interval for \\\alpha\\ (see
 [`confint.cpb()`](https://bagozzib.github.io/underdisp/reference/confint.cpb.md)).
+
+Runtime: a fit with `se = "none"` takes a few seconds at 500 rows and
+about fifteen at 2,000 on one core, the nine starts, the profile trace,
+and the scan in `alpha` included. The bootstrap replicates are maximized
+by the multistart without the profile trace (about a third of a second
+each at 500 rows), so a replicate can sit on a different tooth from the
+point estimate by the order of the jumps; `cores` runs them in parallel.
 
 ## References
 
@@ -166,11 +181,11 @@ summary(fit)
 #> N = 298    inference: none 
 #> 
 #>             Estimate Std. Error z value Pr(>|z|)
-#> (Intercept)  1.58947         NA      NA       NA
-#> x            0.50646         NA      NA       NA
+#> (Intercept)  1.58998         NA      NA       NA
+#> x            0.50639         NA      NA       NA
 #> 
-#> alpha = 0.4864   (profile 95% CI: 0.458 to 0.591)
-#> Implied ceiling lambda/(1-alpha): median 9.37   range 2.21 to 36.51 
+#> alpha = 0.4862   (profile 95% CI: 0.457 to 0.591)
+#> Implied ceiling lambda/(1-alpha): median 9.37   range 2.21 to 36.5 
 #> logLik = -559.53    AIC = 1125.06 
-#> LR vs ZT-Poisson (H0: alpha = 1): 51.09, p 4.4129e-13
+#> LR vs ZT-Poisson (H0: alpha = 1): 51.09, p 4.4046e-13
 ```

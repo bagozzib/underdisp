@@ -45,6 +45,6 @@ compare_models(hurdle = hurdle_cpb(y ~ x, data = d, participation = ~ z),
                zi = zi_cpb(y ~ x, data = d, zero = ~ z))
 #>        df    logLik      AIC      BIC logscore      rps
 #> hurdle  5 -1124.482 2258.964 2282.388 1.405603 1.008874
-#> zi      5 -1126.524 2263.049 2286.472 1.408155 1.009496
+#> zi      5 -1126.524 2263.049 2286.472 1.408156 1.009496
 # }
 ```

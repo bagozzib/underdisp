@@ -95,7 +95,11 @@ An object of class `"count_reg"`. The component `$theta` holds the
 dispersion parameter on its natural scale (the negative-binomial size,
 the COM-Poisson \\\nu\\, the generalized-Poisson \\\lambda\\, the
 gamma-count \\\alpha\\, the double-Poisson \\\theta\\; `NA` for the
-Poisson).
+Poisson); `$fitted.values` and `$residuals` are on the mean scale (the
+conditional mean E(Y \| Y \>= 1) for a zero-truncated fit), as
+[`fitted()`](https://rdrr.io/r/stats/fitted.values.html) and
+[`residuals()`](https://rdrr.io/r/stats/residuals.html) return them, and
+`$mu` is the family's natural parameter `exp(offset + x'b)`.
 
 ## Families
 
@@ -137,6 +141,14 @@ The Poisson is the equidispersed member of every family, so
 tests each family's dispersion parameter against it, and
 [`dispersion_profile()`](https://bagozzib.github.io/underdisp/reference/dispersion_profile.md)
 compares the families' implied variance-to-mean curves against the data.
+
+Runtime: the Poisson, negative binomial, gamma-count, and double Poisson
+and generalized Poisson families fit in under a second at a few hundred
+rows; the COM-Poisson families evaluate a normalizing sum per
+observation (and the mean parameterization solves a root per
+observation), so they take seconds at a few hundred rows and minutes at
+several thousand; `se = "robust"` and `"cluster"` add numerical scores
+at the same cost per parameter.
 
 ## References
 

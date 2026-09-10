@@ -84,7 +84,10 @@ zi_count(
 
 ## Value
 
-An object of class `"zi_count"`.
+An object of class `"zi_count"`; `$fitted.values` is the marginal mean
+`(1 - pi) E(Y | count component)` that
+[`fitted()`](https://rdrr.io/r/stats/fitted.values.html) returns, and
+`$mu` the count component's natural parameter.
 
 ## See also
 

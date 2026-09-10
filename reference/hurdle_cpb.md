@@ -126,6 +126,6 @@ fit
 #> 
 #> Intensity (zero-truncated CPB) coefficients:
 #> (Intercept)           x 
-#>      1.2831      0.5031 
-#> Intensity alpha (shape): 0.5106 
+#>      1.2828      0.5023 
+#> Intensity alpha (shape): 0.51 
 ```
