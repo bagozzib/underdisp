@@ -42,7 +42,10 @@
 #include "cpb_pmf.h"
 using namespace Rcpp;
 
-// Everything the inner search needs about one unit.
+// Everything the inner search needs about one unit. Internal linkage: gec_fe.cpp
+// defines a different Unit, and two definitions of one class name with external
+// linkage would share their inline member functions across the files.
+namespace {
 struct Unit {
   const IntegerVector& Y; const std::vector<double>& o; const NumericVector& w;
   int lo, hi; double alpha, la, l1a; int max_support; bool truncated;
@@ -68,6 +71,7 @@ struct Unit {
   }
   void tooth(double a, double& prev, double& next) const { int pt, nt; tooth(a, prev, next, pt, nt); }
 };
+}  // namespace
 
 // window (log scale) around the peak within which breakpoints are enumerated
 // (extended once on a side where the best breakpoint sits near the edge), and
