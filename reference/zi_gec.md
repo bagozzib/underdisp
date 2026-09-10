@@ -108,13 +108,13 @@ zi_gec(y ~ x, data.frame(y = y, x = x, z = z), zero = ~ z)
 #> 
 #> Count (GEC) coefficients:
 #> (Intercept)           x 
-#>      1.0339      0.2559 
-#> Count dispersion delta: 0.919  [underdispersed (point estimate)]
+#>      1.0341      0.2551 
+#> Count dispersion delta: 0.914  [underdispersed (point estimate)]
 #> 
 #> Zero-inflation (logit link) -- positive coefficients raise P(structural zero), i.e. lower the
 #> chance of a positive count (the opposite direction from a hurdle participation model):
 #> (Intercept)           z 
-#>     -0.5645      0.8042 
-#> Mean structural-zero probability: 0.37 
+#>     -0.5634      0.8040 
+#> Mean structural-zero probability: 0.371 
 # }
 ```

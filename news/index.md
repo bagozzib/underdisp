@@ -179,10 +179,17 @@
   and
   [`zi_gec()`](https://bagozzib.github.io/underdisp/reference/zi_gec.md)
   refuse a non-integer response instead of flooring it;
-  [`zi_cpb()`](https://bagozzib.github.io/underdisp/reference/zi_cpb.md)
-  works on scaled covariates like every other estimator;
-  `summary.zi_count()` prints the stored inflation standard errors;
-  every bootstrapping summary states how many replicates converged;
+  [`zi_cpb()`](https://bagozzib.github.io/underdisp/reference/zi_cpb.md),
+  [`zi_count()`](https://bagozzib.github.io/underdisp/reference/zi_count.md),
+  and
+  [`zi_gec()`](https://bagozzib.github.io/underdisp/reference/zi_gec.md)
+  work on scaled covariates with a Nelder-Mead polish like every other
+  estimator (the unscaled joint fit of
+  [`zi_count()`](https://bagozzib.github.io/underdisp/reference/zi_count.md)
+  could stop at its starting values: on lme4’s `grouseticks` it stopped
+  4.4 log-likelihood units below pscl’s optimum); `summary.zi_count()`
+  prints the stored inflation standard errors; every bootstrapping
+  summary states how many replicates converged;
   [`count_reg()`](https://bagozzib.github.io/underdisp/reference/count_reg.md)
   and
   [`zi_count()`](https://bagozzib.github.io/underdisp/reference/zi_count.md)
