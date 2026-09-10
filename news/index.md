@@ -155,6 +155,11 @@
   [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) on a
   `hurdle_gec` is the exact conditional mean that
   [`predict()`](https://rdrr.io/r/stats/predict.html) returns.
+- The zero-truncated CPB at an implied ceiling below 1 is the point mass
+  at 1 in the pmf, the moments, the first differences, and the simulator
+  alike (the zero-truncated distribution for every ceiling in \[1, 2)),
+  so the hurdle’s predictions, scores, and rootograms are finite at rows
+  whose covariates put the rate below a unit’s feasibility floor.
 - One rule names the coefficients of the two-part classes everywhere:
   `participation:`/`intensity:` for the hurdles and `count:`/`zero:` for
   the zero-inflated models, in

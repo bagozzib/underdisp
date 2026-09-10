@@ -77,7 +77,10 @@ zero. Complements the simulator <code><a href="rcpb.html">rcpb()</a></code>.</p>
 
 
 <dt id="arg-truncated">truncated<a class="anchor" aria-label="anchor" href="#arg-truncated"></a></dt>
-<dd><p>If <code>TRUE</code>, use the zero-truncated CPB.</p></dd>
+<dd><p>If <code>TRUE</code>, use the zero-truncated CPB. Where the implied
+ceiling <code>lambda / (1 - alpha)</code> is below 1 the CPB puts all its mass on 0,
+and its zero-truncated form is the point mass at 1, the zero-truncated
+distribution for every ceiling in [1, 2).</p></dd>
 
 
 <dt id="arg-log-log-p">log, log.p<a class="anchor" aria-label="anchor" href="#arg-log-log-p"></a></dt>

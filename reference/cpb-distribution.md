@@ -32,7 +32,10 @@ qcpb(p, lambda, alpha, truncated = FALSE, lower.tail = TRUE, log.p = FALSE)
 
 - truncated:
 
-  If `TRUE`, use the zero-truncated CPB.
+  If `TRUE`, use the zero-truncated CPB. Where the implied ceiling
+  `lambda / (1 - alpha)` is below 1 the CPB puts all its mass on 0, and
+  its zero-truncated form is the point mass at 1, the zero-truncated
+  distribution for every ceiling in \[1, 2).
 
 - log, log.p:
 
