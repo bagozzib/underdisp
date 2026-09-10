@@ -1,6 +1,8 @@
 ## The four families added in 0.1.1: pmf identities, oracle parity, recovery,
 ## and inheritance of the two-part machinery.
 
+testthat::skip_on_cran()   # validation battery: runs in the package's CI (NOT_CRAN = true), not on CRAN
+
 test_that("each family's pmf sums to one and has the Poisson as its equidispersed member", {
   k <- 0:80
   expect_equal(sum(dgammacount(k, 3.2, 2.5)), 1, tolerance = 1e-10)

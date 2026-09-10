@@ -2,6 +2,8 @@
 ## adversarial re-review (predict recycling, dropped offsets, truncated prob,
 ## zero_fe predict, GEC/FE QoI parity). Each guards a specific fixed bug.
 
+testthat::skip_on_cran()   # validation battery: runs in the package's CI (NOT_CRAN = true), not on CRAN
+
 test_that("predict.hurdle_cpb marginal E(Y) is full-length and not recycled", {
   set.seed(1); n <- 300; x <- rnorm(n); z <- rnorm(n)
   y <- ifelse(rbinom(n, 1, plogis(0.3 + 0.6 * z)) == 1, 0L, 1L + rpois(n, exp(0.6 + 0.4 * x)))

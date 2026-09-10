@@ -2,6 +2,8 @@
 ## class answers confint()/vcov()/irr()/first_difference()/update(), the
 ## refusals are informative, and the argument checks are uniform.
 
+testthat::skip_on_cran()   # validation battery: runs in the package's CI (NOT_CRAN = true), not on CRAN
+
 set.seed(21); n <- 300; x <- rnorm(n); z <- rnorm(n)
 d0 <- data.frame(y = rcpb(n, exp(1.2 + 0.5 * x), 0.5), x = x, z = z, u = factor(sample(1:15, n, TRUE)))
 

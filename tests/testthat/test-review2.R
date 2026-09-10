@@ -2,6 +2,8 @@
 ## verification/referee_panels_2026-09/round2/response_r2.md): each block guards
 ## one item by the behaviour the referee reproduced.
 
+testthat::skip_on_cran()   # validation battery: runs in the package's CI (NOT_CRAN = true), not on CRAN
+
 set.seed(21); n <- 240; x <- rnorm(n); z <- rnorm(n); u <- rep(1:20, each = 12)
 d  <- data.frame(y = rcpb(n, exp(1.2 + 0.4 * x + rnorm(20, 0, 0.3)[u]), 0.5), x = x, z = z, unit = u)
 dz <- d; dz$y <- ifelse(runif(n) < plogis(-1 + 0.8 * z), 0L, dz$y)

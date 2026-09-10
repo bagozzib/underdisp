@@ -3,6 +3,8 @@
 ## tests pin the inner search against an R-side brute force and check that the
 ## reported log-likelihood is attained at the reported intercepts.
 
+testthat::skip_on_cran()   # validation battery: runs in the package's CI (NOT_CRAN = true), not on CRAN
+
 brute_unit <- function(yy, oo, alpha, width = 4, by = 0.002) {
   if (sum(yy) == 0) return(0)                 # all-zero unit: the supremum is P(0) -> 1 as the rate -> 0
   ll <- function(a) { v <- sum(dcpb(yy, exp(a + oo), alpha, log = TRUE)); if (is.finite(v)) v else -1e300 }

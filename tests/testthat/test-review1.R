@@ -1,5 +1,7 @@
 ## Regression tests for the round-1 referee findings (statistics and numerics).
 
+testthat::skip_on_cran()   # validation battery: runs in the package's CI (NOT_CRAN = true), not on CRAN
+
 set.seed(31); n <- 400; x <- rnorm(n); z <- rnorm(n)
 d0 <- data.frame(y = rcpb(n, exp(1.2 + 0.5 * x), 0.5), x = x, z = z, u = factor(sample(1:15, n, TRUE)))
 
