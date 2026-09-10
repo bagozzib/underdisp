@@ -18,8 +18,9 @@ review round (see NEWS.md).
 Local (Windows 11, R 4.6.1, `R CMD check --as-cran`, 2026-09-10):
 0 errors | 0 warnings | 1 note. The note is "Files 'README.md' or 'NEWS.md'
 cannot be checked without 'pandoc' being installed", a property of the local
-check environment. With NOT_CRAN=true (the full validation batteries) the
-suite is 835 tests, 0 failures.
+check environment. The CRAN-mode test run passes (183 expectations, 0
+failures); the full validation batteries run with NOT_CRAN=true in the
+package CI on macOS (arm64), Windows, and Linux.
 
 ## Notes for the reviewer
 
@@ -31,5 +32,5 @@ suite is 835 tests, 0 failures.
 * Tests and examples that compare against `glmmTMB`, `gamlss.dist`, `rmutil`,
   `COMPoissonReg`, and the `Ecdat`/`wooldridge` data sets are guarded by
   `requireNamespace()` and skip when those Suggests are unavailable.
-* Words flagged as possibly misspelled in the Description (CPB, Katz,
-  COM-Poisson, underdispersed, underdispersion) are standard statistical terms.
+* Words flagged as possibly misspelled in the Description (Katz, equidispersion,
+  rootograms) are standard statistical terms.
