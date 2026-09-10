@@ -121,8 +121,11 @@
   `cluster` with it; `hurdle_count()` selects the cluster-robust covariance
   when `cluster` is supplied, as its siblings do, and accepts a vector
   `cluster` aligned to the data; `zi_cpb()` and `zi_gec()` refuse a
-  non-integer response instead of flooring it; `zi_cpb()` works on scaled
-  covariates like every other estimator; `summary.zi_count()` prints the
+  non-integer response instead of flooring it; `zi_cpb()`, `zi_count()`, and
+  `zi_gec()` work on scaled covariates with a Nelder-Mead polish like every
+  other estimator (the unscaled joint fit of `zi_count()` could stop at its
+  starting values: on lme4's `grouseticks` it stopped 4.4 log-likelihood units
+  below pscl's optimum); `summary.zi_count()` prints the
   stored inflation standard errors; every bootstrapping summary states how
   many replicates converged; `count_reg()` and `zi_count()` store
   `$fitted.values` on the mean scale and the natural parameter as `$mu`.

@@ -244,13 +244,20 @@ zi_gec <- function(formula, data, zero = NULL, zero_fe = NULL, se = c("none", "b
       pit <- as.numeric(stats::plogis(Z %*% par[(pb + 2):(pb + 1 + pg)]))
       -sum(w * ifelse(is0, log(pit + (1 - pit) * m[, 2]), log(1 - pit) + pmax(m[, 1], -700)))
     }
+    ## the optimizer works on the covariates of both equations scaled to unit
+    ## (weighted) standard deviation, and the best start is polished by chained
+    ## Nelder-Mead restarts; the coefficients are mapped back at the end
+    sc <- c(.ud_colscale(X, w), 1, .ud_colscale(Z, w))
+    nll_s <- function(v) nll(v / sc)
     best <- NULL
     for (ld0 in unique(c(log(d0), log(0.5), 0, log(1.5)))) {
-      op <- tryCatch(stats::optim(c(b0, ld0, g0), nll, method = "Nelder-Mead",
+      op <- tryCatch(stats::optim(c(b0, ld0, g0) * sc, nll_s, method = "Nelder-Mead",
                                   control = list(maxit = 20L * maxit, reltol = tol)), error = function(e) NULL)
       if (!is.null(op) && (is.null(best) || op$value < best$value)) best <- op
     }
     if (is.null(best)) stop("zi_gec: all optimization starts failed.")
+    best <- .ud_nm_polish(best, nll_s, 20L * maxit, tol)
+    best$par <- best$par / sc
     b <- best$par[1:pb]; delta <- exp(best$par[pb + 1]); g <- best$par[(pb + 2):(pb + 1 + pg)]
     names(b) <- colnames(X); names(g) <- colnames(Z)
     list(b = b, delta = delta, g = g, ll = -best$value, it = as.integer(best$counts[1]),

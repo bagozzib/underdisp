@@ -511,13 +511,20 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
     c(ft$beta, g0, if (fam$nshape) fam$shape_link(ft$theta))
   }, error = function(e) NULL)
   nll <- function(th) { v <- sum(w1 * .zi_llik_i(th, Xc, Zz, Y, fam, linkinv, off)); if (!is.finite(v)) 1e10 else -v }
+  ## the optimizer works on the covariates of both equations scaled to unit
+  ## (weighted) standard deviation, and each start is polished by chained
+  ## Nelder-Mead restarts; the coefficients are mapped back at the end
+  sc <- c(.ud_colscale(Xc, w1), .ud_colscale(Zz, w1), if (fam$nshape) 1)
+  nll_s <- function(v) nll(v / sc)
   o <- NULL
   for (st in Filter(Negate(is.null), list(st_tr, c(b0, g0, if (fam$nshape) fam$shape_link(fam$shape_starts[1L]))))) {
-    oi <- tryCatch(stats::optim(st, nll, method = "BFGS", control = list(maxit = 1000, reltol = 1e-10)),
+    oi <- tryCatch(stats::optim(st * sc, nll_s, method = "BFGS", control = list(maxit = 1000, reltol = 1e-10)),
                    error = function(e) NULL)
+    if (!is.null(oi)) oi <- .ud_nm_polish(oi, nll_s, maxit = 5000L, reltol = 1e-10)
     if (!is.null(oi) && (is.null(o) || oi$value < o$value)) o <- oi
   }
   if (is.null(o)) stop("zi_count: optimization failed from all starting values.")
+  o$par <- o$par / sc
   beta <- o$par[seq_len(pc)]; names(beta) <- colnames(Xc)
   gamma <- o$par[pc + seq_len(pz)]; names(gamma) <- colnames(Zz)
   theta <- if (fam$nshape) unname(fam$shape_inv(o$par[pc + pz + 1L])) else NA_real_
@@ -527,7 +534,7 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
   if (se != "none") {
     nm <- c(paste0("count:", colnames(Xc)), paste0("zero:", colnames(Zz)), if (fam$nshape) fam$shape_name)
     V <- tryCatch(.count_vcov(o$par, function(th) .zi_llik_i(th, Xc, Zz, Y, fam, linkinv, off), se, clid, nm, w = w,
-                              scale = c(.ud_colscale(Xc), .ud_colscale(Zz), if (fam$nshape) 1)),
+                              scale = sc),
                   error = function(e) NULL)
     if (!is.null(V)) {
       vcv_full <- V

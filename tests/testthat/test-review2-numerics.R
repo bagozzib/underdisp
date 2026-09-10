@@ -42,3 +42,17 @@ test_that("a matched-family fit that never leaves the infeasible plateau is not 
   expect_warning(f <- count_reg(y ~ x, d, family = "poisson", se = "none"), "did not converge")
   expect_false(f$converged); expect_equal(f$loglik, -Inf)
 })
+
+test_that("zi_count reaches pscl's optimum and does not depend on a covariate's units (battery)", {
+  ## a design like lme4's grouseticks: a covariate in the hundreds in both equations
+  set.seed(8); n <- 400; h <- runif(n, 400, 550)
+  y <- ifelse(runif(n) < plogis(-11.6 + 0.024 * h), 0L, rpois(n, exp(9.9 - 0.017 * h)))
+  d <- data.frame(y = y, h = h, h100 = h / 100)
+  f1 <- zi_count(y ~ h, d, family = "poisson", zero = ~ h, se = "none")
+  f2 <- zi_count(y ~ h100, d, family = "poisson", zero = ~ h100, se = "none")
+  expect_equal(f1$loglik, f2$loglik, tolerance = 1e-8)
+  expect_equal(unname(f1$zero.coefficients[2]) * 100, unname(f2$zero.coefficients[2]), tolerance = 1e-5)
+  skip_if_not_installed("pscl")
+  pz <- pscl::zeroinfl(y ~ h | h, data = d, dist = "poisson")
+  expect_gte(f1$loglik, as.numeric(logLik(pz)) - 1e-4)
+})

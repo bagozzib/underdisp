@@ -115,3 +115,11 @@ test_that("rows dropped for a missing unit identifier take vector arguments with
   g <- count_reg(y ~ x, dn, family = "poisson", fe = "unit", offset = off, weights = wt)
   expect_equal(g$n, n - 6)
 })
+
+test_that("zi_gec does not depend on the units of a covariate", {
+  f1 <- zi_gec(y ~ x, dz, zero = ~ z, se = "none")
+  d2 <- dz; d2$x <- 1000 * d2$x; d2$z <- 100 * d2$z
+  f2 <- zi_gec(y ~ x, d2, zero = ~ z, se = "none")
+  expect_equal(f1$loglik, f2$loglik, tolerance = 1e-6)
+  expect_equal(unname(coef(f1)$count["x"]), 1000 * unname(coef(f2)$count["x"]), tolerance = 1e-4)
+})
