@@ -90,13 +90,12 @@
 }
 .dp_kmax <- function(mu, theta)
   .grow_support(function(k) .dp_lterm(k, mu, theta), ceiling(mu + 12 * sqrt(mu / theta + 1) + 30))
-.dp_logZ <- function(mu, theta)
-  vapply(mu, function(m) .lse(.dp_lterm(0:.dp_kmax(m, theta), m, theta)), numeric(1))
+## the normalizer and the exact moments are summed in C++ (src/family_norm.cpp),
+## one pass per observation with the same terms and support rule
+.dp_logZ <- function(mu, theta) dp_norm_cpp(as.numeric(mu), theta, 100000L)[, 1]
 .dp_moments <- function(mu, theta) {
-  vapply(mu, function(m) {
-    K <- .dp_kmax(m, theta); k <- 0:K; lt <- .dp_lterm(k, m, theta); p <- exp(lt - .lse(lt))
-    e1 <- sum(k * p); c(e1, sum(k * k * p) - e1 * e1)
-  }, numeric(2))
+  m <- dp_norm_cpp(as.numeric(mu), theta, 100000L)
+  rbind(m[, 2], m[, 3])
 }
 
 ## ---- generalized Poisson (Consul & Jain 1973), constant lambda ----------------
@@ -115,17 +114,17 @@
   out
 }
 .gp_kmax <- function(mu, lambda) {
-  if (lambda < 0) return(as.integer(max(0, ceiling(mu * (1 - lambda) / (-lambda)) - 1)))
-  .grow_support(function(k) .gp_lterm(k, mu, lambda), ceiling(mu + 12 * sqrt(mu / (1 - lambda)^2 + 1) + 30))
+  ## the terms are unimodal in k, so the tail rule applies for every lambda; for
+  ## lambda < 0 the finite support end (beyond which the terms are -Inf) caps it
+  K <- .grow_support(function(k) .gp_lterm(k, mu, lambda), ceiling(mu + 12 * sqrt(mu / (1 - lambda)^2 + 1) + 30))
+  if (lambda < 0) K <- min(K, as.integer(max(0, ceiling(mu * (1 - lambda) / (-lambda)) - 1)))
+  as.integer(K)
 }
-.gp_logZ <- function(mu, lambda)
-  vapply(mu, function(m) .lse(.gp_lterm(0:.gp_kmax(m, lambda), m, lambda)), numeric(1))
+.gp_logZ <- function(mu, lambda) gp_norm_cpp(as.numeric(mu), lambda, 100000L)[, 1]
 .gp_moments <- function(mu, lambda) {
   if (lambda >= 0) return(rbind(mu, mu / (1 - lambda)^2))
-  vapply(mu, function(m) {
-    K <- .gp_kmax(m, lambda); k <- 0:K; lt <- .gp_lterm(k, m, lambda); p <- exp(lt - .lse(lt))
-    e1 <- sum(k * p); c(e1, sum(k * k * p) - e1 * e1)
-  }, numeric(2))
+  m <- gp_norm_cpp(as.numeric(mu), lambda, 100000L)
+  rbind(m[, 2], m[, 3])
 }
 
 ## ---- mean-parameterized COM-Poisson (Huang 2017) ---------------------------

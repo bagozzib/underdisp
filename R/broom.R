@@ -9,7 +9,7 @@
 ## Two-part tidy tables: the terms of the two equations repeat, so each is
 ## prefixed by its component; modelsummary and friends then lay the table out
 ## without a `shape` argument, and the `component` column stays for filtering.
-.two_part_terms <- function(df) { df$term <- paste(df$component, df$term, sep = ": "); df }
+.two_part_terms <- function(df) { df$term <- paste(df$component, df$term, sep = ":"); df }
 
 #' Tidy a CPB fit (broom method)
 #'
@@ -195,8 +195,9 @@ glance.count_reg <- function(x, ...)
 #' @exportS3Method broom::tidy
 tidy.zi_count <- function(x, ...) {
   cse <- if (is.null(x$se.beta)) rep(NA_real_, length(x$coefficients)) else x$se.beta
+  zse <- if (is.null(x$se.zero)) rep(NA_real_, length(x$zero.coefficients)) else x$se.zero
   .two_part_terms(rbind(cbind(component = "count", term = names(x$coefficients), .zdf(x$coefficients, cse)),
-        cbind(component = "zero",  term = names(x$zero.coefficients), .zdf(x$zero.coefficients, NA_real_))))
+        cbind(component = "zero",  term = names(x$zero.coefficients), .zdf(x$zero.coefficients, zse))))
 }
 #' @rdname glance.cpb
 #' @exportS3Method broom::glance

@@ -3,6 +3,25 @@
 ## parameter delta (Var/Mean) spanning under-, equi-, and over-dispersion.
 ## ---------------------------------------------------------------------------
 
+## The GEC support guard. The recursion refuses a rate whose terms have not
+## fallen below relative precision by `max.support` (the pmf is never
+## renormalized over a cut support): a fit reports whether its largest fitted
+## support reaches the guard, and a prediction beyond it is NA with a warning.
+.gec_guard_binding <- function(mu, delta, max.support) {
+  kl <- gec_klen_cpp(mu, delta, as.integer(max.support))
+  b <- anyNA(kl) || max(kl) >= max.support
+  if (b) warning("the fitted support reaches max.support (", max.support, "): the dispersion is bounded by the guard, ",
+                 "not the data. Raise max.support.", call. = FALSE)
+  b
+}
+.gec_mean_guarded <- function(mu, delta, max.support, truncated, p0fun = NULL) {
+  m <- gec_mean_cpp(mu, delta, as.integer(max.support))
+  if (anyNA(m)) warning(sum(is.na(m)), " prediction(s) lie beyond max.support (", max.support,
+                        ") and are NA; raise max.support.", call. = FALSE)
+  if (truncated) { p0 <- p0fun(); m <- m / pmax(1 - p0, 1e-8) }
+  m
+}
+
 #' Generalized event count (Katz-family) regression
 #'
 #' Fits King's generalized event count model, a Katz-family count regression
@@ -48,6 +67,7 @@
 #' @export
 gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B = 500, cluster = NULL,
                 offset = NULL, weights = NULL, cores = 1L, max.support = 500, maxit = 20000, reltol = 1e-8) {
+  .ud_no_formula_offset(formula)
   se <- match.arg(se); cl <- match.call()
   mf <- stats::model.frame(formula, data, na.action = stats::na.omit)
   Y  <- stats::model.response(mf); X <- stats::model.matrix(formula, mf)
@@ -87,7 +107,7 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
             v <- -sum(wm * (m[, 1] - log1p(-m[, 2]))); if (is.finite(v)) v else 1e10
           }
   fitone <- function(Xm, Ym, om, wm) {
-    s <- .ud_colscale(Xm); Xs <- sweep(Xm, 2, s, "/")
+    s <- .ud_colscale(Xm, wm); Xs <- sweep(Xm, 2, s, "/")
     b0 <- tryCatch({ v <- stats::glm.fit(Xs, Ym, weights = wm, offset = om, family = stats::poisson())$coefficients
                      v[!is.finite(v)] <- 0; v }, error = function(e) rep(0, p))
     best <- NULL
@@ -105,12 +125,14 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
   }
   fit <- fitone(X, Y, off, wv)
   if (is.null(fit) || fit$value >= 1e9)
-    stop("no feasible fit: every start left some count outside the model's support (raise max.support, ",
-         "currently ", ms, ", or check the data).")
+    stop("no feasible fit: at every start some count lay outside the model's support or the recursion ",
+         "reached max.support (currently ", ms, "); raise max.support or check the data.")
   beta   <- setNames(fit$par[1:p], colnames(X)); delta <- exp(fit$par[p + 1]); loglik <- -fit$value
   mu     <- as.numeric(exp(off + X %*% beta))
   fitted <- if (!truncated) gec_mean_cpp(mu, delta, ms)
-            else { p0 <- gec_lp0_cpp(c(beta, log(delta)), X, Y, off, ms)[, 2]; mu / pmax(1 - p0, 1e-8) }
+            else { p0 <- gec_lp0_cpp(c(beta, log(delta)), X, Y, off, ms)[, 2]; gec_mean_cpp(mu, delta, ms) / pmax(1 - p0, 1e-8) }
+  support_binding <- .gec_guard_binding(mu, delta, ms)
+  support_binding <- .gec_guard_binding(mu, delta, ms)
 
   se.beta <- setNames(rep(NA_real_, p), colnames(X)); se.delta <- NA_real_; boot <- NULL; ci.beta <- NULL
   if (se == "bootstrap") {
@@ -131,6 +153,7 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
       rownames(ci.beta) <- colnames(X)
     } else warning("Too few bootstrap resamples converged for stable inference.")
     attr(boot, "nboot_ok") <- nrow(ok)
+    if (nrow(ok) < B / 2) warning(sprintf("only %d of %d bootstrap replicates converged; the standard errors rest on the survivors.", nrow(ok), B), call. = FALSE)
   }
 
   structure(list(coefficients = beta, delta = delta, dispersion = delta, loglik = loglik,
@@ -139,15 +162,30 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
                  weights = w, nobs_weighted = if (is.null(w)) n else sum(w),
                  n = n, df = p + 1, p = p, se.type = se, clustered = !is.null(clid),
                  converged = fit$convergence == 0,
-                 truncated = truncated, max.support = ms, formula = formula, terms = attr(mf, "terms"),
+                 truncated = truncated, max.support = ms, support_binding = support_binding,
+                 formula = formula, terms = attr(mf, "terms"),
                  levels = .cpb_xlevels(mf), contrasts = attr(X, "contrasts"),
                  X = X, Y = Y, call = cl), class = "gec")
 }
 
 #' @method print gec
+## direction label for the printed dispersion: the pooled fit is cheap to test
+## against its Poisson nest, so the label reports that test; the concentrated
+## and two-part fits fall back to the point estimate with its band stated
+.gec_direction <- function(x) {
+  d <- x$delta
+  p <- if (inherits(x, "gec") && !inherits(x, "gec_fe"))
+         tryCatch(suppressWarnings(dispersion_test(x)$p.value), error = function(e) NA_real_) else NA_real_
+  if (is.finite(p)) {
+    if (p >= 0.05) sprintf("equidispersion not rejected (LR p = %.2f)", p)
+    else if (d < 1) sprintf("underdispersed (LR p = %.2g)", p) else sprintf("overdispersed (LR p = %.2g)", p)
+  } else if (d < 0.97) "underdispersed (point estimate)" else if (d > 1.03) "overdispersed (point estimate)"
+  else "within 3% of equidispersion (point estimate)"
+}
+
 #' @export
 print.gec <- function(x, ...) {
-  disp <- if (x$delta < 0.97) "underdispersed" else if (x$delta > 1.03) "overdispersed" else "~ equidispersed"
+  disp <- .gec_direction(x)
   cat("Generalized event count (Katz family) regression\n")
   cat("Call:  ", deparse(x$call), "\n", sep = "")
   if (!is.null(x$se.beta) && any(is.finite(x$se.beta)))
@@ -211,18 +249,15 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
     Terms <- stats::delete.response(object$terms)
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
-    X <- stats::model.matrix(Terms, newdata, xlev = object$levels, contrasts.arg = object$contrasts)
-    X <- X[, names(object$coefficients), drop = FALSE]
+    X <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
     off <- if (is.null(offset)) rep_len(0, nrow(X))
            else as.numeric(if (is.character(offset) && length(offset) == 1L) newdata[[offset]] else offset)
   }
   mu <- as.numeric(exp(off + X %*% object$coefficients))
   switch(type,
     link = log(mu),
-    response = if (isTRUE(object$truncated)) {
-      p0 <- gec_lp0_cpp(c(object$coefficients, log(object$delta)), X, rep(0L, length(mu)), off, object$max.support)[, 2]
-      mu / pmax(1 - p0, 1e-8)                                    # E(Y | Y > 0) for a zero-truncated fit
-    } else gec_mean_cpp(mu, object$delta, object$max.support),
+    response = .gec_mean_guarded(mu, object$delta, object$max.support, isTRUE(object$truncated),
+                                 function() gec_lp0_cpp(c(object$coefficients, log(object$delta)), X, rep(0L, length(mu)), off, object$max.support)[, 2]),
     prob = {
       if (is.null(at)) stop("For type = \"prob\", supply 'at' (the count value).")
       yv <- if (length(at) == 1) rep(as.integer(at), length(mu)) else as.integer(at)
@@ -307,6 +342,10 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
 gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, cluster = NULL,
                    offset = NULL, weights = NULL, cores = 1L, max.support = NULL, inner_it = 30L,
                    maxit = 3000L, reltol = 1e-7, bias_correct = c("none", "jackknife")) {
+  .ud_no_formula_offset(formula)
+  data <- .ud_drop_na_fe(data, fe)
+  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
+  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); bias_correct <- match.arg(bias_correct)
   if (!is.character(fe) || length(fe) != 1L || !fe %in% names(data)) stop("'fe' must name a column of 'data'.")
   if (!is.null(cluster) && se != "bootstrap")
@@ -339,7 +378,7 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
   if (is.null(max.support)) max.support <- max(500L, 10L * max(Y))
   ustart <- as.integer(c(0, cumsum(tabulate(as.integer(uf), nu))))
   p  <- ncol(X); ms <- as.integer(max.support); it <- as.integer(inner_it)
-  s  <- .ud_colscale(X); Xs <- sweep(X, 2, s, "/")
+  s  <- .ud_colscale(X, wv); Xs <- sweep(X, 2, s, "/")
   bs <- tryCatch({ v <- stats::glm.fit(cbind(1, Xs), Y, weights = wv, offset = off, family = stats::poisson())$coefficients[-1]
                    v[!is.finite(v)] <- 0; v }, error = function(e) rep(0, p))
   ## concentrated objective, every unit searched from cold (src/gec_fe.cpp);
@@ -349,19 +388,19 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
   best <- .fe_outer(nll_raw, grad_raw, bs, c(-0.5, 0.2), maxit, reltol)
   if (is.null(best)) stop("All optimization starts failed.")
   if (best$value >= 1e9)
-    stop("no feasible fit: every start left some count outside the model's support (raise max.support, ",
-         "currently ", ms, ", or check the data).")
+    stop("no feasible fit: at every start some count lay outside the model's support or the recursion ",
+         "reached max.support (currently ", ms, "); raise max.support or check the data.")
   beta <- setNames(best$par[1:p] / s, keep); delta <- exp(best$par[p + 1])
   fe_hat <- best$a
   rate <- as.numeric(exp(off + fe_hat[as.integer(uf)] + X %*% beta))
   fitted <- gec_mean_cpp(rate, delta, ms)
+  support_binding <- .gec_guard_binding(rate, delta, ms)
+  support_binding <- .gec_guard_binding(rate, delta, ms)
 
   se.beta <- setNames(rep(NA_real_, p), keep); ci.beta <- NULL; boot <- NULL; clab <- NULL
   if (se == "bootstrap") {
     fev  <- as.character(data[[fe]][rows]); dest <- data[rows, , drop = FALSE]
-    cval <- if (is.null(cluster)) fev
-            else if (is.character(cluster) && length(cluster) == 1L) as.character(dest[[cluster]])
-            else as.character(cluster[rows])
+    cval <- if (is.null(cluster)) fev else .ud_cluster_values(cluster, data, rows)
     clab <- if (is.null(cluster)) fe else if (is.character(cluster) && length(cluster) == 1L) cluster else "custom"
     .ud_cluster_guard(cval)
     grp  <- split(seq_along(Y), cval)
@@ -383,6 +422,7 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
       ci.beta <- cbind(lower = beta - z * se.beta, upper = beta + z * se.beta); rownames(ci.beta) <- keep
     } else warning("Too few bootstrap resamples converged for stable inference.")
     attr(boot, "nboot_ok") <- nrow(ok)
+    if (nrow(ok) < B / 2) warning(sprintf("only %d of %d bootstrap replicates converged; the standard errors rest on the survivors.", nrow(ok), B), call. = FALSE)
   }
 
   ## split-panel jackknife: refit on each unit's temporal halves and remove the
@@ -411,6 +451,8 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
       fe_hat <- gec_fe_intercepts_cpp(c(beta, log(delta)), X, Y, off, wv, ustart, nu, ms, it)
       rate   <- as.numeric(exp(off + fe_hat[as.integer(uf)] + X %*% beta))
       fitted <- gec_mean_cpp(rate, delta, ms)
+  support_binding <- .gec_guard_binding(rate, delta, ms)
+  support_binding <- .gec_guard_binding(rate, delta, ms)
       if (!is.null(ci.beta)) {                        # recenter the normal-approx interval
         z <- stats::qnorm(0.975)
         ci.beta <- cbind(lower = beta - z * se.beta, upper = beta + z * se.beta)
@@ -425,7 +467,7 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
                  weights = w, nobs_weighted = if (is.null(w)) length(Y) else sum(w),
                  xref = colMeans(X), fe_ref = mean(fe_hat),
                  linear.predictors = log(rate), n = length(Y), n_units = nu, Y = Y,
-                 df = p + nu + 1L, max.support = ms, formula = formula, fe_var = fe,
+                 df = p + nu + 1L, max.support = ms, support_binding = support_binding, formula = formula, fe_var = fe,
                  X = X, unit = as.integer(uf), levels = .cpb_xlevels(mf), contrasts = attr(Xf, "contrasts"),
                  converged = best$convergence == 0,
                  bias_correct = bias_correct, uncorrected = uncorrected,
@@ -435,7 +477,7 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
 #' @method print gec_fe
 #' @export
 print.gec_fe <- function(x, ...) {
-  disp <- if (x$delta < 0.97) "underdispersed" else if (x$delta > 1.03) "overdispersed" else "~ equidispersed"
+  disp <- .gec_direction(x)
   cat("GEC (Katz family) regression with", x$n_units, "unit fixed effects (concentrated likelihood)\n")
   if (!is.null(x$se.beta) && any(is.finite(x$se.beta))) {
     cat("Coefficients (", x$cluster, "-clustered bootstrap SEs):\n", sep = "")
@@ -458,8 +500,8 @@ predict.gec_fe <- function(object, newdata = NULL, type = c("response", "link"),
     Terms <- stats::delete.response(stats::terms(object$formula))
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
-    X <- stats::model.matrix(Terms, newdata, xlev = object$levels)[, names(object$coefficients), drop = FALSE]
+    X <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
     rate <- as.numeric(exp(mean(object$fe) + X %*% object$coefficients))
   }
-  switch(type, link = log(rate), response = gec_mean_cpp(rate, object$delta, object$max.support))
+  switch(type, link = log(rate), response = .gec_mean_guarded(rate, object$delta, object$max.support, FALSE))
 }

@@ -68,7 +68,7 @@ qcpb <- function(p, lambda, alpha, truncated = FALSE, lower.tail = TRUE, log.p =
   if (log.p) p <- exp(p); if (!lower.tail) p <- 1 - p
   n <- max(length(p), length(lambda)); p <- rep_len(p, n); lambda <- rep_len(lambda, n)
   vapply(seq_len(n), function(i) {
-    K <- floor(lambda[i] / (1 - alpha))
+    K <- floor(lambda[i] / (1 - alpha) + 1e-9)          # tolerance matches the pmf core
     cdf <- cumsum(.cpb_pmf1(lambda[i], alpha, kmax = K, truncated = truncated))
     as.numeric(which(cdf >= p[i] - 1e-12)[1L] - 1L)
   }, numeric(1))
@@ -178,6 +178,7 @@ dgec <- function(x, lambda, delta, max.support = 500, log = FALSE) {
   km <- max(0L, as.integer(max(x)))
   P <- gec_pmf_cpp(lambda, delta, km, as.integer(max.support))
   d <- vapply(seq_len(n), function(i) if (x[i] < 0 || x[i] != floor(x[i])) 0 else P[i, x[i] + 1L], numeric(1))
+  if (anyNA(d)) warning("'max.support' (", max.support, ") binds for ", sum(is.na(d)), " rate(s): NA returned; raise it.", call. = FALSE)
   if (log) log(d) else d
 }
 #' @rdname gec-distribution
@@ -190,6 +191,7 @@ pgec <- function(q, lambda, delta, max.support = 500, lower.tail = TRUE, log.p =
     qi <- floor(q[i]); if (qi < 0) return(0)
     sum(gec_pmf_cpp(lambda[i], delta, as.integer(qi), as.integer(max.support)))
   }, numeric(1))
+  if (anyNA(out)) warning("'max.support' (", max.support, ") binds for ", sum(is.na(out)), " rate(s): NA returned; raise it.", call. = FALSE)
   out <- pmin(pmax(out, 0), 1); if (!lower.tail) out <- 1 - out
   if (log.p) log(out) else out
 }

@@ -68,3 +68,14 @@ test_that("the dispersion profile recovers a constant ratio for CPB data", {
   pdf(NULL); on.exit(dev.off())
   expect_invisible(plot(pr))
 })
+
+test_that("a CPB fit below its Poisson nest reports the negative LR without a p-value", {
+  set.seed(3); x <- rnorm(300)
+  over <- data.frame(y = rnbinom(300, mu = exp(1.2 + 0.5 * x), size = 1), x = x)
+  f <- suppressWarnings(cpb(y ~ x, over, truncated = FALSE, se = "none"))
+  dt <- dispersion_test(f)
+  expect_lt(unname(dt$statistic), 0)
+  expect_true(is.na(dt$p.value))
+  expect_match(dt$note, "does not attain its Poisson nest")
+  expect_output(print(dt), "no p-value")
+})

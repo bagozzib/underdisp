@@ -26,7 +26,7 @@ predict.hurdle_count <- function(object, newdata = NULL,
   type <- match.arg(type); fam <- .count_fam(object$family)
   if (is.null(newdata)) { p <- object$p_full; mu <- object$lambda_full }
   else {
-    p  <- as.numeric(stats::predict(object$participation, newdata = newdata, type = "response"))
+    p  <- .ud_glm_predict(object$participation, newdata)
     mu <- exp(predict(object$intensity, newdata = newdata, type = "link", offset = offset))   # natural parameter
   }
   if (type == "participation") return(as.numeric(p))
@@ -56,9 +56,10 @@ predict.zi_count <- function(object, newdata = NULL, type = c("response", "count
   if (is.null(newdata)) { pistar <- object$pi_full; lam <- object$lambda_full }
   else {
     linkinv <- stats::make.link(object$link)$linkinv
-    Xc <- stats::model.matrix(stats::delete.response(stats::terms(object$formula)), newdata)
-    Zz <- stats::model.matrix(object$zero.formula, newdata)
-    eta <- as.numeric(Xc[, names(object$coefficients), drop = FALSE] %*% object$coefficients)
+    Xc <- .ud_newdata_matrix(stats::terms(object$formula), newdata, object$levels, object$contrasts, names(object$coefficients))
+    Zz <- .ud_newdata_matrix(if (!is.null(object$zero_terms)) object$zero_terms else stats::terms(object$zero.formula), newdata,
+                             object$levels, object$zero_contrasts, names(object$zero.coefficients))
+    eta <- as.numeric(Xc %*% object$coefficients)
     if (!is.null(offset)) {
       ov <- if (is.character(offset) && length(offset) == 1L) newdata[[offset]] else offset
       eta <- eta + as.numeric(ov)

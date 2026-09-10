@@ -59,8 +59,7 @@ predict.cpb <- function(object, newdata = NULL,
     if (length(miss))
       stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "),
            ". Supply every predictor in the model.")
-    mf <- model.frame(Terms, newdata, xlev = object$levels)
-    X  <- model.matrix(Terms, mf, contrasts.arg = object$contrasts)
+    X  <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
     off <- if (is.null(offset)) rep_len(0, nrow(X))
            else as.numeric(if (is.character(offset) && length(offset) == 1L) newdata[[offset]] else offset)
   }

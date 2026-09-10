@@ -44,7 +44,8 @@ test_that("d/p/q are mutually consistent and handle zero-length input", {
     expect_identical(fam$r(0, 3.2, fam$th), numeric(0))
     expect_error(fam$d(0:3, 3.2, c(fam$th, fam$th)), "single value")
     set.seed(1); s <- fam$r(4000, 3.2, fam$th)
-    expect_equal(mean(s), 3.2, tolerance = 0.06)
+    m_pmf <- sum((0:60) * fam$d(0:60, 3.2, fam$th))                 # the pmf's own mean (mu is the rate)
+    expect_equal(mean(s), m_pmf, tolerance = 0.06)
   }
   expect_identical(dcpb(numeric(0), 3, 0.5), numeric(0))
   expect_identical(dgec(numeric(0), 3, 0.7), numeric(0))
@@ -107,4 +108,20 @@ test_that("the new families inherit the hurdle, zero-inflated, scoring, and simu
   }
   cm <- compare_models(gc = count_reg(y ~ x, d, family = "gammacount"), po = count_reg(y ~ x, d, family = "poisson"))
   expect_equal(nrow(cm), 2L)
+})
+
+test_that("the compiled double-Poisson and generalized-Poisson normalizers match the R terms", {
+  lse <- function(x) { m <- max(x); m + log(sum(exp(x - m))) }
+  for (mu in c(0.3, 2.5, 14)) for (th in c(0.5, 2, 6)) {
+    K <- underdisp:::.dp_kmax(mu, th); lt <- underdisp:::.dp_lterm(0:K, mu, th); p <- exp(lt - lse(lt))
+    r <- underdisp:::dp_norm_cpp(mu, th, 100000L)
+    expect_equal(r[1, 1], lse(lt), tolerance = 1e-10); expect_equal(r[1, 2], sum((0:K) * p), tolerance = 1e-8)
+  }
+  for (mu in c(0.3, 2.5, 14)) for (la in c(-0.4, -0.05, 0.3)) {
+    K <- underdisp:::.gp_kmax(mu, la); lt <- underdisp:::.gp_lterm(0:K, mu, la); ok <- is.finite(lt)
+    r <- underdisp:::gp_norm_cpp(mu, la, 100000L)
+    expect_true(is.finite(r[1, 1]) && abs(r[1, 1] - lse(lt[ok])) < 1e-9,
+                info = sprintf("mu %g lambda %g: C++ logZ %.12g, R logZ %.12g, K %d, finite terms %d", mu, la, r[1, 1], lse(lt[ok]), K, sum(ok)))
+    if (la < 0) { p <- exp(lt[ok] - lse(lt[ok])); expect_equal(r[1, 2], sum((0:K)[ok] * p), tolerance = 1e-8) }
+  }
 })

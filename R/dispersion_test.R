@@ -105,7 +105,7 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
   w <- .ud_w1(object$weights, length(Y))
   off <- if (is.null(object$offset)) rep(0, length(Y)) else object$offset
   trunc <- isTRUE(object$truncated)
-  s <- .ud_colscale(X); Xs <- sweep(X, 2, s, "/")
+  s <- .ud_colscale(X, w); Xs <- sweep(X, 2, s, "/")
   sy <- as.numeric(rowsum(w * Y, u)[, 1])
   ll_conc <- function(b) {
     eta <- off + as.numeric(Xs %*% b)
@@ -165,14 +165,23 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
               forced, "\").")
     alternative <- forced
   } else if (alt_missing) alternative <- "two.sided"
-  LR <- max(2 * (ll1 - ll0), 0)
-  r <- sqrt(LR) * if (isTRUE(under_dir)) 1 else -1     # signed root: positive = underdispersed direction
-  p <- if (boundary) 0.5 * stats::pchisq(LR, 1, lower.tail = FALSE)   # Self-Liang mixture
-       else switch(alternative,
-         two.sided = stats::pchisq(LR, 1, lower.tail = FALSE),
-         under = stats::pnorm(r, lower.tail = FALSE),
-         over  = stats::pnorm(r))
+  LR <- 2 * (ll1 - ll0)
+  ## a fitted family whose optimum lies below its own Poisson nest (possible for
+  ## the CPB, whose feasibility guard can bind) has no likelihood-ratio p-value:
+  ## the negative statistic is reported as such, as summary() reports it
+  nested <- LR >= -1e-8
+  if (nested) {
+    LR <- max(LR, 0)
+    r <- sqrt(LR) * if (isTRUE(under_dir)) 1 else -1     # signed root: positive = underdispersed direction
+    p <- if (boundary) 0.5 * stats::pchisq(LR, 1, lower.tail = FALSE)   # Self-Liang mixture
+         else switch(alternative,
+           two.sided = stats::pchisq(LR, 1, lower.tail = FALSE),
+           under = stats::pnorm(r, lower.tail = FALSE),
+           over  = stats::pnorm(r))
+  } else p <- NA_real_
   structure(list(statistic = c(LR = LR), parameter = c(df = 1), p.value = p,
+                 note = if (!nested) paste0("the fitted ", fam_lab, " does not attain its Poisson nest (LR < 0): ",
+                                            "no p-value; the data may not be underdispersed") else NULL,
                  estimate = stats::setNames(est, par_name), null.value = stats::setNames(null, par_name),
                  alternative = switch(alternative, two.sided = "two.sided", under = "underdispersion", over = "overdispersion"),
                  method = paste0("Likelihood-ratio test of equidispersion (", fam_lab, " vs Poisson",
@@ -186,16 +195,19 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
   if (!inherits(object, "count_reg") || !identical(object$family, "poisson"))
     stop("method = \"auxiliary\" applies to a count_reg(family = \"poisson\") fit.")
   if (isTRUE(object$truncated)) stop("the auxiliary regression is defined for the untruncated Poisson.")
-  y <- object$Y; mu <- object$fitted.values; w <- .ud_w1(object$weights, length(y))
+  y <- object$Y; mu <- object$mu; w <- .ud_w1(object$weights, length(y))
   z <- ((y - mu)^2 - y) / mu                      # E[(y-mu)^2 - y] = a * mu^2 under Var = mu + a mu^2
   fit <- stats::lm(z ~ mu + 0, weights = w)
   cf <- summary(fit)$coefficients
   a <- cf[1, 1]; tstat <- cf[1, 3]
+  ## lm() counts rows, not weight: rescale the statistic and the df to the weight total
+  n <- length(y); sw <- sum(w)
+  if (abs(sw - n) > 1e-8) tstat <- tstat * sqrt((sw - 1) / (n - 1))
   p <- switch(alternative,
     two.sided = 2 * stats::pnorm(-abs(tstat)),
     under = stats::pnorm(tstat),                  # a < 0
     over  = stats::pnorm(tstat, lower.tail = FALSE))
-  structure(list(statistic = c(t = tstat), parameter = c(df = fit$df.residual), p.value = p,
+  structure(list(statistic = c(t = tstat), parameter = c(df = sw - 1), p.value = p,
                  estimate = c(a = a), null.value = c(a = 0),
                  alternative = switch(alternative, two.sided = "two.sided", under = "underdispersion", over = "overdispersion"),
                  method = "Cameron-Trivedi auxiliary regression test of equidispersion (Var = mu + a mu^2)",
@@ -211,6 +223,7 @@ print.dispersion_test <- function(x, digits = 4, ...) {
       if (!is.null(x$loglik)) sprintf("  (logLik: fitted family = %.2f, Poisson = %.2f)", x$loglik[1], x$loglik[2]),
       sprintf(",  p-value = %s\n", format.pval(x$p.value, digits = digits)), sep = "")
   cat("alternative hypothesis: ", x$alternative, "\n", sep = "")
+  if (!is.null(x$note)) cat("note: ", x$note, "\n", sep = "")
   cat(sprintf("estimate: %s = %.4f  (Poisson value %s)\n", names(x$estimate), x$estimate, format(x$null.value)))
   invisible(x)
 }

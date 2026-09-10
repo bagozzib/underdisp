@@ -95,15 +95,29 @@ jumps, by about \eqn{(1-\alpha)^{k}} at ceiling \eqn{k}. The maximizer is
 found by a deterministic multistart, BFGS from the Poisson solution at each
 value of \code{alpha.start} polished by Nelder-Mead with feasibility-repaired
 restarts, on covariates scaled to unit standard deviation (the coefficients
-are mapped back, so the fit does not depend on the covariates' units). Two
-parameterizations of the same design (say, treatment and sum contrasts) can
-settle on different teeth of this surface, with log-likelihoods differing by
-the order of the jumps, which is far inside the sampling variability of the
-estimates; the fixed-effects estimator \code{\link[=cpb_fe]{cpb_fe()}} solves the corresponding
-problem in the unit intercepts exactly. The numerical Hessian is unreliable on
+are mapped back, so the fit does not depend on the covariates' units), and
+the reported maximum is the maximum of the fit's own profile in \code{alpha}: the
+profile is traced by continuation on both sides of the estimate (the slopes
+re-maximized at each step from the neighbouring solution) until it has
+dropped four log-likelihood units, and a trace point above the multistart's
+value restarts the fit from there. The same trace gives the profile interval
+of \code{\link[=confint.cpb]{confint.cpb()}}. Two parameterizations of the same design (say, treatment
+and sum contrasts) can still settle on different teeth of this surface, with
+log-likelihoods differing by the order of the jumps; unit intercepts belong
+in the fixed-effects estimator \code{\link[=cpb_fe]{cpb_fe()}}, which solves each of them exactly
+(a pooled fit with many dummy columns can stop short of it). The numerical
+Hessian is unreliable on
 such a surface, so inference uses a cold-multistart bootstrap for the
 coefficients (validated to nominal coverage) and a profile-likelihood interval
 for \eqn{\alpha} (see \code{\link[=confint.cpb]{confint.cpb()}}).
+
+Runtime: a fit with \code{se = "none"} takes a few seconds at 500 rows and about
+fifteen at 2,000 on one core, the nine starts, the profile trace, and the
+scan in \code{alpha} included. The bootstrap
+replicates are maximized by the multistart without the profile trace (about
+a third of a second each at 500 rows), so a replicate can sit on a different
+tooth from the point estimate by the order of the jumps; \code{cores} runs them in
+parallel.
 }
 \examples{
 set.seed(1)

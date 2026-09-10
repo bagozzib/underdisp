@@ -29,7 +29,8 @@ ud_screen(
 
 \item{cpb_max_n}{Skip the CPB fit above this sample size (default 3000).}
 
-\item{run_gp}{Logical; fit the generalized-Poisson comparator (default \code{TRUE}).}
+\item{run_gp}{Logical; fit the generalized-Poisson comparator (default
+\code{TRUE}); gated by \code{comp_max_par} and \code{comp_max_n} like the COM-Poisson.}
 
 \item{run_comp}{Logical; fit the native COM-Poisson comparator (default
 \code{TRUE}). Skipped when the mean model carries more than \code{comp_max_par}
@@ -37,7 +38,7 @@ parameters (the COM-Poisson has no concentrated fixed-effects path, so
 dummy-heavy screens would be slow) or when \code{n} exceeds \code{comp_max_n}.}
 
 \item{comp_max_par, comp_max_n}{Parameter and sample-size gates for the
-COM-Poisson comparator (defaults 30 and 5000).}
+generalized-Poisson and COM-Poisson comparators (defaults 30 and 5000).}
 
 \item{ztp_threshold}{How to set the at-risk test's underdispersion cutoff.
 \code{"calibrated"} (default) uses the simulation-calibrated rule
@@ -88,6 +89,15 @@ separates genuine underdispersion from the artifact of conditioning on \eqn{Y>0}
 When the data are not zero-dominated it also fits the CPB and reports a
 ceiling-exceedance diagnostic, and it fits a generalized-Poisson soft-tail
 comparator.
+}
+\details{
+Runtime: the marginal and at-risk arms take seconds. \code{ztp_threshold = "bootstrap"}
+refits the zero-truncated Poisson \code{ztp_boot_B} times (use \code{cores}); the CPB
+comparator is fit only up to \code{cpb_max_n} rows, and the generalized-Poisson and
+COM-Poisson comparators only when the mean model carries at most
+\code{comp_max_par} parameters and at most \code{comp_max_n} rows, beyond which their
+rows print \code{NA}; each is a full model fit (the two soft-tail families have no
+concentrated fixed-effects path, so a dummy-heavy screen would take minutes).
 }
 \examples{
 set.seed(1); x <- rnorm(250)

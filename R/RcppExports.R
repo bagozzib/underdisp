@@ -41,6 +41,14 @@ cpb_lp0_cpp <- function(params, X, Y, offset, max_support, truncated) {
     .Call(`_underdisp_cpb_lp0_cpp`, params, X, Y, offset, max_support, truncated)
 }
 
+dp_norm_cpp <- function(mu, theta, cap) {
+    .Call(`_underdisp_dp_norm_cpp`, mu, theta, cap)
+}
+
+gp_norm_cpp <- function(mu, lambda, cap) {
+    .Call(`_underdisp_gp_norm_cpp`, mu, lambda, cap)
+}
+
 gec_fe_nll_cpp <- function(params, X, Y, offset, w, ustart, n_units, max_support, inner_it, awarm) {
     .Call(`_underdisp_gec_fe_nll_cpp`, params, X, Y, offset, w, ustart, n_units, max_support, inner_it, awarm)
 }
@@ -67,6 +75,10 @@ gec_lp0_cpp <- function(params, X, Y, offset, max_support) {
 
 gec_pmf_cpp <- function(mu, delta, kmax, max_support) {
     .Call(`_underdisp_gec_pmf_cpp`, mu, delta, kmax, max_support)
+}
+
+gec_klen_cpp <- function(mu, delta, max_support) {
+    .Call(`_underdisp_gec_klen_cpp`, mu, delta, max_support)
 }
 
 gec_mean_cpp <- function(mu, delta, max_support) {

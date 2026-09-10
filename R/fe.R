@@ -21,15 +21,18 @@
 #' envelope's peak (located on a coarse grid around the unit's Poisson intercept)
 #' and refines inside whole teeth by golden section; every evaluation of the
 #' concentrated likelihood searches each unit afresh, so the objective is a
-#' function of the parameters alone. Solving the inner problem to its supremum
-#' makes the concentrated likelihood smooth in `alpha` and continuous in the
-#' slopes, so the outer optimizer (BFGS with the analytic envelope gradient from
-#' the Poisson slopes and two dispersion starts, polished by Nelder-Mead) is
-#' reliable; the solution is
-#' re-evaluated with every unit searched from cold before it is returned.
-#' Runtime: on a laptop a panel of 500 rows in 20 units fits in under ten seconds and
-#' one of 2,600 rows in 146 units with four covariates in about a minute; a
-#' bootstrap multiplies that by `B`, so use `cores`.
+#' function of the parameters alone. Solving the inner problem to its supremum makes the concentrated likelihood
+#' continuous in `alpha` (with kinks where a unit's maximizing tooth switches) but
+#' not in the slopes: where a unit's supremum sits on its feasibility floor (an
+#' observation whose count equals its ceiling) the intercept cannot retreat, so
+#' when another observation's breakpoint crosses that floor the concentrated
+#' likelihood drops by about \eqn{(1-\alpha)^k}, a cliff in the slopes on whose
+#' edge the maximizer can rest with a non-zero one-sided gradient. The outer
+#' optimizer is therefore a deterministic multistart: BFGS with the analytic
+#' envelope gradient from the Poisson slopes and two dispersion starts, a
+#' Nelder-Mead polish, and two perturbed restarts; alternative local optima
+#' differ by the order of the jumps (a few hundredths of a log-likelihood unit
+#' on a 12-unit panel), far inside the bootstrap variability of the estimates.
 #'
 #' Short panels: the dispersion parameter `alpha` and the fixed effects are subject to
 #' the incidental-parameters bias of nonlinear fixed-effects estimation. The bias in
@@ -116,6 +119,10 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
                    B = 500, cluster = NULL, offset = NULL, weights = NULL, cores = 1L,
                    max.support = NULL, inner_it = 30L, maxit = 3000L, reltol = 1e-7,
                    bias_correct = c("none", "jackknife")) {
+  .ud_no_formula_offset(formula)
+  data <- .ud_drop_na_fe(data, fe)
+  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
+  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); bias_correct <- match.arg(bias_correct)
   if (!is.character(fe) || length(fe) != 1L || !fe %in% names(data)) stop("'fe' must name a column of 'data'.")
   if (!is.null(cluster) && se != "bootstrap")
@@ -149,7 +156,7 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
   if (is.null(max.support)) max.support <- max(500L, 10L * max(Y))
   ustart <- as.integer(c(0, cumsum(tabulate(as.integer(uf), nu))))
   p  <- ncol(X)
-  s  <- .ud_colscale(X); Xs <- sweep(X, 2, s, "/")
+  s  <- .ud_colscale(X, wv); Xs <- sweep(X, 2, s, "/")
   bs <- tryCatch({ v <- glm.fit(cbind(1, Xs), Y, weights = wv, offset = off, family = poisson())$coefficients[-1]
                    v[!is.finite(v)] <- 0; v }, error = function(e) rep(0, p))
   ## concentrated objective, every unit searched from cold (src/cpb_fe.cpp);
@@ -179,9 +186,7 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
   clab <- NULL
   if (se == "bootstrap") {
     fev  <- as.character(data[[fe]][rows]); dest <- data[rows, , drop = FALSE]
-    cval <- if (is.null(cluster)) fev
-            else if (is.character(cluster) && length(cluster) == 1L) as.character(dest[[cluster]])
-            else as.character(cluster[rows])
+    cval <- if (is.null(cluster)) fev else .ud_cluster_values(cluster, data, rows)
     clab <- if (is.null(cluster)) fe else if (is.character(cluster) && length(cluster) == 1L) cluster else "custom"
     .ud_cluster_guard(cval)
     grp  <- split(seq_along(Y), cval)
@@ -208,6 +213,7 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
       rownames(ci.beta) <- keep
     } else warning("Too few bootstrap resamples converged for stable inference.")
     attr(boot, "nboot_ok") <- nrow(ok)
+    if (nrow(ok) < B / 2) warning(sprintf("only %d of %d bootstrap replicates converged; the standard errors rest on the survivors.", nrow(ok), B), call. = FALSE)
   }
 
   ## split-panel jackknife: refit on each unit's temporal halves and remove the
@@ -301,7 +307,7 @@ predict.cpb_fe <- function(object, newdata = NULL, type = c("response", "rate", 
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss))
       stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
-    X  <- stats::model.matrix(Terms, newdata, xlev = object$levels)[, names(object$coefficients), drop = FALSE]
+    X  <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
     lam <- as.numeric(exp(mean(object$fe) + X %*% object$coefficients))
   }
   switch(type, link = log(lam), rate = lam,

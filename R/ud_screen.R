@@ -86,18 +86,27 @@
 #' ceiling-exceedance diagnostic, and it fits a generalized-Poisson soft-tail
 #' comparator.
 #'
+#' Runtime: the marginal and at-risk arms take seconds. `ztp_threshold = "bootstrap"`
+#' refits the zero-truncated Poisson `ztp_boot_B` times (use `cores`); the CPB
+#' comparator is fit only up to `cpb_max_n` rows, and the generalized-Poisson and
+#' COM-Poisson comparators only when the mean model carries at most
+#' `comp_max_par` parameters and at most `comp_max_n` rows, beyond which their
+#' rows print `NA`; each is a full model fit (the two soft-tail families have no
+#' concentrated fixed-effects path, so a dummy-heavy screen would take minutes).
+#'
 #' @param formula A model formula.
 #' @param data A data frame.
 #' @param run_cpb Logical; fit the CPB when the data are not zero-dominated
 #'   (default `TRUE`).
 #' @param cpb_max_n Skip the CPB fit above this sample size (default 3000).
-#' @param run_gp Logical; fit the generalized-Poisson comparator (default `TRUE`).
+#' @param run_gp Logical; fit the generalized-Poisson comparator (default
+#'   `TRUE`); gated by `comp_max_par` and `comp_max_n` like the COM-Poisson.
 #' @param run_comp Logical; fit the native COM-Poisson comparator (default
 #'   `TRUE`). Skipped when the mean model carries more than `comp_max_par`
 #'   parameters (the COM-Poisson has no concentrated fixed-effects path, so
 #'   dummy-heavy screens would be slow) or when `n` exceeds `comp_max_n`.
 #' @param comp_max_par,comp_max_n Parameter and sample-size gates for the
-#'   COM-Poisson comparator (defaults 30 and 5000).
+#'   generalized-Poisson and COM-Poisson comparators (defaults 30 and 5000).
 #' @param ztp_threshold How to set the at-risk test's underdispersion cutoff.
 #'   `"calibrated"` (default) uses the simulation-calibrated rule
 #'   \eqn{1 - 2.27/\sqrt{n_+}}, whose constant is an estimated standard
@@ -147,6 +156,7 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
                       comp_max_n = 5000,
                       ztp_threshold = c("calibrated", "bootstrap"),
                       ztp_boot_B = 199L, cores = 1L, digits = 3) {
+  .ud_no_formula_offset(formula)
   ztp_threshold <- match.arg(ztp_threshold)
   mf <- model.frame(formula, data, na.action = na.omit)
   y  <- model.response(mf)
@@ -278,10 +288,13 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
     }
   }
   gp_ll <- NA_real_
-  if (run_gp) {
-    gp <- tryCatch(suppressWarnings(VGAM::vglm(formula, family = VGAM::genpoisson0, data = data)),
+  if (run_gp && k <= comp_max_par && n <= comp_max_n) {
+    ## the package's own generalized Poisson, whose dispersion may be negative
+    ## (an overdispersion-only GP would report the Poisson fit on underdispersed
+    ## data); gated like the COM-Poisson, since it is a full numerical-gradient fit
+    gp <- tryCatch(suppressWarnings(count_reg(formula, data = data, family = "genpois", se = "none")),
                    error = function(e) NULL)
-    if (!is.null(gp)) gp_ll <- tryCatch(as.numeric(VGAM::logLik(gp)), error = function(e) NA_real_)
+    if (!is.null(gp) && is.finite(gp$loglik)) gp_ll <- gp$loglik
   }
   ## native COM-Poisson comparator (soft tail); gated because it has no
   ## concentrated fixed-effects path and the normalizing constant is per-obs work

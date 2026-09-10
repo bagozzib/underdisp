@@ -28,14 +28,16 @@
   else list(name = paste0("Dispersion (", nm, ")"), value = theta, decimal = TRUE)
 }
 
+utils::globalVariables(c(".w", ".d"))   # columns built for the participation glm() calls
+
 .onLoad <- function(libname, pkgname) {
   if (!requireNamespace("texreg", quietly = TRUE)) return(invisible())
   tryCatch({
     ## the model classes are S3; texreg dispatches its S4 generic on them, so
     ## they are declared to the methods package in this namespace
-    methods::setOldClass(c("cpb", "cpb_fe", "hurdle_cpb", "zi_cpb", "gec", "gec_fe", "hurdle_gec",
-                           "zi_gec", "count_reg", "hurdle_count", "zi_count"),
-                         where = asNamespace(pkgname))
+    for (cl in c("cpb", "cpb_fe", "hurdle_cpb", "zi_cpb", "gec", "gec_fe", "hurdle_gec",
+                 "zi_gec", "count_reg", "hurdle_count", "zi_count"))
+      methods::setOldClass(cl, where = asNamespace(pkgname))    # one call each: no inheritance chain
     ## the methods must attach to texreg's generic, not to a generic of that name
     ## looked up from this namespace (which does not import texreg)
     extract <- methods::getGeneric("extract", where = asNamespace("texreg"))
@@ -57,14 +59,14 @@
       idf <- if (!is.null(model$intensity$df)) model$intensity$df else length(ie) + 1L
       df  <- length(stats::coef(model$participation)) + idf
       ll  <- as.numeric(stats::logLik(model$participation)) + model$intensity$loglik
-      .extract_underdisp(c(paste0("part: ", rownames(ps)), paste0("int: ", names(ie))),
+      .extract_underdisp(c(paste0("participation:", rownames(ps)), paste0("intensity:", names(ie))),
                          c(ps[, 1], as.numeric(ie)), c(ps[, 2], as.numeric(ise)), ll, df, model$n)
     })
     methods::setMethod(extract, "zi_cpb", function(model, ...) {
       cse <- if (is.null(model$se.beta)) rep(NA_real_, length(model$coefficients)) else model$se.beta
       zse <- if (is.null(model$se.zero)) rep(NA_real_, length(model$zero_coef))    else model$se.zero
-      .extract_underdisp(c(paste0("count: ", names(model$coefficients)),
-                           paste0("zero: ",  names(model$zero_coef))),
+      .extract_underdisp(c(paste0("count:", names(model$coefficients)),
+                           paste0("zero:",  names(model$zero_coef))),
                          c(as.numeric(model$coefficients), as.numeric(model$zero_coef)),
                          c(as.numeric(cse), as.numeric(zse)), model$loglik, model$df, model$n)
     })
@@ -85,7 +87,7 @@
       ise <- if (is.null(model$intensity$se.beta)) rep(NA_real_, length(ie)) else model$intensity$se.beta
       df  <- length(stats::coef(model$participation)) + model$intensity$df
       ll  <- as.numeric(stats::logLik(model$participation)) + model$intensity$loglik
-      .extract_underdisp(c(paste0("part: ", rownames(ps)), paste0("int: ", names(ie))),
+      .extract_underdisp(c(paste0("participation:", rownames(ps)), paste0("intensity:", names(ie))),
                          c(ps[, 1], as.numeric(ie)), c(ps[, 2], as.numeric(ise)), ll, df, model$n,
                          "Dispersion", model$delta, TRUE)
     })
@@ -100,7 +102,7 @@
       ie  <- model$intensity$coefficients
       ise <- if (is.null(model$intensity$se.beta)) rep(NA_real_, length(ie)) else model$intensity$se.beta
       disp <- .count_disp_row(.count_fam(model$family), model$theta)
-      .extract_underdisp(c(paste0("part: ", rownames(ps)), paste0("int: ", names(ie))),
+      .extract_underdisp(c(paste0("participation:", rownames(ps)), paste0("intensity:", names(ie))),
                          c(ps[, 1], as.numeric(ie)), c(ps[, 2], as.numeric(ise)), model$loglik, model$df, model$n,
                          disp$name, disp$value, disp$decimal)
     })
@@ -108,8 +110,8 @@
       cse <- if (is.null(model$se.beta)) rep(NA_real_, length(model$coefficients)) else model$se.beta
       zse <- if (is.null(model$se.zero)) rep(NA_real_, length(model$zero.coefficients)) else model$se.zero
       disp <- .count_disp_row(.count_fam(model$family), model$theta)
-      .extract_underdisp(c(paste0("count: ", names(model$coefficients)),
-                           paste0("zero: ",  names(model$zero.coefficients))),
+      .extract_underdisp(c(paste0("count:", names(model$coefficients)),
+                           paste0("zero:",  names(model$zero.coefficients))),
                          c(as.numeric(model$coefficients), as.numeric(model$zero.coefficients)),
                          c(as.numeric(cse), as.numeric(zse)), model$loglik, model$df, model$n,
                          disp$name, disp$value, disp$decimal)
@@ -117,8 +119,8 @@
     methods::setMethod(extract, "zi_gec", function(model, ...) {
       cse <- if (is.null(model$se.beta)) rep(NA_real_, length(model$coefficients)) else model$se.beta
       zse <- if (is.null(model$se.zero)) rep(NA_real_, length(model$zero_coef))    else model$se.zero
-      .extract_underdisp(c(paste0("count: ", names(model$coefficients)),
-                           paste0("zero: ",  names(model$zero_coef))),
+      .extract_underdisp(c(paste0("count:", names(model$coefficients)),
+                           paste0("zero:",  names(model$zero_coef))),
                          c(as.numeric(model$coefficients), as.numeric(model$zero_coef)),
                          c(as.numeric(cse), as.numeric(zse)), model$loglik, model$df, model$n,
                          "Dispersion", model$delta, TRUE)

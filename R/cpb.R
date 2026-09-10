@@ -34,29 +34,34 @@
 ## and the coefficients mapped back, so the fit is invariant to the covariates'
 ## units. Returns the lowest-objective fit with `par` on the original scale.
 .cpb_fit_ms <- function(X, Y, offset, max.support, truncated, alpha.starts, maxit, reltol, w = NULL,
-                        restarts = 4L) {
-  s <- .ud_colscale(X); Xs <- sweep(X, 2, s, "/"); p <- ncol(X)
+                        restarts = 2L, start = NULL) {
   wv <- .ud_w1(w, nrow(X))
+  s <- .ud_colscale(X, wv); Xs <- sweep(X, 2, s, "/"); p <- ncol(X)
   fn <- function(par) .cpb_nll(par, Xs, Y, offset, max.support, truncated, w)
-  bs <- tryCatch({ v <- glm.fit(Xs, Y, weights = wv, offset = offset, family = poisson())$coefficients
-                   v[!is.finite(v)] <- 0; v }, error = function(e) rep(0, p))
+  bs <- if (!is.null(start)) start * s                       # slopes given on the original scale
+        else tryCatch({ v <- glm.fit(Xs, Y, weights = wv, offset = offset, family = poisson())$coefficients
+                        v[!is.finite(v)] <- 0; v }, error = function(e) rep(0, p))
+  icol <- match("(Intercept)", colnames(X)); pos <- Y > 0
+  ## feasibility repair: raise the intercept until every count sits below its
+  ## ceiling, so that a start (and a restart) is never on the infeasible plateau
+  repair <- function(st) {
+    if (is.na(icol) || !any(pos)) return(st)
+    a <- plogis(st[p + 1L]); eta <- offset + as.numeric(Xs %*% st[seq_len(p)])
+    need <- max(log(Y[pos] * (1 - a)) - eta[pos]) + 1e-6
+    if (need > 0) st[icol] <- st[icol] + need
+    st
+  }
   cand <- lapply(alpha.starts, function(a0)
-    tryCatch(.cpb_fit_one(Xs, Y, c(bs, qlogis(a0)), offset, max.support, truncated, maxit, reltol, w),
+    tryCatch(.cpb_fit_one(Xs, Y, repair(c(bs, qlogis(a0))), offset, max.support, truncated, maxit, reltol, w),
              error = function(e) NULL))
   cand <- cand[!vapply(cand, is.null, logical(1))]
   if (!length(cand)) return(NULL)
   best <- cand[[which.min(vapply(cand, function(f) f$value, numeric(1)))]]
-  best <- .ud_nm_polish(best, fn, maxit, reltol)
+  best <- .ud_nm_polish(best, fn, maxit, reltol, restarts = 1L)
   if (restarts > 0L && best$value < 1e9) {
-    icol <- match("(Intercept)", colnames(X)); pos <- Y > 0
     pats <- list(rep(0.15, p + 1L), rep(-0.15, p + 1L), 0.15 * (-1)^seq_len(p + 1L), -0.15 * (-1)^seq_len(p + 1L))
     for (dlt in pats[seq_len(min(restarts, 4L))]) {
-      st <- best$par + dlt
-      if (!is.na(icol) && any(pos)) {                    # feasibility repair: raise the intercept
-        a <- plogis(st[p + 1L]); eta <- offset + as.numeric(Xs %*% st[seq_len(p)])
-        need <- max(log(Y[pos] * (1 - a)) - eta[pos]) + 1e-6
-        if (need > 0) st[icol] <- st[icol] + need
-      }
+      st <- repair(best$par + dlt)
       o2 <- tryCatch(.cpb_fit_one(Xs, Y, st, offset, max.support, truncated, maxit, reltol, w),
                      error = function(e) NULL)
       if (!is.null(o2) && o2$value < best$value - 1e-8) best <- .ud_nm_polish(o2, fn, maxit, reltol)
@@ -68,7 +73,7 @@
 
 ## Baseline log-likelihood: (zero-truncated) Poisson MLE, the correct H0: alpha = 1.
 .cpb_baseline_loglik <- function(X, Y, offset, truncated, w = NULL) {
-  wv <- .ud_w1(w, nrow(X)); s <- .ud_colscale(X); Xs <- sweep(X, 2, s, "/")
+  wv <- .ud_w1(w, nrow(X)); s <- .ud_colscale(X, wv); Xs <- sweep(X, 2, s, "/")
   nll <- if (truncated)
     function(b) { l <- as.numeric(exp(offset + Xs %*% b))
       v <- sum(wv * (dpois(Y, l, log = TRUE) - log(1 - exp(-l)))); if (!is.finite(v)) 1e10 else -v }
@@ -99,15 +104,29 @@
 #' found by a deterministic multistart, BFGS from the Poisson solution at each
 #' value of `alpha.start` polished by Nelder-Mead with feasibility-repaired
 #' restarts, on covariates scaled to unit standard deviation (the coefficients
-#' are mapped back, so the fit does not depend on the covariates' units). Two
-#' parameterizations of the same design (say, treatment and sum contrasts) can
-#' settle on different teeth of this surface, with log-likelihoods differing by
-#' the order of the jumps, which is far inside the sampling variability of the
-#' estimates; the fixed-effects estimator [cpb_fe()] solves the corresponding
-#' problem in the unit intercepts exactly. The numerical Hessian is unreliable on
+#' are mapped back, so the fit does not depend on the covariates' units), and
+#' the reported maximum is the maximum of the fit's own profile in `alpha`: the
+#' profile is traced by continuation on both sides of the estimate (the slopes
+#' re-maximized at each step from the neighbouring solution) until it has
+#' dropped four log-likelihood units, and a trace point above the multistart's
+#' value restarts the fit from there. The same trace gives the profile interval
+#' of [confint.cpb()]. Two parameterizations of the same design (say, treatment
+#' and sum contrasts) can still settle on different teeth of this surface, with
+#' log-likelihoods differing by the order of the jumps; unit intercepts belong
+#' in the fixed-effects estimator [cpb_fe()], which solves each of them exactly
+#' (a pooled fit with many dummy columns can stop short of it). The numerical
+#' Hessian is unreliable on
 #' such a surface, so inference uses a cold-multistart bootstrap for the
 #' coefficients (validated to nominal coverage) and a profile-likelihood interval
 #' for \eqn{\alpha} (see [confint.cpb()]).
+#'
+#' Runtime: a fit with `se = "none"` takes a few seconds at 500 rows and about
+#' fifteen at 2,000 on one core, the nine starts, the profile trace, and the
+#' scan in `alpha` included. The bootstrap
+#' replicates are maximized by the multistart without the profile trace (about
+#' a third of a second each at 500 rows), so a replicate can sit on a different
+#' tooth from the point estimate by the order of the jumps; `cores` runs them in
+#' parallel.
 #'
 #' @param formula A model formula.
 #' @param data A data frame.
@@ -170,6 +189,7 @@
 cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
                 B = 500, cluster = NULL, offset = NULL, weights = NULL, cores = 1L,
                 alpha.start = 0.5, max.support = NULL, maxit = 20000, reltol = 1e-8) {
+  .ud_no_formula_offset(formula)
   se <- match.arg(se)
   cl <- match.call()
   mf <- model.frame(formula, data, na.action = na.omit)
@@ -207,17 +227,31 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
   .ud_rank_check(X)
   if (is.null(max.support)) max.support <- max(500L, 10L * max(Y))
 
-  astarts <- unique(c(alpha.start, 0.15, 0.4, 0.65, 0.9))
+  astarts <- unique(c(alpha.start, 0.1, 0.25, 0.4, 0.55, 0.7, 0.85, 0.95))   # the teeth in alpha are thin: nine starts
   fit <- .cpb_fit_ms(X, Y, off, max.support, truncated, astarts, maxit, reltol, w = w)
   if (is.null(fit)) stop("All optimization starts failed.")
   if (fit$value >= 1e9)
     stop("no feasible fit: every start left some count above its implied ceiling (raise max.support, ",
          "currently ", max.support, ", or check the data).")
+  ## The reported maximum is the maximum of the fit's own alpha profile: the
+  ## profile is traced by continuation on both sides of alpha-hat (the slopes
+  ## re-maximized at each alpha from the neighbouring solution), and when a
+  ## point of the trace exceeds the multistart's value the fit is re-run from
+  ## it with alpha free. The trace is stored for the profile interval.
+  for (round in 1:2) {
+    fit <- .cpb_alpha_scan(X, Y, off, max.support, truncated, w, fit, maxit, reltol)
+    tr <- .cpb_profile_trace(X, Y, off, max.support, truncated, w, fit)
+    k <- which.max(tr$ll)
+    if (tr$ll[k] <= -fit$value + 1e-8) break
+    fit <- .cpb_fit_ms(X, Y, off, max.support, truncated, tr$alpha[k], maxit, reltol, w = w,
+                       start = tr$b[[k]])
+  }
   if (fit$convergence != 0)
     warning("Optimization did not converge (code ", fit$convergence, ").")
 
   beta  <- fit$par[1:p]; names(beta) <- colnames(X)
   alpha <- plogis(fit$par[p + 1]); loglik <- -fit$value
+  profile <- tr[c("alpha", "ll", "b")]                      # the alpha-profile trace the fit is the maximum of
   lam   <- as.numeric(exp(off + X %*% beta))
   fitted <- .cpb_mean(lam, alpha, truncated)                # exact mean of the fitted pmf
   binding <- max(lam / (1 - alpha)) >= 0.95 * max.support
@@ -230,7 +264,6 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
   se.beta <- setNames(rep(NA_real_, p), colnames(X)); vcv <- NULL
   boot <- NULL; ci.beta <- NULL
   if (se == "bootstrap") {
-    if (!is.null(clid)) .ud_cluster_guard(clid)
     if (!is.null(clid)) .ud_cluster_guard(clid)
     grp <- if (!is.null(clid)) split(seq_len(n), clid) else NULL   # NULL = ordinary bootstrap
     one <- function(b) {
@@ -251,6 +284,7 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
     ci.beta <- t(apply(ok[, 1:p, drop = FALSE], 2, quantile, c(.025, .975)))
     rownames(ci.beta) <- colnames(X)
     attr(boot, "nboot_ok") <- nrow(ok)
+    if (nrow(ok) < B / 2) warning(sprintf("only %d of %d bootstrap replicates converged; the standard errors rest on the survivors.", nrow(ok), B), call. = FALSE)
   }
 
   structure(list(
@@ -260,6 +294,7 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
     weights = w, nobs_weighted = if (is.null(w)) n else sum(w),
     ceiling = lam / (1 - alpha), residuals = Y - fitted,
     n = n, df = p + 1, p = p, truncated = truncated, max.support = max.support, support_binding = binding,
+    profile = profile,
     se.type = se, clustered = !is.null(clid),
     n_clusters = if (!is.null(clid)) length(unique(clid)) else NA_integer_,
     converged = (fit$convergence == 0),
@@ -280,46 +315,145 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
 ## restarts. The lower limit is bracketed on a descending grid and located by
 ## uniroot inside the bracket. The interval is one-sided (`boundary`) only when
 ## the profile has not dropped to the cut by alpha = 0.005.
-.cpb_alpha_profile_ci <- function(object, level = 0.95) {
-  X <- object$X; Y <- object$Y; ms <- object$max.support; tr <- object$truncated
-  off <- if (!is.null(object$offset)) object$offset else rep_len(0, length(Y))
-  w <- object$weights
-  s <- .ud_colscale(X); Xs <- sweep(X, 2, s, "/")
-  llmax <- object$loglik; cut <- llmax - qchisq(level, 1) / 2
-  icol <- match("(Intercept)", colnames(X))
-  pos <- Y > 0
-  repair <- function(b, a) {                     # shift the intercept so every count is feasible
+## The profile machinery of the pooled fit. `.cpb_prof_at()` maximizes the
+## slopes at a fixed alpha with the fit's own effort (BFGS, Nelder-Mead polish,
+## feasibility-repaired perturbation restarts, since a single simplex can stop
+## on a lower tooth); `.cpb_profile_trace()` traces the profile by continuation
+## on both sides of alpha-hat, in steps of max(0.01, alpha-hat/20), until it has
+## dropped `drop` log-likelihood units below its running maximum (or reached
+## the parameter bounds); `.cpb_alpha_profile_ci()` reads the crossing of the
+## likelihood-ratio cut off the trace and refines it by root finding.
+.cpb_prof_at <- function(a, b0, Xs, Y, off, ms, tr, w, s, icol, pos, b_cold = NULL) {
+  repair <- function(b) {                        # shift the intercept so every count is feasible
     if (is.na(icol) || !any(pos)) return(b)
     eta <- off + as.numeric(Xs %*% b)
     need <- max(log(Y[pos] * (1 - a)) - eta[pos]) + 1e-6
     if (need > 0) b[icol] <- b[icol] + need * s[icol]
     b
   }
-  prof <- function(a, b0) {
-    b0 <- repair(b0, a)
-    fn <- function(bb) .cpb_nll(c(bb, qlogis(a)), Xs, Y, off, ms, tr, w)
-    o <- optim(b0, fn, method = "Nelder-Mead", control = list(maxit = 3000, reltol = 1e-8))
-    o <- .ud_nm_polish(o, fn, 3000, 1e-8, restarts = 2L)
-    list(ll = -o$value, b = o$par)
+  fn <- function(bb) .cpb_nll(c(bb, qlogis(a)), Xs, Y, off, ms, tr, w)
+  ## from the neighbouring solution (continuation) and, when given, from the
+  ## Poisson slopes (a cold start, as the multistart's alpha.start values use)
+  run <- function(st) {
+    st <- repair(st)
+    o <- tryCatch(optim(st, fn, method = "BFGS", control = list(maxit = 3000, reltol = 1e-8)),
+                  error = function(e) NULL)
+    if (is.null(o) || !is.finite(o$value) || o$value >= 1e9)
+      o <- optim(st, fn, method = "Nelder-Mead", control = list(maxit = 3000, reltol = 1e-8))
+    o
   }
-  ah <- object$alpha; bh <- object$coefficients * s
-  ## downward: descending grid with continuation until the profile crosses the cut
-  lo <- NA_real_; a_prev <- ah; b_prev <- bh; ll_prev <- llmax
-  grid <- rev(seq(0.005, ah - 1e-4, by = max(0.005, ah / 40)))
-  for (a in grid) {
-    r <- prof(a, b_prev)
-    if (r$ll < cut) {
-      f <- function(aa) prof(aa, b_prev)$ll - cut
-      lo <- tryCatch(uniroot(f, c(a, a_prev), tol = 1e-4)$root, error = function(e) a)
-      break
+  o <- run(b0)
+  if (!is.null(b_cold)) { oc <- run(b_cold); if (oc$value < o$value) o <- oc }
+  o <- .ud_nm_polish(o, fn, 3000, 1e-8, restarts = 1L)
+  p <- length(o$par)
+  for (dlt in if (p > 1L) list(rep(0.15, p), -0.15 * (-1)^seq_len(p)) else list()) {
+    st <- repair(o$par + dlt)
+    o2 <- tryCatch(optim(st, fn, method = "Nelder-Mead", control = list(maxit = 3000, reltol = 1e-8)),
+                   error = function(e) NULL)
+    if (!is.null(o2) && o2$value < o$value - 1e-8) o <- .ud_nm_polish(o2, fn, 3000, 1e-8, restarts = 1L)
+  }
+  list(ll = -o$value, b = o$par)
+}
+## An exact one-dimensional search in alpha at the fitted slopes. At fixed
+## beta the log-likelihood is a saw-tooth in alpha: observation i's ceiling
+## reaches k at alpha = 1 - lambda_i/k, where its normalizer grows and the log
+## pmf drops by about (1-alpha)^k, so the supremum of a tooth is its interior
+## critical point or its right end (the left limit of the next breakpoint).
+## Every breakpoint within `window` of the estimate whose jump exceeds 1e-7 is
+## enumerated, the objective evaluated at its left limit, the best tooth
+## refined by optimize(), and, when the winner beats the incumbent, the fit is
+## re-run from it with alpha free (up to three rounds). The profile trace sees
+## the large-scale shape of the profile; this step resolves the teeth next to
+## the estimate, which are narrower than any trace step.
+.cpb_alpha_scan <- function(X, Y, off, ms, tr, w, fit, maxit, reltol, window = 0.02) {
+  p <- ncol(X); wv <- .ud_w1(w, length(Y))
+  s <- .ud_colscale(X, wv); Xs <- sweep(X, 2, s, "/")
+  fn <- function(par) .cpb_nll(par, Xs, Y, off, ms, tr, w)
+  par <- fit$par; par[seq_len(p)] <- par[seq_len(p)] * s
+  for (round in 1:3) {
+    ah <- plogis(par[p + 1L]); lam <- exp(off + as.numeric(Xs %*% par[seq_len(p)]))
+    lo <- max(0.005, ah - window); hi <- min(0.995, ah + window)
+    kcap <- floor(log(1e-7) / log1p(-hi))
+    bp <- unlist(lapply(seq_along(Y), function(i) {
+      k1 <- max(Y[i], ceiling(lam[i] / (1 - lo))); k2 <- min(floor(lam[i] / (1 - hi)), kcap)
+      if (k2 < k1 || k1 < 1) numeric(0) else 1 - lam[i] / seq(k1, k2)
+    }))
+    bp <- sort(unique(round(bp[bp > lo & bp < hi], 12)))
+    if (!length(bp)) break
+    cand <- bp - 1e-9                                        # left limits
+    vals <- vapply(cand, function(a) fn(c(par[seq_len(p)], qlogis(a))), numeric(1))
+    j <- which.min(vals); best <- list(par = c(par[seq_len(p)], qlogis(cand[j])), value = vals[j])
+    if (j > 1L) {                                            # the interior of the winning tooth
+      o <- optimize(function(a) fn(c(par[seq_len(p)], qlogis(a))), c(bp[j - 1L] + 1e-9, cand[j]), tol = 1e-10)
+      if (o$objective < best$value) best <- list(par = c(par[seq_len(p)], qlogis(o$minimum)), value = o$objective)
     }
-    a_prev <- a; b_prev <- r$b; ll_prev <- r$ll
+    if (best$value >= fit$value - 1e-8) break
+    o2 <- tryCatch(.cpb_fit_one(Xs, Y, best$par, off, ms, tr, maxit, reltol, w), error = function(e) NULL)
+    if (!is.null(o2) && o2$value < best$value) best <- o2
+    best <- .ud_nm_polish(best, fn, maxit, reltol, restarts = 1L)
+    if (best$value >= fit$value - 1e-8) break
+    if (is.null(best$convergence)) best$convergence <- 0L      # a scan point carries no optim() fields
+    if (is.null(best$counts)) best$counts <- c(0L, 0L)
+    fit <- best; fit$par[seq_len(p)] <- fit$par[seq_len(p)] / s; par <- best$par
   }
-  ## upward: the previous solution stays feasible as alpha rises
-  hi <- tryCatch(uniroot(function(aa) prof(aa, bh)$ll - cut, c(ah + 1e-4, 0.999), tol = 1e-4)$root,
-                 error = function(e) NA_real_)
-  boundary <- is.na(lo)
+  fit
+}
+.cpb_profile_trace <- function(X, Y, off, ms, tr, w, fit, drop = 4) {
+  p <- ncol(X); wv <- .ud_w1(w, length(Y))
+  s <- .ud_colscale(X, wv); Xs <- sweep(X, 2, s, "/")
+  icol <- match("(Intercept)", colnames(X)); pos <- Y > 0
+  bs <- tryCatch({ v <- glm.fit(Xs, Y, weights = wv, offset = off, family = poisson())$coefficients
+                   v[!is.finite(v)] <- 0; v }, error = function(e) rep(0, p))
+  ah <- plogis(fit$par[p + 1L]); bh <- fit$par[seq_len(p)] * s; llmax <- -fit$value
+  step <- max(0.01, ah / 20)
+  alpha <- ah; ll <- llmax; b <- list(bh / s)
+  for (dir in c(-1, 1)) {
+    a <- ah; bp <- bh; top <- llmax
+    repeat {
+      a <- a + dir * step
+      if (a < 0.005 || a > 0.995) break
+      r <- .cpb_prof_at(a, bp, Xs, Y, off, ms, tr, w, s, icol, pos, b_cold = bs)
+      alpha <- c(alpha, a); ll <- c(ll, r$ll); b <- c(b, list(r$b / s))
+      if (r$ll > top) top <- r$ll
+      if (r$ll < top - drop) break
+      bp <- r$b
+    }
+  }
+  ## a fine pass next to the estimate: the teeth of the profile in alpha can be
+  ## narrower than the step, so the neighbourhood is sampled at a fifth of it
+  for (a in ah + step * c(-0.8, -0.6, -0.4, -0.2, 0.2, 0.4, 0.6, 0.8)) {
+    if (a < 0.005 || a > 0.995) next
+    r <- .cpb_prof_at(a, bh, Xs, Y, off, ms, tr, w, s, icol, pos, b_cold = bs)
+    alpha <- c(alpha, a); ll <- c(ll, r$ll); b <- c(b, list(r$b / s))
+  }
+  o <- order(alpha)
+  list(alpha = alpha[o], ll = ll[o], b = b[o])
+}
+.cpb_alpha_profile_ci <- function(object, level = 0.95) {
+  X <- object$X; Y <- object$Y; ms <- object$max.support; tr <- object$truncated
+  off <- if (!is.null(object$offset)) object$offset else rep_len(0, length(Y))
+  w <- object$weights
+  s <- .ud_colscale(X, .ud_w1(w, length(Y))); Xs <- sweep(X, 2, s, "/")
+  icol <- match("(Intercept)", colnames(X)); pos <- Y > 0
+  llmax <- object$loglik; cut <- llmax - qchisq(level, 1) / 2
+  pr <- object$profile
+  if (is.null(pr) || max(pr$ll) > llmax + 1e-8) {           # an older object, or one whose trace is stale
+    fit <- list(par = c(object$coefficients, qlogis(object$alpha)), value = -llmax)
+    pr <- .cpb_profile_trace(X, Y, off, ms, tr, w, fit, drop = qchisq(level, 1) / 2 + 2)
+  }
+  prof <- function(a, b0) .cpb_prof_at(a, b0, Xs, Y, off, ms, tr, w, s, icol, pos)$ll
+  k <- which(abs(pr$alpha - object$alpha) < 1e-12)[1L]; if (is.na(k)) k <- which.max(pr$ll)
+  cross <- function(idx) {                                   # first trace point below the cut on one side
+    below <- idx[pr$ll[idx] < cut]
+    if (!length(below)) return(NA_real_)
+    j <- below[1L]; m <- match(j, idx); i <- if (m > 1L) idx[m - 1L] else k
+    f <- function(aa) prof(aa, pr$b[[i]] * s) - cut
+    tryCatch(uniroot(f, sort(c(pr$alpha[i], pr$alpha[j])), tol = 1e-4)$root, error = function(e) pr$alpha[j])
+  }
+  lo <- if (k > 1L) cross(rev(seq_len(k - 1L))) else NA_real_
+  hi <- if (k < length(pr$ll)) cross(seq(k + 1L, length(pr$ll))) else NA_real_
+  ## the trace ends only where the profile has dropped below the cut or at a bound
   c(lower = if (is.na(lo)) 0.005 else unname(lo),
     upper = if (is.na(hi)) 0.999 else unname(hi),
-    boundary = as.numeric(boundary))
+    boundary = as.numeric(is.na(lo)))
 }

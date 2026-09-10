@@ -71,6 +71,8 @@ section on a bracket around the unit's Poisson intercept, expanded while the max
 sits at an edge; a maximum at a kink is tracked in the analytic gradient of the
 concentrated likelihood, which the outer BFGS uses. The feasibility floor is exact:
 every count must lie in \verb{0..ceiling(mu/(1-delta))}.
+Runtime: about twice that of \code{\link[=cpb_fe]{cpb_fe()}} on the same panel (the Katz recursion
+runs the whole support), so a 2,600-row panel in 146 units takes about two minutes.
 }
 \details{
 Limitation: unlike \code{\link[=cpb_fe]{cpb_fe()}}, \code{gec_fe()} has no \code{truncated} argument -- a

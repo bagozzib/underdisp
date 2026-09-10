@@ -75,15 +75,67 @@
   count families label their dispersion row by the parameter.
 * `tidy()` for the two-part classes prefixes each term by its component, so
   `modelsummary()` lays the table out without a `shape` argument.
+* `predict()`, `score()`, and the QoI methods rebuild a `newdata` model matrix
+  in the fit's own factor coding (stored levels and contrasts) and align it to
+  the coefficients by name; a factor whose reference level was set through its
+  contrasts attribute (as in AER's `NMES1988`) is no longer re-coded on
+  `newdata`, and a coding mismatch is refused instead of multiplied by position.
+* A formula `offset()` term and a pscl-style `y ~ x | z` formula are refused
+  with a message naming `offset =`, `participation =`, and `zero =`; rows whose
+  unit identifier is missing are dropped like other incomplete rows; the
+  screen's generalized-Poisson comparator is the package's own family, so it
+  can report underdispersion, and it is gated by `comp_max_par`/`comp_max_n`
+  like the COM-Poisson (a full fit, not a diagnostic, on a dummy-heavy design); `print.gec()` labels the dispersion direction by
+  the likelihood-ratio test; `count_reg(fe =)` hides the absorbed dummies and
+  warns when `cluster` is the fixed-effects variable; standard errors from a
+  Hessian that is not positive definite are `NA` with a warning; the
+  generalized Poisson's support is capped for negative dispersion; `score()`
+  honours frequency weights; the auxiliary test is weighted; the parallel
+  driver draws its cluster seed eagerly, so consecutive `cores > 1` bootstraps
+  differ.
 * `converged` is stored by every class and reported by `print()`/`summary()`
-  when it is `FALSE`.
+  when it is `FALSE`; a matched-family fit whose optimizer never left the
+  infeasible plateau (a fitted mean outside `[1e-12, 1e8]`) is reported as not
+  converged with a warning, and its log-likelihood is `-Inf`, instead of
+  returning the sentinel as a likelihood.
+* The predictive distribution of a zero-truncated `gec()` or `count_reg()`
+  fit, as `score()`, `rootogram()`, `pit_hist()`, and `cv_score()` use it, is
+  the fit's own zero-truncated pmf normalized over the full support (in 0.1.0
+  the Katz pmf was scored untruncated and the count families renormalized over
+  the observed range), so the in-sample log score equals `-logLik/n` for every
+  class; `fitted()` on a `hurdle_gec` is the exact conditional mean that
+  `predict()` returns.
+* One rule names the coefficients of the two-part classes everywhere:
+  `participation:`/`intensity:` for the hurdles and `count:`/`zero:` for the
+  zero-inflated models, in `vcov()`, `confint()`, `tidy()`, and the texreg
+  tables, so a term read off a table indexes the covariance and the interval.
+* A vector `cluster` is checked for its length and for missing values by every
+  estimator before it is used (the fixed-effects and two-part estimators
+  recycled or padded a short vector in 0.1.0), and a row dropped for a missing
+  unit identifier drops its entry of a vector `offset`, `weights`, or
+  `cluster` with it; `hurdle_count()` selects the cluster-robust covariance
+  when `cluster` is supplied, as its siblings do, and accepts a vector
+  `cluster` aligned to the data; `zi_cpb()` and `zi_gec()` refuse a
+  non-integer response instead of flooring it; `zi_cpb()` works on scaled
+  covariates like every other estimator; `summary.zi_count()` prints the
+  stored inflation standard errors; every bootstrapping summary states how
+  many replicates converged; `count_reg()` and `zi_count()` store
+  `$fitted.values` on the mean scale and the natural parameter as `$mu`.
+* The parallel workers of `cores > 1` attach the package, so a `cv_score()`
+  fit function that names `cpb()` or `count_reg()` unqualified runs on them.
+* The analytic, robust, and cluster covariances of the matched families are
+  differenced at an absolute step of 1e-3 in the scaled parameterization
+  (numDeriv's default relative step left the family's support at large fitted
+  means and returned `NA` standard errors).
 
 ## Estimation and numerics
 
 * The CPB profile-likelihood interval for `alpha` is traced by continuation
-  with a feasibility-repaired start at each `alpha`, so the lower limit is the
-  re-maximized profile's crossing point; the interval is one-sided only when
-  the profile has not dropped to the cut by `alpha = 0.005`.
+  with a feasibility-repaired start at each `alpha`, and the profile at each
+  `alpha` is maximized with the fit's own multistart (BFGS, Nelder-Mead
+  polish, perturbed restarts), so the lower limit is the re-maximized
+  profile's crossing point; the interval is one-sided only when the profile
+  has not dropped to the cut by `alpha = 0.005`.
 * `max.support` defaults to `max(500, 10 * max(y))`; a fit whose largest
   implied ceiling reaches the guard warns and records `$support_binding`; a
   fit whose every start is infeasible errors instead of returning the starting
@@ -97,14 +149,16 @@
   the breakpoints within a window of the envelope's peak (as wide as the
   widest tooth in the unit) and refines inside whole teeth by golden section;
   every evaluation searches each unit afresh, so the concentrated likelihood is
-  a function of the parameters alone, and the outer optimizer is BFGS with the analytic
-  envelope gradient (the breakpoint a unit sits at is tracked in the gradient),
-  polished by Nelder-Mead. The Katz family below `delta = 1` has a finite
+  a function of the parameters alone. It is continuous in the dispersion
+  parameter but can jump in the slopes where a unit sits on its feasibility
+  floor, so the outer optimizer is a deterministic multistart: BFGS with the
+  analytic envelope gradient (the breakpoint a unit sits at is tracked in the
+  gradient), a Nelder-Mead polish, and two perturbed restarts; `?cpb_fe`
+  states the size of the alternative optima. The Katz family below `delta = 1` has a finite
   support too, but its likelihood only kinks at an integer ceiling (the
   entering point's mass grows from zero), so `gec_fe()` maximizes each unit's
   unimodal objective by golden section on an expanding bracket, with the
-  feasibility floor exact (support `0..ceiling(mu/(1-delta))`). This makes the
-  concentrated likelihood smooth in the dispersion parameter. The compiled
+  feasibility floor exact (support `0..ceiling(mu/(1-delta))`). The compiled
   code asserts the
   unit index against the design, and the fits use only the estimation rows, so
   rows dropped for missing values no longer misalign the unit blocks.
@@ -112,6 +166,49 @@
   deterministic multistart that maximizes it (BFGS from the Poisson solution
   at each `alpha.start`, Nelder-Mead polish, feasibility-repaired restarts);
   the mean-parameterized COM-Poisson tabulates its log-factorials.
+* The CPB pmf is normalized by a recursion outward from the mode of its terms
+  (consecutive terms differ by the factor `(n - k)/(k + 1) (1 - alpha)/alpha`,
+  so the sum runs over the body of the distribution and stops where the terms
+  fall below relative precision on either side), shared by the pooled
+  likelihoods and the concentrated fixed-effects likelihood and gradient. A
+  likelihood evaluation costs the width of the pmf rather than its ceiling: on
+  counts in the hundreds one evaluation of the concentrated objective takes
+  0.04 s instead of 2.6 s, and the pooled objective is 45 times cheaper. The
+  R implementation of the pmf keeps the direct lgamma form as the independent
+  check (agreement to 5e-10 across alpha from 0.01 to 0.999 and rates from
+  0.05 to 2,000).
+* The reported maximum of a pooled `cpb()` fit is the maximum of the fit's own
+  profile in `alpha`: the profile is traced by continuation on both sides of the
+  estimate (the slopes re-maximized at each step from the neighbouring solution
+  and from the Poisson slopes, with a finer pass next to the estimate) until it
+  has dropped four log-likelihood units, and a trace point above the
+  multistart's value restarts the fit from there; the multistart itself runs
+  from nine values of `alpha` and ends with an exact breakpoint search in
+  `alpha` at the fitted slopes, since the teeth of the surface in `alpha` are
+  thinner than any grid. `confint()` and `summary()`
+  read the profile interval off the stored trace. On small samples the
+  multistart alone could stop on a lower tooth with `alpha` off by 0.1; the
+  remaining differences against a dense grid of starts are of the size of the
+  jumps (below 0.005 log-likelihood units on 12 samples of 72 zero-truncated
+  counts). Unit intercepts belong in `cpb_fe()`, which solves them exactly; a
+  pooled fit with many dummy columns can stop short of it (0.14
+  log-likelihood units on pscl's `prussian` with 14 corps dummies).
+* The inner search of `cpb_fe()` locates the peak of a unit's smooth part to
+  1e-6 (in 0.1.1's first candidate the twelve golden-section steps left an
+  error of 1.6e-3, wider than a tooth at ceilings above a few hundred, so the
+  wrong tooth could be searched) and searches the neighbouring tooth when the
+  interior optimum sits at a tooth's end.
+* The GEC support guard refuses instead of renormalizing: a rate whose recursion
+  has not reached the tail by `max.support` is infeasible in the likelihood, a
+  fit whose fitted support reaches the guard warns and records
+  `$support_binding`, and `predict()`, `dgec()`, and `pgec()` return `NA` with
+  a warning for such a rate (in 0.1.0 the pmf was silently renormalized over
+  `0..max.support`, so a prediction far outside the fitted range was too small).
+* The COM-Poisson support rule no longer clips the rate at 1e10 (with `mu =` at
+  strong underdispersion the rate exceeds it and the pmf was wrong), and the
+  d/p/q/r functions return `NA` for a non-finite rate.
+* `.ud_nm_polish()` chains its restarts until a restart gains less than the
+  tolerance, as documented (the first candidate stopped after one).
 * Design matrices are rank-checked (an empty factor level or an exact linear
   combination is refused with the column named; a covariate constant within
   units is refused by the fixed-effects fits); a wrong-length vector `offset`,
@@ -279,5 +376,5 @@ The estimators are hardened for the difficult likelihoods this package targets
 
 * Bundled `peacekeeping` dataset (UN peacekeeping contributions, a
   state-year roster with structural zeros).
-* `broom` (`tidy`/`glance`/`augment`) methods for all model classes, and
+* `broom` `tidy()`/`glance()` methods for all model classes (`augment()` for `cpb`), and
   `modelsummary` / `texreg` table support.

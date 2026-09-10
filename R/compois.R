@@ -22,7 +22,9 @@
 ## where the mode is small and the loop stops almost immediately. A hard ceiling
 ## of 100000 bounds a transient extreme lambda during optimization.
 .compois_kmax <- function(lambda, nu) {
-  logl <- log(min(max(lambda, 1e-12), 1e10))                # bounded log-rate (guards optim excursions)
+  lambda <- lambda[is.finite(lambda)]
+  if (!length(lambda)) return(50L)
+  logl <- log(min(max(lambda, 1e-12), .Machine$double.xmax))   # the mode and the ceiling below bound the work
   mode <- min(max(1, exp(logl / max(nu, 0.05))), 1e5)       # bounded mode of the terms
   term <- function(k) k * logl - nu * lgamma(k + 1)
   peak <- term(mode); if (!is.finite(peak)) peak <- 0
@@ -93,6 +95,7 @@ dcompois <- function(x, lambda, nu, log = FALSE, mu = NULL) {
   n <- max(length(x), length(lambda)); x <- rep_len(x, n); lambda <- rep_len(lambda, n)
   logZ <- .compois_logZ(lambda, nu)
   ld <- ifelse(x < 0 | x != floor(x), -Inf, x * log(lambda) - nu * lgamma(x + 1) - logZ)
+  ld[!is.finite(lambda)] <- NA_real_
   if (log) ld else exp(ld)
 }
 #' @rdname compois-distribution
@@ -102,6 +105,7 @@ pcompois <- function(q, lambda, nu, lower.tail = TRUE, log.p = FALSE, mu = NULL)
   if (!length(q) || !length(lambda)) return(numeric(0))
   n <- max(length(q), length(lambda)); q <- rep_len(q, n); lambda <- rep_len(lambda, n)
   out <- vapply(seq_len(n), function(i) {
+    if (!is.finite(lambda[i])) return(NA_real_)
     qi <- floor(q[i]); if (qi < 0) return(0)
     sum(.compois_pmf1(lambda[i], nu, qi))
   }, numeric(1))
@@ -116,6 +120,7 @@ qcompois <- function(p, lambda, nu, lower.tail = TRUE, log.p = FALSE, mu = NULL)
   if (log.p) p <- exp(p); if (!lower.tail) p <- 1 - p
   n <- max(length(p), length(lambda)); p <- rep_len(p, n); lambda <- rep_len(lambda, n)
   vapply(seq_len(n), function(i) {
+    if (!is.finite(lambda[i])) return(NA_real_)
     K <- .compois_kmax(lambda[i], nu); cdf <- cumsum(.compois_pmf1(lambda[i], nu, K))
     as.numeric(which(cdf >= p[i] - 1e-12)[1L] - 1L)
   }, numeric(1))
@@ -127,6 +132,7 @@ rcompois <- function(n, lambda, nu, mu = NULL) {
   if (n == 0) return(numeric(0))
   lambda <- rep_len(lambda, n)
   vapply(seq_len(n), function(i) {
+    if (!is.finite(lambda[i])) return(NA_real_)
     K <- .compois_kmax(lambda[i], nu); cdf <- cumsum(.compois_pmf1(lambda[i], nu, K))
     as.numeric(which(cdf >= stats::runif(1))[1L] - 1L)
   }, numeric(1))

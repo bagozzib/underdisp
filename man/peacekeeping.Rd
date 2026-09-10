@@ -8,7 +8,7 @@
 A data frame with 4,448 rows and 9 variables:
 \describe{
 \item{iso3}{ISO3 country code (the panel unit).}
-\item{year}{Calendar year, 1990--2024.}
+\item{year}{Calendar year, 1990--2016.}
 \item{contributions}{Number of distinct UN peacekeeping operations the
 state contributes personnel to in that year (the count outcome).}
 \item{democracy}{Electoral-democracy index.}

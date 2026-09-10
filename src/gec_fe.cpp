@@ -140,7 +140,7 @@ static double maximize_unit(const Unit& U, double a0, double& a_star, int& edge_
   }
   if (ymax == 0) { a_star = -30.0; return 0.0; }
   double apois = (sy > 0.0 && se > 0.0) ? std::log(sy / se) : 0.0;
-  double L0 = finite_support ? alo + 1e-6 : -30.0;
+  double L0 = finite_support ? alo + 1e-9 : -30.0;
   double centre;
   if (R_finite(a0)) centre = std::max(a0, L0);
   else {
@@ -211,6 +211,7 @@ List gec_fe_nll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, Nume
   NumericVector a(n_units);
   double total = 0.0, astar; int et;
   for (int u = 0; u < n_units; u++) {
+    if ((u & 15) == 0) Rcpp::checkUserInterrupt();
     Unit U = { Y, o, w, ustart[u], ustart[u + 1], delta, max_support };
     double a0 = warm ? awarm[u] : NA_REAL;
     double ll = maximize_unit(U, a0, astar, et, inner_it);

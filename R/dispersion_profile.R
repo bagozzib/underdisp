@@ -32,7 +32,7 @@
     m1 <- as.numeric(P %*% k); m2 <- as.numeric(P %*% (k * k))
     list(mean = m1, var = pmax(m2 - m1^2, 0), p0 = P[, 1], truncated = isTRUE(fit$truncated))
   } else if (inherits(fit, "count_reg")) {
-    fam <- .count_fam(fit$family); mu <- fit$fitted.values     # natural parameter
+    fam <- .count_fam(fit$family); mu <- fit$mu                # natural parameter
     list(mean = fam$meanfun(mu, fit$theta), var = fam$varfun(mu, fit$theta),
          p0 = fam$p0(mu, fit$theta), truncated = isTRUE(fit$truncated))
   } else stop("dispersion_profile() takes single-equation fits: cpb, cpb_fe, gec, gec_fe, or count_reg.")

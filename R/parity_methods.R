@@ -71,8 +71,8 @@ coef.hurdle_gec <- function(object, ...) .hurdle_coef(object)
   V <- matrix(0, nrow(A) + nrow(B), ncol(A) + ncol(B))
   V[seq_len(nrow(A)), seq_len(ncol(A))] <- A
   V[nrow(A) + seq_len(nrow(B)), ncol(A) + seq_len(ncol(B))] <- B
-  dimnames(V) <- list(c(paste0("part:", rownames(A)), paste0("int:", rownames(B))),
-                      c(paste0("part:", colnames(A)), paste0("int:", colnames(B))))
+  dimnames(V) <- list(c(paste0("participation:", rownames(A)), paste0("intensity:", rownames(B))),
+                      c(paste0("participation:", colnames(A)), paste0("intensity:", colnames(B))))
   V
 }
 .hurdle_vcov <- function(object) {
@@ -100,14 +100,14 @@ vcov.hurdle_count <- function(object, ...) .hurdle_vcov(object)
 #' @export
 vcov.zi_cpb <- function(object, ...) {
   nb <- length(object$coefficients); nz <- length(object$zero_coef)
-  .zi_boot_vcov(object, seq_len(nb + nz), c(names(object$coefficients), paste0("zero_", names(object$zero_coef))))
+  .zi_boot_vcov(object, seq_len(nb + nz), c(paste0("count:", names(object$coefficients)), paste0("zero:", names(object$zero_coef))))
 }
 #' @method vcov zi_gec
 #' @export
 vcov.zi_gec <- function(object, ...) {
   nb <- length(object$coefficients); nz <- length(object$zero_coef)
   .zi_boot_vcov(object, c(seq_len(nb), nb + 1L + seq_len(nz)),   # skip the log-delta column
-                c(names(object$coefficients), paste0("zero_", names(object$zero_coef))))
+                c(paste0("count:", names(object$coefficients)), paste0("zero:", names(object$zero_coef))))
 }
 
 ## --- confidence-interval parity ----------------------------------------------
@@ -136,8 +136,9 @@ vcov.zi_gec <- function(object, ...) {
 #' intervals from the analytic covariance for [count_reg()] and [zi_count()]
 #' (the dispersion parameter's interval is mapped from its estimation scale to
 #' the natural scale); and, for the hurdles, the participation model's Wald
-#' intervals (prefixed `part:`) stacked over the intensity model's intervals
-#' (prefixed `int:`). A fit without inference errors informatively.
+#' intervals (prefixed `participation:`) stacked over the intensity model's intervals
+#' (prefixed `intensity:`); the zero-inflated classes prefix `count:` and `zero:`.
+#' The same names label `vcov()`, `tidy()`, and the texreg tables. A fit without inference errors informatively.
 #'
 #' @param object A fitted model from this package.
 #' @param parm Optional subset of parameter names.
@@ -194,7 +195,8 @@ confint.count_reg <- function(object, parm, level = 0.95, ...) {
 confint.zi_count <- function(object, parm, level = 0.95, ...) {
   if (is.null(object$vcov_full)) .no_inference()
   fam <- .count_fam(object$family); pc <- length(object$coefficients); pz <- length(object$zero.coefficients)
-  est <- c(object$coefficients, stats::setNames(object$zero.coefficients, paste0("zero_", names(object$zero.coefficients))))
+  est <- c(stats::setNames(object$coefficients, paste0("count:", names(object$coefficients))),
+           stats::setNames(object$zero.coefficients, paste0("zero:", names(object$zero.coefficients))))
   se <- sqrt(pmax(diag(object$vcov_full)[seq_len(pc + pz)], 0))
   ci <- .ci_wald(est, se, level)
   if (fam$nshape) {
@@ -208,9 +210,9 @@ confint.zi_count <- function(object, parm, level = 0.95, ...) {
 .hurdle_confint <- function(object, parm, level) {
   pv <- stats::vcov(object$participation)
   pc <- stats::coef(object$participation)
-  pci <- .ci_wald(pc, sqrt(diag(pv)), level); rownames(pci) <- paste0("part:", names(pc))
+  pci <- .ci_wald(pc, sqrt(diag(pv)), level); rownames(pci) <- paste0("participation:", names(pc))
   ici <- stats::confint(object$intensity, level = level)
-  rownames(ici) <- paste0("int:", rownames(ici))
+  rownames(ici) <- paste0("intensity:", rownames(ici))
   .ci_pick(rbind(pci, ici), parm)
 }
 #' @rdname confint.underdisp
@@ -227,7 +229,8 @@ confint.hurdle_gec <- function(object, parm, level = 0.95, ...) .hurdle_confint(
 confint.hurdle_count <- function(object, parm, level = 0.95, ...) .hurdle_confint(object, parm, level)
 .zi_confint <- function(object, parm, level) {
   if (is.null(object$se.beta) || !any(is.finite(object$se.beta))) .no_inference()
-  est <- c(object$coefficients, stats::setNames(object$zero_coef, paste0("zero_", names(object$zero_coef))))
+  est <- c(stats::setNames(object$coefficients, paste0("count:", names(object$coefficients))),
+           stats::setNames(object$zero_coef, paste0("zero:", names(object$zero_coef))))
   se  <- c(object$se.beta, object$se.zero)
   .ci_pick(.ci_wald(est, se, level), parm)
 }
@@ -311,6 +314,12 @@ print.summary.underdisp <- function(x, ...) {
 }
 .no_inf_note <- function(has_se)
   if (!has_se) "Note: no inference was requested at fit time (se = \"none\")." else NULL
+## the survivor count of a bootstrap, or the no-inference note
+.boot_note <- function(object, has_se) {
+  if (!has_se) return(.no_inf_note(FALSE))
+  nb <- if (!is.null(object$boot)) attr(object$boot, "nboot_ok") else NULL
+  if (is.null(nb)) NULL else sprintf("(%d bootstrap resamples converged)", nb)
+}
 #' @method summary cpb_fe
 #' @export
 summary.cpb_fe <- function(object, ...) {
@@ -322,7 +331,7 @@ summary.cpb_fe <- function(object, ...) {
     disp = sprintf("alpha (shape) = %.4f%s", object$alpha,
                    if (identical(object$bias_correct, "jackknife"))
                      " [split-panel jackknife corrected]" else ""),
-    note = .no_inf_note(!is.null(se)))
+    note = .boot_note(object, !is.null(se)))
 }
 #' @method summary gec
 #' @export
@@ -331,10 +340,10 @@ summary.gec <- function(object, ...) {
   .ud_summary(object,
     stats::setNames(list(.sum_block(object$coefficients, se)),
                     if (is.null(se)) "Coefficients" else "Coefficients (bootstrap SEs)"),
-    disp = sprintf("dispersion delta (Var/Mean) = %.4f%s", object$delta,
+    disp = sprintf("dispersion delta (Var/Mean on an unbounded support) = %.4f%s", object$delta,
                    if (!is.null(object$se.delta) && is.finite(object$se.delta))
                      sprintf("  (SE %.4f)", object$se.delta) else ""),
-    note = .no_inf_note(!is.null(se)))
+    note = .boot_note(object, !is.null(se)))
 }
 #' @method summary gec_fe
 #' @export
@@ -344,10 +353,10 @@ summary.gec_fe <- function(object, ...) {
   .ud_summary(object,
     stats::setNames(list(.sum_block(object$coefficients, se)),
                     if (is.null(se)) "Coefficients" else "Coefficients (unit-bootstrap SEs)"),
-    disp = sprintf("dispersion delta (Var/Mean) = %.4f%s", object$delta,
+    disp = sprintf("dispersion delta (Var/Mean on an unbounded support) = %.4f%s", object$delta,
                    if (identical(object$bias_correct, "jackknife"))
                      " [split-panel jackknife corrected]" else ""),
-    note = .no_inf_note(!is.null(se)))
+    note = .boot_note(object, !is.null(se)))
 }
 #' @method summary hurdle_cpb
 #' @export
@@ -396,10 +405,10 @@ summary.zi_cpb <- function(object, ...) {
 #' @method summary zi_count
 #' @export
 summary.zi_count <- function(object, ...) {
-  cse <- if (!is.null(object$vcov)) sqrt(pmax(diag(object$vcov), 0)) else NULL
+  cse <- if (!is.null(object$vcov)) object$se.beta else NULL
   .ud_summary(object,
     list("Count component" = .sum_block(object$coefficients, cse),
-         "Zero-inflation" = .sum_block(object$zero.coefficients, NULL)),
+         "Zero-inflation" = .sum_block(object$zero.coefficients, if (is.null(cse)) NULL else object$se.zero)),
     disp = .shape_line(object$family, object$theta),
     note = .no_inf_note(!is.null(cse)))
 }

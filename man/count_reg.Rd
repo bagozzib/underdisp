@@ -58,7 +58,10 @@ An object of class \code{"count_reg"}. The component \verb{$theta} holds the
 dispersion parameter on its natural scale (the negative-binomial size, the
 COM-Poisson \eqn{\nu}, the generalized-Poisson \eqn{\lambda}, the
 gamma-count \eqn{\alpha}, the double-Poisson \eqn{\theta}; \code{NA} for the
-Poisson).
+Poisson); \verb{$fitted.values} and \verb{$residuals} are on the mean scale (the
+conditional mean E(Y | Y >= 1) for a zero-truncated fit), as \code{fitted()} and
+\code{residuals()} return them, and \verb{$mu} is the family's natural parameter
+\verb{exp(offset + x'b)}.
 }
 \description{
 Fits a count regression with a log link from any of the package's count
@@ -100,6 +103,13 @@ The Poisson is the equidispersed member of every family, so
 \code{\link[=dispersion_test]{dispersion_test()}} tests each family's dispersion parameter against it, and
 \code{\link[=dispersion_profile]{dispersion_profile()}} compares the families' implied variance-to-mean curves
 against the data.
+
+Runtime: the Poisson, negative binomial, gamma-count, and double Poisson and
+generalized Poisson families fit in under a second at a few hundred rows; the
+COM-Poisson families evaluate a normalizing sum per observation (and the
+mean parameterization solves a root per observation), so they take seconds
+at a few hundred rows and minutes at several thousand; \code{se = "robust"} and
+\code{"cluster"} add numerical scores at the same cost per parameter.
 }
 
 \examples{

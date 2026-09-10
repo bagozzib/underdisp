@@ -47,7 +47,9 @@ see \code{\link[=count_reg]{count_reg()}}.}
 \item{se, cluster}{Standard-error type and optional cluster; see \code{\link[=count_reg]{count_reg()}}.}
 }
 \value{
-An object of class \code{"zi_count"}.
+An object of class \code{"zi_count"}; \verb{$fitted.values} is the marginal
+mean \verb{(1 - pi) E(Y | count component)} that \code{fitted()} returns, and \verb{$mu}
+the count component's natural parameter.
 }
 \description{
 Fits a structural-zero mixture whose count component comes from any of the

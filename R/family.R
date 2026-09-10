@@ -43,6 +43,7 @@
 #' @seealso [ud_screen()], [cpb()], [score()]
 #' @export
 compare_dispersion <- function(formula, data, max.support = 500, hurdle = FALSE, zi = FALSE) {
+  .ud_no_formula_offset(formula)
   y <- stats::model.response(stats::model.frame(formula, data))
   n <- length(y); kmax <- max(y); obs_zero <- mean(y == 0)
   aic <- function(ll, df) -2 * ll + 2 * df

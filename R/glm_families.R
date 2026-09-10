@@ -48,12 +48,16 @@
   n <- length(ll_i(par)); w <- .ud_w1(w, n)
   k <- length(par); sc <- if (is.null(scale)) rep(1, k) else scale
   ps <- par * sc; to_par <- function(v) v / sc
-  H <- numDeriv::hessian(function(th) sum(w * ll_i(to_par(th))), ps)
+  ## differenced at an absolute step of 1e-3 in the scaled parameterization
+  ## (numDeriv's default is a step of a tenth of the parameter, which at large
+  ## fitted means leaves the family's support and returns NA)
+  ma <- list(eps = 1e-3, d = 0.1, zero.tol = 1e-8, r = 4, v = 2, show.details = FALSE)
+  H <- numDeriv::hessian(function(u) sum(w * ll_i(to_par(ps + u))), rep(0, k), method.args = ma)
   bread <- tryCatch(solve(-H), error = function(e) MASS::ginv(-H))
   V <- if (type == "analytic") {
     bread
   } else {
-    S <- numDeriv::jacobian(function(th) ll_i(to_par(th)), ps)   # n x length(par) score matrix
+    S <- numDeriv::jacobian(function(u) ll_i(to_par(ps + u)), rep(0, k), method.args = ma)   # n x length(par) scores
     meat <- if (type == "cluster") {
       if (is.null(cluster)) stop("cluster-robust SE requires a 'cluster'.")
       G <- length(unique(cluster))
@@ -69,7 +73,7 @@
 ## core estimator shared by count_reg() and the intensity of hurdle/zi.
 .count_fit <- function(X, Y, fam, truncated, offset = 0, start = NULL, w = NULL) {
   p <- ncol(X); off <- rep_len(offset, nrow(X)); w <- .ud_w1(w, nrow(X))
-  s <- .ud_colscale(X); Xs <- sweep(X, 2, s, "/")              # optimize on unit-SD columns
+  s <- .ud_colscale(X, w); Xs <- sweep(X, 2, s, "/")           # optimize on unit-SD (weighted) columns
   sc <- c(s, if (fam$nshape) 1)
   if (!is.null(start)) start <- start * sc
   b0 <- tryCatch({ v <- stats::glm.fit(Xs, Y, weights = w, offset = off, family = stats::poisson())$coefficients
@@ -95,6 +99,11 @@
     o2 <- tryCatch(stats::optim(o$par, nll, method = "Nelder-Mead", control = list(maxit = 2000, reltol = 1e-12)),
                    error = function(e) NULL)
     if (!is.null(o2) && o2$value < o$value) { o2$convergence <- 0L; o <- o2 }
+  }
+  if (!is.finite(o$value) || o$value >= 1e9) {            # never left the infeasible plateau
+    warning("the optimizer found no finite likelihood: a fitted mean lies outside [1e-12, 1e8] at every ",
+            "point it visited. The fit did not converge; the coefficients are its last iterate.", call. = FALSE)
+    o$value <- Inf; o$convergence <- 1L
   }
   par <- o$par / sc                                          # back to the original scale
   beta <- par[seq_len(p)]; names(beta) <- colnames(X)
@@ -156,6 +165,13 @@
 #' [dispersion_profile()] compares the families' implied variance-to-mean curves
 #' against the data.
 #'
+#' Runtime: the Poisson, negative binomial, gamma-count, and double Poisson and
+#' generalized Poisson families fit in under a second at a few hundred rows; the
+#' COM-Poisson families evaluate a normalizing sum per observation (and the
+#' mean parameterization solves a root per observation), so they take seconds
+#' at a few hundred rows and minutes at several thousand; `se = "robust"` and
+#' `"cluster"` add numerical scores at the same cost per parameter.
+#'
 #' @param formula A model formula.
 #' @param data A data frame.
 #' @param family One of `"poisson"`, `"negbin"`, `"compois"`, `"mpcmp"`,
@@ -186,7 +202,10 @@
 #'   dispersion parameter on its natural scale (the negative-binomial size, the
 #'   COM-Poisson \eqn{\nu}, the generalized-Poisson \eqn{\lambda}, the
 #'   gamma-count \eqn{\alpha}, the double-Poisson \eqn{\theta}; `NA` for the
-#'   Poisson).
+#'   Poisson); `$fitted.values` and `$residuals` are on the mean scale (the
+#'   conditional mean E(Y | Y >= 1) for a zero-truncated fit), as `fitted()` and
+#'   `residuals()` return them, and `$mu` is the family's natural parameter
+#'   `exp(offset + x'b)`.
 #' @references Huang, A. (2017). Mean-parametrized Conway--Maxwell--Poisson
 #'   regression models for dispersed counts. \emph{Statistical Modelling},
 #'   17(6), 359-380. Winkelmann, R. (1995). Duration dependence and dispersion
@@ -210,6 +229,10 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
                                                 "gammacount", "doublepois"),
                       truncated = FALSE, fe = NULL, offset = NULL, weights = NULL,
                       se = c("analytic", "robust", "cluster", "none"), cluster = NULL) {
+  .ud_no_formula_offset(formula)
+  data <- .ud_drop_na_fe(data, fe)
+  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
+  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se_missing <- missing(se)
   fam <- .count_fam(family); family <- fam$tag; se <- match.arg(se)
   ## uniform cluster semantics across the family: supplying `cluster` implies
@@ -219,6 +242,10 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
   if (!is.null(fe)) {
     miss <- setdiff(fe, names(data))
     if (length(miss)) stop("'fe' names column(s) not in 'data': ", paste(miss, collapse = ", "), ".")
+    if (is.character(cluster) && any(cluster %in% fe))
+      warning("'cluster' is the fixed-effects variable: each unit dummy is identified within a single cluster, ",
+              "so the cluster-robust covariance is degenerate for the dummies (the slopes' cluster-robust ",
+              "standard errors remain valid).", call. = FALSE)
     formula <- stats::reformulate(c(labels(stats::terms(formula)), paste0("factor(", fe, ")")),  # fe may name >1 column (two-way FE)
                                   response = all.vars(formula)[1L])
   }
@@ -253,19 +280,37 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
     if (!is.null(V)) {
       vcv_full <- V
       vcv <- V[seq_len(p), seq_len(p), drop = FALSE]
-      se.beta <- sqrt(pmax(diag(vcv), 0))
+      se.beta <- .count_se(vcv)
     }
   }
+  ## $mu is the family's natural parameter (the rate of the recursion); the
+  ## stored fitted values and residuals are on the mean scale, as fitted() returns
+  fv <- fam$meanfun(ft$mu, ft$theta)
+  if (truncated) fv <- fv / pmax(1 - fam$p0(ft$mu, ft$theta), 1e-12)     # E(Y | Y >= 1)
   structure(list(
     coefficients = ft$beta, theta = ft$theta, family = family, truncated = truncated,
-    se.beta = se.beta, vcov = vcv, vcov_full = vcv_full, loglik = ft$loglik, fitted.values = ft$mu,
-    linear.predictors = as.numeric(rep_len(off, n) + X %*% ft$beta), residuals = Y - ft$mu,
+    se.beta = se.beta, vcov = vcv, vcov_full = vcv_full, loglik = ft$loglik, mu = ft$mu, fitted.values = fv,
+    linear.predictors = as.numeric(rep_len(off, n) + X %*% ft$beta), residuals = Y - fv,
     offset = off, weights = w, n = n, nobs_weighted = if (is.null(w)) n else sum(w),
     df = df, p = p, fe = fe, se.type = se, clustered = !is.null(clid),
     n_clusters = if (!is.null(clid)) length(unique(clid)) else NA_integer_,
     converged = ft$converged, formula = formula, terms = attr(mf, "terms"),
     levels = .cpb_xlevels(mf), contrasts = attr(X, "contrasts"), X = X, Y = Y, call = cl),
     class = "count_reg")
+}
+
+## standard errors from a numerical covariance: a non-positive diagonal means
+## the Hessian is not positive definite (the fit may sit on a feasibility
+## boundary, with counts at their ceiling), and such an SE is NA, not 0
+.count_se <- function(vcv) {
+  d <- diag(vcv); bad <- !is.finite(d) | d <= 0
+  if (any(bad)) {
+    warning("the numerical Hessian is not positive definite for ", sum(bad), " coefficient(s): their standard ",
+            "errors are NA. The fit may sit on the family's feasibility boundary (counts at their ceiling); ",
+            "compare a bootstrap, or se = \"none\".", call. = FALSE)
+    d[bad] <- NA_real_
+  }
+  sqrt(d)
 }
 
 ## ---------------------------------------------------------------------------
@@ -311,7 +356,10 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
                          participation = NULL, fe = NULL, part_fe = NULL,
                          link = c("logit", "probit", "cloglog"), offset = NULL, weights = NULL,
                          se = c("analytic", "robust", "cluster", "none"), cluster = NULL) {
+  .ud_no_formula_offset(formula, participation)
+  se_missing <- missing(se)
   fam <- .count_fam(family); family <- fam$tag; se <- match.arg(se); link <- match.arg(link)
+  if (!is.null(cluster) && se_missing) se <- "cluster"       # uniform cluster semantics
   ## reduce to complete cases on all model variables so the two margins stay aligned
   mv <- unique(c(all.vars(formula), all.vars(if (is.null(participation)) formula[-2L] else participation),
                  fe, part_fe))
@@ -319,6 +367,7 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
   if (!is.null(offset) && !is.character(offset)) offset <- offset[keep]
   w_all <- .ud_weights(weights, data, seq_len(nrow(data)))
   if (!is.null(w_all)) w_all <- w_all[keep]
+  cl_vals <- if (se == "cluster") .ud_cluster_values(cluster, data, keep) else NULL   # checked before the rows are reduced
   data <- data[keep, , drop = FALSE]
   y <- stats::model.response(stats::model.frame(formula, data))
   if (!is.numeric(y)) stop("Response must be a numeric count; got ", class(y)[1L], ".")
@@ -336,7 +385,8 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
                 else offset[y > 0]
   ifit <- count_reg(formula, data = pos, family = family, truncated = TRUE,
                     fe = fe, offset = int_offset, weights = if (is.null(w_all)) NULL else w_all[y > 0],
-                    se = se, cluster = cluster)
+                    se = se, cluster = if (is.null(cl_vals) || (is.character(cluster) && length(cluster) == 1L)) cluster
+                                       else cl_vals[y > 0])
   ## per-observation intensity natural parameter for all units (missing FE levels
   ## -> reference), offset included
   beta <- ifit$coefficients
@@ -400,7 +450,9 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
 #' @param weights Optional frequency weights (a numeric vector or a column name);
 #'   see [count_reg()].
 #' @param se,cluster Standard-error type and optional cluster; see [count_reg()].
-#' @return An object of class `"zi_count"`.
+#' @return An object of class `"zi_count"`; `$fitted.values` is the marginal
+#'   mean `(1 - pi) E(Y | count component)` that `fitted()` returns, and `$mu`
+#'   the count component's natural parameter.
 #' @examples
 #' set.seed(2); n <- 300; x <- rnorm(n); z <- rnorm(n)
 #' y <- ifelse(rbinom(n, 1, plogis(-0.5 + 0.8 * z)) == 1, 0L, rpois(n, exp(1 + 0.3 * x)))
@@ -413,6 +465,7 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
                      zero = NULL, fe = NULL, zero_fe = NULL, link = c("logit", "probit", "cloglog"),
                      offset = NULL, weights = NULL, se = c("analytic", "robust", "cluster", "none"),
                      cluster = NULL) {
+  .ud_no_formula_offset(formula, zero)
   se_missing <- missing(se)
   fam <- .count_fam(family); family <- fam$tag; se <- match.arg(se); link <- match.arg(link)
   if (!is.null(cluster) && se_missing) se <- "cluster"   # uniform cluster semantics
@@ -472,14 +525,14 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
   se.beta <- setNames(rep(NA_real_, pc), colnames(Xc)); se.zero <- setNames(rep(NA_real_, pz), colnames(Zz))
   vcv <- NULL; vcv_full <- NULL
   if (se != "none") {
-    nm <- c(colnames(Xc), paste0("zero_", colnames(Zz)), if (fam$nshape) fam$shape_name)
+    nm <- c(paste0("count:", colnames(Xc)), paste0("zero:", colnames(Zz)), if (fam$nshape) fam$shape_name)
     V <- tryCatch(.count_vcov(o$par, function(th) .zi_llik_i(th, Xc, Zz, Y, fam, linkinv, off), se, clid, nm, w = w,
                               scale = c(.ud_colscale(Xc), .ud_colscale(Zz), if (fam$nshape) 1)),
                   error = function(e) NULL)
     if (!is.null(V)) {
       vcv_full <- V
-      vcv <- V[seq_len(pc), seq_len(pc), drop = FALSE]; se.beta <- sqrt(pmax(diag(vcv), 0))
-      se.zero <- sqrt(pmax(diag(V)[pc + seq_len(pz)], 0))
+      vcv <- V[seq_len(pc), seq_len(pc), drop = FALSE]; se.beta <- .count_se(vcv)
+      se.zero <- .count_se(V[pc + seq_len(pz), pc + seq_len(pz), drop = FALSE])
     }
   }
   structure(list(coefficients = beta, zero.coefficients = gamma, zero_coef = gamma, theta = theta, family = family,
@@ -489,9 +542,13 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
                  pi_full = as.numeric(linkinv(Zz %*% gamma)),
                  lambda_full = as.numeric(exp(rep_len(off, n) + Xc %*% beta)), y = as.integer(Y),
                  xref = colMeans(Xc), zref = colMeans(Zz), offset = off,
-                 fitted.values = as.numeric(exp(rep_len(off, n) + Xc %*% beta)), Xc = Xc, Zz = Zz, fe = fe, zero_fe = zero_fe,
+                 mu = as.numeric(exp(rep_len(off, n) + Xc %*% beta)),
+                 fitted.values = as.numeric((1 - linkinv(Zz %*% gamma)) * fam$meanfun(exp(rep_len(off, n) + Xc %*% beta), theta)),
+                 Xc = Xc, Zz = Zz, fe = fe, zero_fe = zero_fe,
                  se.type = se, converged = o$convergence == 0, formula = cform,
-                 zero.formula = zrhs, call = match.call()), class = "zi_count")
+                 zero.formula = zrhs, zero_terms = stats::terms(zrhs), levels = .cpb_xlevels(mf),
+                 contrasts = attr(Xc, "contrasts"), zero_contrasts = attr(Zz, "contrasts"),
+                 call = match.call()), class = "zi_count")
 }
 
 ## ---------------------------------------------------------------------------
@@ -502,7 +559,12 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
 print.count_reg <- function(x, ...) {
   cat(.count_fam(x$family)$label, "count regression",
       if (x$truncated) "(zero-truncated)" else "", if (!is.null(x$fe)) paste0("[FE: ", paste(x$fe, collapse = ", "), "]"), "\n")
-  cat("Call:  ", deparse(x$call), "\n\nCoefficients:\n", sep = ""); print(round(x$coefficients, 4))
+  cf <- x$coefficients
+  if (!is.null(x$fe)) {                                 # the absorbed unit dummies are not shown
+    keep <- !grepl("^factor\\(", names(cf)); nd <- sum(!keep); cf <- cf[keep]
+  }
+  cat("Call:  ", deparse(x$call), "\n\nCoefficients:\n", sep = ""); print(round(cf, 4))
+  if (!is.null(x$fe) && nd > 0) cat("(", nd, " fixed-effect dummies not shown; see coef())\n", sep = "")
   if (x$family == "compois")
     cat("\nCoefficients are on the log-rate scale; predict(type='response') is on the mean scale.\n")
   cat(.shape_line(x$family, x$theta))
@@ -527,12 +589,7 @@ logLik.count_reg <- function(object, ...)
 nobs.count_reg <- function(object, ...) if (is.null(object$nobs_weighted)) object$n else object$nobs_weighted
 #' @method fitted count_reg
 #' @export
-fitted.count_reg <- function(object, ...) {
-  fam <- .count_fam(object$family); mu <- object$fitted.values          # natural parameter
-  m <- fam$meanfun(mu, object$theta)                                     # mean scale (identity for pois/nb)
-  if (isTRUE(object$truncated)) m <- m / pmax(1 - fam$p0(mu, object$theta), 1e-12)   # E(Y | Y >= 1)
-  m
-}
+fitted.count_reg <- function(object, ...) object$fitted.values          # the mean scale (E(Y | Y >= 1) when truncated)
 #' @method residuals count_reg
 #' @export
 residuals.count_reg <- function(object, ...) object$Y - fitted(object)
@@ -558,8 +615,8 @@ predict.count_reg <- function(object, newdata = NULL, type = c("response", "link
     Terms <- stats::delete.response(object$terms)
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
-    X <- stats::model.matrix(Terms, newdata, xlev = object$levels, contrasts.arg = object$contrasts)
-    eta <- as.numeric(X[, names(object$coefficients), drop = FALSE] %*% object$coefficients)
+    X <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
+    eta <- as.numeric(X %*% object$coefficients)
     if (!is.null(offset)) {                                   # offset for newdata (log scale)
       ov <- if (is.character(offset) && length(offset) == 1L) newdata[[offset]] else offset
       eta <- eta + as.numeric(ov)
@@ -588,7 +645,7 @@ summary.count_reg <- function(object, ...) {
                 `z value` = z, `Pr(>|z|)` = 2 * stats::pnorm(-abs(z)))
   structure(list(coefficients = ctab, family = object$family, label = .count_fam(object$family)$label,
                  truncated = object$truncated, n = object$n, nobs = nobs(object), se.type = object$se.type,
-                 theta = object$theta, loglik = object$loglik, df = object$df, converged = object$converged),
+                 theta = object$theta, loglik = object$loglik, df = object$df, converged = object$converged, fe = object$fe),
             class = "summary.count_reg")
 }
 #' @export
@@ -596,7 +653,10 @@ print.summary.count_reg <- function(x, ...) {
   cat("\n", x$label, " count regression", if (x$truncated) " (zero-truncated)" else "", "\n", sep = "")
   cat("N =", x$n, if (!is.null(x$nobs) && x$nobs != x$n) paste0(" (weight total ", format(x$nobs), ")"),
       "  inference:", x$se.type, "\n\n")
-  stats::printCoefmat(x$coefficients, P.values = TRUE, has.Pvalue = TRUE, na.print = "NA")
+  ct <- x$coefficients
+  if (!is.null(x$fe)) { keep <- !grepl("^factor\\(", rownames(ct)); nd <- sum(!keep); ct <- ct[keep, , drop = FALSE] }
+  stats::printCoefmat(ct, P.values = TRUE, has.Pvalue = TRUE, na.print = "NA")
+  if (!is.null(x$fe) && nd > 0) cat("(", nd, " fixed-effect dummies not shown; see coef())\n", sep = "")
   cat(.shape_line(x$family, x$theta))
   cat("logLik =", round(x$loglik, 2), "  AIC =", round(-2 * x$loglik + 2 * x$df, 2), "\n")
   if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")

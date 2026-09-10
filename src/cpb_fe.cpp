@@ -10,9 +10,10 @@
 // observed y_t < k drops by about (1-alpha)^k. The unit log-likelihood is
 // therefore a saw-tooth in a: smooth between breakpoints, with a downward jump
 // at every breakpoint, and its smooth part is unimodal. Its supremum over a is
-// attained either at the interior critical point of the tooth that contains the
-// peak of the smooth part or as the left limit at a breakpoint, never at a
-// tooth's left end. The search below (i) locates the peak of the smooth part
+// attained at the interior critical point of the tooth that contains the peak
+// of the smooth part, as the left limit at a breakpoint, or at the feasibility
+// floor (the left end of the first tooth, where an observation's count equals
+// its ceiling). The search below (i) locates the peak of the smooth part
 // (a coarse grid around the unit's Poisson intercept; a warm start may be
 // supplied, but the package evaluates every unit from cold, since a warm start
 // carried from a distant trial point can leave a unit on the wrong tooth),
@@ -20,9 +21,13 @@
 // left limit at every breakpoint within a window of that peak, and (iii)
 // refines by golden section inside the tooth holding the peak and inside the
 // tooth ending at the best breakpoint. Solving the inner problem to its
-// supremum is what makes the concentrated likelihood smooth in alpha (a change
-// in alpha shifts every breakpoint of a unit rigidly, so the maximizing tooth
-// slides) and continuous with kinks in beta.
+// supremum makes the concentrated likelihood continuous in alpha (a change in
+// alpha shifts every breakpoint of a unit rigidly, so the maximizing tooth
+// slides; kinks where it switches). It is NOT continuous in beta: at a unit
+// whose supremum sits on its feasibility floor the intercept cannot retreat,
+// so when another observation's breakpoint crosses that floor the supremum
+// drops by about (1-alpha)^k. The outer optimizer treats it accordingly (a
+// multistart with restarts; see .fe_outer in R/utils.R).
 //
 // The gradient. By the envelope theorem the gradient of the concentrated
 // log-likelihood is the partial gradient at the solved intercepts; where a
@@ -34,86 +39,17 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include "cpb_pmf.h"
 using namespace Rcpp;
-
-// log P_CPB(Y=y | lambda, alpha), using a precomputed log-factorial table lf.
-static inline double cpb_logpmf(int y, double lam, double alpha, double la, double l1a,
-                                const std::vector<double>& lf, int max_support, bool truncated) {
-  double ni = lam / (1.0 - alpha);
-  int Ki = (int)std::floor(ni + 1e-9);
-  if (y > Ki || Ki > max_support) return -1e300;
-  double lgni1 = R::lgammafn(ni + 1.0);
-  double g = lgni1, mx = -1e300;
-  // first pass: max (the work buffer is reused across calls: no allocation). The
-  // log terms are unimodal in k, so the sum stops once it is past the mode and
-  // 36 log units below it (and past y), which bounds the work at large ceilings.
-  static std::vector<double> lw; if ((int)lw.size() < Ki + 1) lw.resize(Ki + 1);
-  int kend = Ki;
-  for (int k = 0; k <= Ki; k++) {
-    if (k > 0) g -= std::log(ni - k + 1.0);
-    lw[k] = lgni1 - lf[k] - g + k * l1a + (ni - k) * la;
-    if (lw[k] > mx) mx = lw[k];
-    else if (k >= y && lw[k] < mx - 36.0) { kend = k; break; }
-  }
-  double s = 0.0; for (int k = 0; k <= kend; k++) s += std::exp(lw[k] - mx);
-  double logD = mx + std::log(s);
-  double lp = lw[y] - logD;
-  if (truncated) {
-    double e = std::exp(lw[0] - logD);
-    if (e >= 1.0 - 1e-15) return -1e300;
-    lp -= std::log1p(-e);
-  }
-  return lp;
-}
-
-// d log P_CPB(y | lambda, alpha) / d eta (eta = log lambda) and / d alpha.
-// Writing psi_k = digamma(N - k + 1) and E[.] for the expectation under the
-// (truncated-support) pmf, the terms common to every k cancel and
-//   d/deta   = N (E[psi_k] - psi_y),
-//   d/dalpha = -(y - E[k]) (1/(1-alpha) + 1/alpha) - N/(1-alpha) (psi_y - E[psi_k]);
-// with zero truncation the same quantities at y = 0 enter through
-//   -d log(1 - p0) = p0/(1-p0) d log p0.
-static inline bool cpb_dlogpmf(int y, double lam, double alpha, double la, double l1a,
-                               const std::vector<double>& lf, int max_support, bool truncated,
-                               double& deta, double& dalpha) {
-  double ni = lam / (1.0 - alpha);
-  int Ki = (int)std::floor(ni + 1e-9);
-  if (y > Ki || Ki > max_support) return false;
-  double lgni1 = R::lgammafn(ni + 1.0);
-  double g = lgni1, mx = -1e300;
-  static std::vector<double> lw, ps; if ((int)lw.size() < Ki + 1) { lw.resize(Ki + 1); ps.resize(Ki + 1); }
-  int kend = Ki;
-  for (int k = 0; k <= Ki; k++) {
-    if (k > 0) g -= std::log(ni - k + 1.0);
-    lw[k] = lgni1 - lf[k] - g + k * l1a + (ni - k) * la;
-    ps[k] = R::digamma(ni - k + 1.0);
-    if (lw[k] > mx) mx = lw[k];
-    else if (k >= y && lw[k] < mx - 36.0) { kend = k; break; }
-  }
-  double s = 0.0, epsi = 0.0, ek = 0.0;
-  for (int k = 0; k <= kend; k++) { double w = std::exp(lw[k] - mx); s += w; epsi += w * ps[k]; ek += w * k; }
-  epsi /= s; ek /= s;
-  double c = 1.0 / (1.0 - alpha) + 1.0 / alpha, r = ni / (1.0 - alpha);
-  deta   = ni * (epsi - ps[y]);
-  dalpha = -((double)y - ek) * c - r * (ps[y] - epsi);
-  if (truncated) {
-    double p0 = std::exp(lw[0] - mx) / s;
-    if (p0 >= 1.0 - 1e-15) return false;
-    double f = p0 / (1.0 - p0);
-    deta   += f * (ni * (epsi - ps[0]));
-    dalpha += f * (-(0.0 - ek) * c - r * (ps[0] - epsi));
-  }
-  return true;
-}
 
 // Everything the inner search needs about one unit.
 struct Unit {
   const IntegerVector& Y; const std::vector<double>& o; const NumericVector& w;
-  int lo, hi; double alpha, la, l1a; const std::vector<double>& lf; int max_support; bool truncated;
+  int lo, hi; double alpha, la, l1a; int max_support; bool truncated;
   double ll(double a) const {
     double v = 0.0;
     for (int t = lo; t < hi; t++) {
-      double lp = cpb_logpmf(Y[t], std::exp(a + o[t]), alpha, la, l1a, lf, max_support, truncated);
+      double lp = cpb_logpmf(Y[t], std::exp(a + o[t]), alpha, la, l1a, max_support, truncated);
       if (lp <= -1e299 || !R_finite(lp)) return -1e300;
       v += w[t] * lp;
     }
@@ -189,7 +125,7 @@ static double maximize_unit(const Unit& U, double a0, double& a_star, int& edge_
   }
   if (ymax == 0) { a_star = -30.0; return 0.0; }
   double apois = (sy > 0.0 && se > 0.0) ? std::log(sy / se) : alo;   // Poisson unit intercept
-  double L0 = alo + 1e-6;
+  double L0 = alo + 1e-9;                          // just inside the feasible set (floor tolerance 1e-9)
   bool warm = R_finite(a0), best_bp = false;
   double best_a = L0, best_v = -1e300, centre = L0; int best_t = -1;
   for (int pass = 0; pass < 2; pass++) {
@@ -209,7 +145,10 @@ static double maximize_unit(const Unit& U, double a0, double& a_star, int& edge_
         if (centre <= L + 1e-9 && L > L0 + 1e-9) { H = L; L = std::max(L0, L - 2.0); continue; }
         break;
       }
-      double ac; double vc = golden_max(U, std::max(L0, centre - 0.5), centre + 0.5, 12, ac);
+      // the peak is located to 1e-6 (golden_max stops at that bracket), finer
+      // than the narrowest tooth of any ceiling the guard admits, so the tooth
+      // holding the peak is identified, not guessed
+      double ac; double vc = golden_max(U, std::max(L0, centre - 0.5), centre + 0.5, 80, ac);
       if (vc > bv) centre = ac;
     }
     // (ii) left limits at every breakpoint within the window. The window is the
@@ -254,18 +193,30 @@ static double maximize_unit(const Unit& U, double a0, double& a_star, int& edge_
   // right end it is the left limit of the next breakpoint; at the left end
   // (including the feasibility floor, where an observation's ceiling equals
   // its count) it sits on the breakpoint below and tracks it as beta moves.
-  // Both need the breakpoint correction in the gradient.
-  if (!best_bp) {
+  // Both need the breakpoint correction in the gradient. An optimum at a
+  // tooth's end may also mean the smooth peak lies in the neighbouring tooth,
+  // so that tooth is searched as well, and the check repeats from there.
+  for (int round = 0; round < 3 && !best_bp; round++) {
     int pt, nt; U.tooth(best_a, prev, next, pt, nt);
+    bool moved = false;
     if (best_a >= next - 1e-5 && nt >= 0) {
       double aH = next - BP_EPS, vH = U.ll(aH);
       if (vH >= best_v - 1e-12) { best_v = vH; best_a = aH; }
       best_bp = true; best_t = nt;
+      double p3, n3; U.tooth(next + BP_EPS, p3, n3);                 // the tooth beyond the breakpoint
+      double L3 = next + BP_EPS, H3 = n3 - BP_EPS;
+      if (H3 > L3) { vg = golden_max(U, L3, H3, inner_it, ag);
+        if (vg > best_v) { best_v = vg; best_a = ag; best_bp = false; best_t = -1; moved = true; } }
     } else if (best_a <= prev + 1e-5 && pt >= 0) {
       double aL = std::max(L0, prev + BP_EPS), vL = U.ll(aL);
       if (vL >= best_v - 1e-12) { best_v = vL; best_a = aL; }
       best_bp = true; best_t = pt;
+      double p3, n3; U.tooth(prev - BP_EPS, p3, n3);                 // the tooth ending at the breakpoint
+      double L3 = std::max(L0, p3 + BP_EPS), H3 = prev - BP_EPS;
+      if (H3 > L3) { vg = golden_max(U, L3, H3, inner_it, ag);
+        if (vg > best_v) { best_v = vg; best_a = ag; best_bp = false; best_t = -1; moved = true; } }
     }
+    if (!moved) break;
   }
   a_star = best_a; edge_t = best_bp ? best_t : -1;
   return best_v;
@@ -294,13 +245,12 @@ List cpb_fe_nll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, Nume
   double alpha = 1.0 / (1.0 + std::exp(-params[p]));
   if (alpha <= 1e-12 || alpha >= 1.0 - 1e-12) return List::create(1e10, awarm, edge);
   double la = std::log(alpha), l1a = std::log1p(-alpha);
-  std::vector<double> lf(max_support + 2); lf[0] = 0.0;
-  for (int k = 1; k < (int)lf.size(); k++) lf[k] = lf[k-1] + std::log((double)k);
   std::vector<double> o(n); compute_offsets(params, X, offset, o);
   NumericVector a(n_units);
   double total = 0.0, astar; int et;
   for (int u = 0; u < n_units; u++) {
-    Unit U = { Y, o, w, ustart[u], ustart[u+1], alpha, la, l1a, lf, max_support, truncated };
+    if ((u & 15) == 0) Rcpp::checkUserInterrupt();
+    Unit U = { Y, o, w, ustart[u], ustart[u+1], alpha, la, l1a, max_support, truncated };
     double a0 = warm ? awarm[u] : NA_REAL;
     double ll = maximize_unit(U, a0, astar, et, inner_it);
     if (ll <= -1e299) return List::create(1e10, awarm, edge);
@@ -320,15 +270,13 @@ NumericVector cpb_fe_grad_cpp(NumericVector params, NumericMatrix X, IntegerVect
     Rcpp::stop("internal error: gradient inputs do not match the design");
   double alpha = 1.0 / (1.0 + std::exp(-params[p]));
   double la = std::log(alpha), l1a = std::log1p(-alpha);
-  std::vector<double> lf(max_support + 2); lf[0] = 0.0;
-  for (int k = 1; k < (int)lf.size(); k++) lf[k] = lf[k-1] + std::log((double)k);
   std::vector<double> o(n); compute_offsets(params, X, offset, o);
   NumericVector G(p + 1);
   for (int u = 0; u < n_units; u++) {
     double Ga = 0.0, Galpha = 0.0; std::vector<double> Gb(p, 0.0);
     for (int t = ustart[u]; t < ustart[u+1]; t++) {
       double de, da;
-      if (!cpb_dlogpmf(Y[t], std::exp(a[u] + o[t]), alpha, la, l1a, lf, max_support, truncated, de, da))
+      if (!cpb_dlogpmf(Y[t], std::exp(a[u] + o[t]), alpha, la, l1a, max_support, truncated, de, da))
         return NumericVector(p + 1, NA_REAL);
       Ga += w[t] * de; Galpha += w[t] * da;
       for (int j = 0; j < p; j++) Gb[j] += w[t] * de * X(t, j);
@@ -350,12 +298,10 @@ NumericVector cpb_fe_grad_cpp(NumericVector params, NumericMatrix X, IntegerVect
 NumericMatrix cpb_dlogpmf_cpp(IntegerVector y, NumericVector lam, double alpha, int max_support, bool truncated) {
   int n = y.size();
   double la = std::log(alpha), l1a = std::log1p(-alpha);
-  std::vector<double> lf(max_support + 2); lf[0] = 0.0;
-  for (int k = 1; k < (int)lf.size(); k++) lf[k] = lf[k-1] + std::log((double)k);
   NumericMatrix out(n, 2);
   for (int i = 0; i < n; i++) {
     double de, da;
-    if (cpb_dlogpmf(y[i], lam[i], alpha, la, l1a, lf, max_support, truncated, de, da)) { out(i, 0) = de; out(i, 1) = da; }
+    if (cpb_dlogpmf(y[i], lam[i], alpha, la, l1a, max_support, truncated, de, da)) { out(i, 0) = de; out(i, 1) = da; }
     else { out(i, 0) = NA_REAL; out(i, 1) = NA_REAL; }
   }
   return out;
@@ -371,12 +317,10 @@ NumericVector cpb_fe_intercepts_cpp(NumericVector params, NumericMatrix X, Integ
     Rcpp::stop("internal error: unit index does not match the design (rows dropped after indexing)");
   double alpha = 1.0 / (1.0 + std::exp(-params[p]));
   double la = std::log(alpha), l1a = std::log1p(-alpha);
-  std::vector<double> lf(max_support + 2); lf[0] = 0.0;
-  for (int k = 1; k < (int)lf.size(); k++) lf[k] = lf[k-1] + std::log((double)k);
   std::vector<double> o(n); compute_offsets(params, X, offset, o);
   NumericVector fe(n_units); double astar; int et;
   for (int u = 0; u < n_units; u++) {
-    Unit U = { Y, o, w, ustart[u], ustart[u+1], alpha, la, l1a, lf, max_support, truncated };
+    Unit U = { Y, o, w, ustart[u], ustart[u+1], alpha, la, l1a, max_support, truncated };
     maximize_unit(U, NA_REAL, astar, et, inner_it);
     fe[u] = astar;
   }

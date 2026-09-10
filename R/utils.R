@@ -44,8 +44,11 @@
   cores <- min(cores, length(X))
   cl <- parallel::makeCluster(cores)
   on.exit(parallel::stopCluster(cl), add = TRUE)
-  parallel::clusterCall(cl, function(lp) { .libPaths(lp); loadNamespace("underdisp"); NULL }, .libPaths())
-  parallel::clusterSetRNGStream(cl, iseed = sample.int(.Machine$integer.max, 1L))
+  ## the workers attach the package (a user's fitfun names cpb(), count_reg(), ... unqualified)
+  parallel::clusterCall(cl, function(lp) { .libPaths(lp); suppressPackageStartupMessages(library("underdisp", character.only = TRUE)); NULL },
+                        .libPaths())
+  seed <- sample.int(.Machine$integer.max, 1L)     # drawn here: the master's RNG advances
+  parallel::clusterSetRNGStream(cl, iseed = seed)
   parallel::parLapply(cl, X, FUN)
 }
 
@@ -54,9 +57,15 @@
 ## back, so the fit (and the numerical Hessians differenced in the scaled
 ## coordinates) do not depend on the units the covariates are measured in.
 ## Constant columns (the intercept, a column of zeros) keep scale 1.
-.ud_colscale <- function(X) {
+## column scales for the optimizer: the (frequency-weighted) standard deviation
+## of each column, so that a weight of w and w copies of the row give the same
+## scaled problem; constant columns and the intercept get scale 1
+.ud_colscale <- function(X, w = NULL) {
+  wv <- if (is.null(w)) rep(1, nrow(X)) else as.numeric(w)
+  sw <- sum(wv)
   s <- apply(X, 2, function(v) {
-    r <- stats::sd(v)
+    m <- sum(wv * v) / sw
+    r <- if (sw > 1) sqrt(sum(wv * (v - m)^2) / (sw - 1)) else NA_real_
     if (!is.finite(r) || r <= 1e-10 * max(1, max(abs(v)))) 1 else r
   })
   s[colnames(X) %in% "(Intercept)"] <- 1
@@ -100,14 +109,36 @@
 ## Nelder-Mead restart until the improvement stops paying (a single run can
 ## stall on a collapsed simplex short of the optimum)
 .ud_nm_polish <- function(fit, fn, maxit, reltol, restarts = 3L, tol = 1e-6) {
+  if (length(fit$par) == 1L) {                       # Nelder-Mead is unreliable in one dimension
+    op <- tryCatch(stats::optimize(fn, c(fit$par - 1, fit$par + 1), tol = 1e-10), error = function(e) NULL)
+    if (!is.null(op) && is.finite(op$objective) && op$objective < fit$value) { fit$par <- op$minimum; fit$value <- op$objective }
+    return(fit)
+  }
   for (rs in seq_len(restarts)) {
     op2 <- tryCatch(stats::optim(fit$par, fn, method = "Nelder-Mead",
                                  control = list(maxit = maxit, reltol = reltol)), error = function(e) NULL)
     if (is.null(op2)) break
-    if (op2$value < fit$value) fit <- op2
-    if (is.null(op2) || fit$value > op2$value - tol) break
+    gain <- fit$value - op2$value                    # improvement over the incumbent
+    if (gain > 0) fit <- op2
+    if (gain < tol) break                            # the chain stops when a restart gains less than tol
   }
   fit
+}
+
+## `cluster` resolved to a character vector on the estimation rows: a column
+## name in `data`, or a vector with one value per row of `data` (checked before
+## the rows are reduced, so a misaligned vector is refused rather than recycled
+## or padded); missing values on the estimation rows are refused.
+.ud_cluster_values <- function(cluster, data, keep = NULL) {
+  if (is.null(cluster)) return(NULL)
+  cv <- if (is.character(cluster) && length(cluster) == 1L) {
+    if (is.null(data[[cluster]])) stop("'cluster' must be a column name in 'data' or a vector.", call. = FALSE)
+    data[[cluster]]
+  } else cluster
+  if (length(cv) != nrow(data)) stop("'cluster' must have one value per row of 'data'.", call. = FALSE)
+  if (!is.null(keep)) cv <- cv[keep]
+  if (anyNA(cv)) stop("'cluster' has missing values on the estimation rows.", call. = FALSE)
+  as.character(cv)
 }
 
 ## guard for a cluster bootstrap: no resampling variation with one cluster
@@ -137,8 +168,8 @@
 ## intercepts (the envelope theorem with the breakpoint correction; see
 ## src/cpb_fe.cpp). The closure caches the last evaluation for the gradient.
 ## Each dispersion start runs BFGS from the Poisson slopes (Nelder-Mead if BFGS
-## fails); the incumbent is polished by Nelder-Mead. The returned `$a` are the
-## intercepts that attain `$value`.
+## fails); the incumbent is polished by Nelder-Mead and challenged from two
+## perturbed restarts. The returned `$a` are the intercepts that attain `$value`.
 .fe_outer <- function(nll_raw, grad_raw, bs, dstarts, maxit, reltol) {
   ## every evaluation searches each unit from cold: a warm start carried from a
   ## distant trial point can leave a unit on the wrong tooth, and the resulting
@@ -170,6 +201,86 @@
   best <- cand[[which.min(vapply(cand, function(f) f$value, numeric(1)))]]
   if (best$value >= 1e9) return(best)
   best <- .ud_nm_polish(best, fn, maxit, reltol, restarts = 1L)
+  ## the concentrated objective can jump in the slopes where a unit sits on its
+  ## feasibility floor (see src/cpb_fe.cpp), so the incumbent may rest against a
+  ## cliff: restart from two deterministic perturbations and keep the best
+  p <- length(best$par)
+  for (dlt in list(rep(0.1, p), -0.1 * (-1)^seq_len(p))) {
+    o2 <- run(best$par + dlt)
+    if (!is.null(o2) && is.finite(o2$value) && o2$value < best$value - 1e-8)
+      best <- .ud_nm_polish(o2, fn, maxit, reltol, restarts = 1L)
+  }
   rc <- nll_raw(best$par, numeric(0)); best$value <- rc[[1L]]; best$a <- rc[[2L]]
   best
+}
+
+## offset() terms in a formula are refused: every estimator takes the exposure
+## through `offset =` (log scale), and a formula term that model.matrix() drops
+## would otherwise be ignored silently
+.ud_no_formula_offset <- function(...) {
+  for (f in list(...)) {
+    if (!inherits(f, "formula")) next
+    if (!is.null(attr(stats::terms(f), "offset")))
+      stop("offset() terms in a formula are not supported; supply the exposure on the log scale ",
+           "through offset = (a column name or a vector).", call. = FALSE)
+    if (grepl("|", paste(deparse(f), collapse = ""), fixed = TRUE))
+      stop("a two-part formula 'y ~ x | z' is not supported; give the second equation through ",
+           "participation = ~ z (hurdle) or zero = ~ z (zero-inflated).", call. = FALSE)
+  }
+  invisible(TRUE)
+}
+
+## rows whose unit identifier is missing are dropped, as rows with a missing
+## response or covariate are; `fe` may name several columns or be NULL
+.ud_drop_na_fe <- function(data, fe) {
+  fe <- fe[!vapply(fe, is.null, logical(1))]
+  fe <- unlist(fe); fe <- fe[is.character(fe) & fe %in% names(data)]
+  if (!length(fe)) return(data)
+  bad <- Reduce(`|`, lapply(fe, function(v) is.na(data[[v]])))
+  if (any(bad)) { data <- data[!bad, , drop = FALSE]; attr(data, "ud_kept") <- !bad }
+  data
+}
+## a vector `offset`, `weights`, or `cluster` given for the original rows of a
+## data set that .ud_drop_na_fe() reduced follows the reduction
+.ud_align_vec <- function(v, data) {
+  kept <- attr(data, "ud_kept")
+  if (is.null(v) || is.null(kept) || (is.character(v) && length(v) == 1L) || length(v) != length(kept)) return(v)
+  v[kept]
+}
+
+## The model matrix of `newdata` in the fit's own coding: the stored factor
+## levels and contrasts (a factor's contrasts attribute is lost when
+## model.frame() re-levels it through xlev, so a data set whose reference
+## level was set through that attribute would otherwise be re-coded), with the
+## columns selected by the coefficient names, so that a coding mismatch is
+## refused rather than multiplied into the coefficients by position. A newdata
+## factor's own contrasts attribute is dropped where the stored coding replaces
+## it (model.frame() would otherwise warn that it drops it).
+.ud_newdata_matrix <- function(terms_obj, newdata, xlev = NULL, contrasts = NULL, coefnames = NULL) {
+  terms_obj <- stats::delete.response(terms_obj)
+  miss <- setdiff(all.vars(terms_obj), names(newdata))
+  if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".", call. = FALSE)
+  for (nm in intersect(names(contrasts), names(newdata)))
+    if (is.factor(newdata[[nm]]) && !is.null(attr(newdata[[nm]], "contrasts"))) attr(newdata[[nm]], "contrasts") <- NULL
+  mf <- stats::model.frame(terms_obj, newdata, xlev = xlev, na.action = stats::na.pass)
+  X <- stats::model.matrix(terms_obj, mf, contrasts.arg = contrasts)
+  if (!is.null(coefnames)) {
+    lack <- setdiff(coefnames, colnames(X))
+    if (length(lack)) stop("'newdata' does not reproduce the fit's design columns (", paste(lack, collapse = ", "),
+                           "): its factors must carry the levels and coding of the fitting data.", call. = FALSE)
+    X <- X[, coefnames, drop = FALSE]
+  }
+  X
+}
+
+## Predicted probabilities of a participation/inflation glm on `newdata`, in the
+## glm's own factor coding: predict.lm() re-levels each factor through the
+## stored xlevels and applies the stored contrasts, so a newdata factor's own
+## contrasts attribute is dropped first (predict.lm() would otherwise warn that
+## it drops it).
+.ud_glm_predict <- function(object, newdata) {
+  if (is.null(newdata)) return(as.numeric(stats::predict(object, type = "response")))
+  for (nm in intersect(names(object$xlevels), names(newdata)))
+    if (is.factor(newdata[[nm]]) && !is.null(attr(newdata[[nm]], "contrasts"))) attr(newdata[[nm]], "contrasts") <- NULL
+  as.numeric(stats::predict(object, newdata = newdata, type = "response"))
 }

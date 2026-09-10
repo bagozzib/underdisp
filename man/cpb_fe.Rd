@@ -89,12 +89,18 @@ and the inner search evaluates every breakpoint within a window of the
 envelope's peak (located on a coarse grid around the unit's Poisson intercept)
 and refines inside whole teeth by golden section; every evaluation of the
 concentrated likelihood searches each unit afresh, so the objective is a
-function of the parameters alone. Solving the inner problem to its supremum
-makes the concentrated likelihood smooth in \code{alpha} and continuous in the
-slopes, so the outer optimizer (BFGS with the analytic envelope gradient from
-the Poisson slopes and two dispersion starts, polished by Nelder-Mead) is
-reliable; the solution is
-re-evaluated with every unit searched from cold before it is returned.
+function of the parameters alone. Solving the inner problem to its supremum makes the concentrated likelihood
+continuous in \code{alpha} (with kinks where a unit's maximizing tooth switches) but
+not in the slopes: where a unit's supremum sits on its feasibility floor (an
+observation whose count equals its ceiling) the intercept cannot retreat, so
+when another observation's breakpoint crosses that floor the concentrated
+likelihood drops by about \eqn{(1-\alpha)^k}, a cliff in the slopes on whose
+edge the maximizer can rest with a non-zero one-sided gradient. The outer
+optimizer is therefore a deterministic multistart: BFGS with the analytic
+envelope gradient from the Poisson slopes and two dispersion starts, a
+Nelder-Mead polish, and two perturbed restarts; alternative local optima
+differ by the order of the jumps (a few hundredths of a log-likelihood unit
+on a 12-unit panel), far inside the bootstrap variability of the estimates.
 }
 \details{
 Short panels: the dispersion parameter \code{alpha} and the fixed effects are subject to

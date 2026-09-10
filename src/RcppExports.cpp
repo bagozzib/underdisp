@@ -172,6 +172,32 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// dp_norm_cpp
+NumericMatrix dp_norm_cpp(NumericVector mu, double theta, int cap);
+RcppExport SEXP _underdisp_dp_norm_cpp(SEXP muSEXP, SEXP thetaSEXP, SEXP capSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< double >::type theta(thetaSEXP);
+    Rcpp::traits::input_parameter< int >::type cap(capSEXP);
+    rcpp_result_gen = Rcpp::wrap(dp_norm_cpp(mu, theta, cap));
+    return rcpp_result_gen;
+END_RCPP
+}
+// gp_norm_cpp
+NumericMatrix gp_norm_cpp(NumericVector mu, double lambda, int cap);
+RcppExport SEXP _underdisp_gp_norm_cpp(SEXP muSEXP, SEXP lambdaSEXP, SEXP capSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< double >::type lambda(lambdaSEXP);
+    Rcpp::traits::input_parameter< int >::type cap(capSEXP);
+    rcpp_result_gen = Rcpp::wrap(gp_norm_cpp(mu, lambda, cap));
+    return rcpp_result_gen;
+END_RCPP
+}
 // gec_fe_nll_cpp
 List gec_fe_nll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, NumericVector offset, NumericVector w, IntegerVector ustart, int n_units, int max_support, int inner_it, NumericVector awarm);
 RcppExport SEXP _underdisp_gec_fe_nll_cpp(SEXP paramsSEXP, SEXP XSEXP, SEXP YSEXP, SEXP offsetSEXP, SEXP wSEXP, SEXP ustartSEXP, SEXP n_unitsSEXP, SEXP max_supportSEXP, SEXP inner_itSEXP, SEXP awarmSEXP) {
@@ -291,6 +317,19 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// gec_klen_cpp
+IntegerVector gec_klen_cpp(NumericVector mu, double delta, int max_support);
+RcppExport SEXP _underdisp_gec_klen_cpp(SEXP muSEXP, SEXP deltaSEXP, SEXP max_supportSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< NumericVector >::type mu(muSEXP);
+    Rcpp::traits::input_parameter< double >::type delta(deltaSEXP);
+    Rcpp::traits::input_parameter< int >::type max_support(max_supportSEXP);
+    rcpp_result_gen = Rcpp::wrap(gec_klen_cpp(mu, delta, max_support));
+    return rcpp_result_gen;
+END_RCPP
+}
 // gec_mean_cpp
 NumericVector gec_mean_cpp(NumericVector mu, double delta, int max_support);
 RcppExport SEXP _underdisp_gec_mean_cpp(SEXP muSEXP, SEXP deltaSEXP, SEXP max_supportSEXP) {
@@ -316,6 +355,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_underdisp_cpb_nll_cpp", (DL_FUNC) &_underdisp_cpb_nll_cpp, 6},
     {"_underdisp_cpb_wnll_cpp", (DL_FUNC) &_underdisp_cpb_wnll_cpp, 7},
     {"_underdisp_cpb_lp0_cpp", (DL_FUNC) &_underdisp_cpb_lp0_cpp, 6},
+    {"_underdisp_dp_norm_cpp", (DL_FUNC) &_underdisp_dp_norm_cpp, 3},
+    {"_underdisp_gp_norm_cpp", (DL_FUNC) &_underdisp_gp_norm_cpp, 3},
     {"_underdisp_gec_fe_nll_cpp", (DL_FUNC) &_underdisp_gec_fe_nll_cpp, 10},
     {"_underdisp_gec_fe_grad_cpp", (DL_FUNC) &_underdisp_gec_fe_grad_cpp, 10},
     {"_underdisp_gec_fe_intercepts_cpp", (DL_FUNC) &_underdisp_gec_fe_intercepts_cpp, 9},
@@ -323,6 +364,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_underdisp_gec_wnll_cpp", (DL_FUNC) &_underdisp_gec_wnll_cpp, 6},
     {"_underdisp_gec_lp0_cpp", (DL_FUNC) &_underdisp_gec_lp0_cpp, 5},
     {"_underdisp_gec_pmf_cpp", (DL_FUNC) &_underdisp_gec_pmf_cpp, 4},
+    {"_underdisp_gec_klen_cpp", (DL_FUNC) &_underdisp_gec_klen_cpp, 3},
     {"_underdisp_gec_mean_cpp", (DL_FUNC) &_underdisp_gec_mean_cpp, 3},
     {NULL, NULL, 0}
 };

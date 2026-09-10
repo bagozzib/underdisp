@@ -53,8 +53,9 @@ bootstrap standard errors for the fixed-effects fits (\code{\link[=cpb_fe]{cpb_f
 intervals from the analytic covariance for \code{\link[=count_reg]{count_reg()}} and \code{\link[=zi_count]{zi_count()}}
 (the dispersion parameter's interval is mapped from its estimation scale to
 the natural scale); and, for the hurdles, the participation model's Wald
-intervals (prefixed \verb{part:}) stacked over the intensity model's intervals
-(prefixed \verb{int:}). A fit without inference errors informatively.
+intervals (prefixed \verb{participation:}) stacked over the intensity model's intervals
+(prefixed \verb{intensity:}); the zero-inflated classes prefix \verb{count:} and \verb{zero:}.
+The same names label \code{vcov()}, \code{tidy()}, and the texreg tables. A fit without inference errors informatively.
 }
 \seealso{
 \code{\link[=confint.cpb]{confint.cpb()}}

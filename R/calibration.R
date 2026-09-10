@@ -15,6 +15,11 @@
   pr / sum(pr)
 }
 
+## zero-truncation of a pmf matrix over its FULL support: the zero column is
+## removed and each row divided by 1 - P(Y = 0) (the predictive distribution of
+## every zero-truncated fit and of every hurdle intensity)
+.zt_rows <- function(P) { p0 <- P[, 1]; P[, 1] <- 0; P / pmax(1 - p0, 1e-12) }
+
 ## internal: pmf of the (possibly truncated) CPB for one lambda, over 0..kmax.
 ## Normalized over the FULL support then cut to kmax (rows may sum to < 1 when
 ## the ceiling exceeds kmax) -- calibration consumers rely on this semantics.
@@ -22,7 +27,7 @@
   pr <- .cpb_pmf_core(lambda, alpha)
   K  <- length(pr) - 1L
   if (truncated) {
-    if (K < 1) return(numeric(kmax + 1))
+    if (K < 1) return(rep(NA_real_, kmax + 1))          # ceiling 0: the truncated pmf is undefined
     pr[1] <- 0; pr <- pr / sum(pr)
   }
   out <- numeric(kmax + 1); m <- min(K + 1, kmax + 1); out[seq_len(m)] <- pr[seq_len(m)]
@@ -37,7 +42,7 @@
 .cpb_moments <- function(lambda, alpha, truncated = FALSE) {
   out <- vapply(lambda, function(l) {
     pr <- .cpb_pmf_core(l, alpha); k <- seq_along(pr) - 1
-    if (truncated) { if (length(pr) < 2L) return(c(1, 0)); pr[1] <- 0; pr <- pr / sum(pr) }
+    if (truncated) { if (length(pr) < 2L) return(c(NA_real_, NA_real_)); pr[1] <- 0; pr <- pr / sum(pr) }   # ceiling 0: undefined
     m <- sum(k * pr); c(m, max(sum(k * k * pr) - m * m, 0))
   }, numeric(2))
   list(mean = out[1, ], var = out[2, ])
@@ -69,8 +74,7 @@
     }, fit$pi_full, fit$lambda_full))
     y <- fit$y
   } else if (inherits(fit, "hurdle_gec")) {
-    U <- gec_pmf_cpp(fit$lambda_full, fit$delta, kmax, fit$max.support)
-    p0 <- U[, 1]; U[, 1] <- 0; U <- U / pmax(1 - p0, 1e-12)   # zero-truncate over the full support
+    U <- .zt_rows(gec_pmf_cpp(fit$lambda_full, fit$delta, kmax, fit$max.support))
     P <- U * fit$p_full; P[, 1] <- 1 - fit$p_full
     y <- fit$y
   } else if (inherits(fit, "zi_gec")) {
@@ -91,6 +95,7 @@
   } else if (inherits(fit, "gec")) {
     y <- fit$Y                                   # the linear predictor carries the offset
     P <- gec_pmf_cpp(as.numeric(exp(fit$linear.predictors)), fit$delta, kmax, fit$max.support)
+    if (isTRUE(fit$truncated)) P <- .zt_rows(P)
   } else if (inherits(fit, "hurdle_count")) {
     fam <- .count_fam(fit$family)
     P <- t(mapply(function(pi, li) {
@@ -107,9 +112,9 @@
     y <- fit$y
   } else if (inherits(fit, "count_reg")) {
     fam <- .count_fam(fit$family); y <- fit$Y
-    P <- t(vapply(fit$fitted.values, function(mu) {
+    P <- t(vapply(fit$mu, function(mu) {
       v <- fam$pvec(mu, fit$theta, kmax)
-      if (isTRUE(fit$truncated)) { v[1] <- 0; v <- v / max(sum(v), 1e-12) }
+      if (isTRUE(fit$truncated)) { v[1] <- 0; v <- v / max(1 - fam$p0(mu, fit$theta), 1e-12) }   # full support
       v
     }, numeric(kmax + 1)))
   } else {
@@ -140,8 +145,8 @@
     vals[!seen] <- xlev[[fv]][1L]                    # reference level for the design
     newdata[[v]] <- vals
   }
-  MM <- stats::model.matrix(terms_obj, newdata, xlev = xlev, contrasts.arg = contrasts)
-  as.numeric(MM[, names(coefs), drop = FALSE] %*% coefs) + extra
+  MM <- .ud_newdata_matrix(terms_obj, newdata, xlev, contrasts, names(coefs))
+  as.numeric(MM %*% coefs) + extra
 }
 
 ## internal: observed y and an n x (kmax+1) predicted-pmf matrix for a fit evaluated
@@ -158,11 +163,11 @@
 
   if (inherits(fit, "cpb")) {
     Tm <- stats::delete.response(fit$terms)
-    X  <- stats::model.matrix(Tm, newdata, xlev = fit$levels)[, names(fit$coefficients), drop = FALSE]
+    X  <- .ud_newdata_matrix(Tm, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
     P  <- cpbmat(as.numeric(exp(X %*% fit$coefficients)), fit$alpha, isTRUE(fit$truncated))
     y  <- yof(fit$terms)
   } else if (inherits(fit, "cpb_fe")) {
-    X  <- stats::model.matrix(fit$formula, newdata)[, names(fit$coefficients), drop = FALSE]
+    X  <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$levels, fit$contrasts, names(fit$coefficients))
     fe <- fit$fe[as.character(newdata[[fit$fe_var]])]; fe[is.na(fe)] <- mean(fit$fe)
     P  <- cpbmat(as.numeric(exp(fe + X %*% fit$coefficients)), fit$alpha, isTRUE(fit$truncated))
     y  <- yof(fit$formula)
@@ -171,8 +176,8 @@
     peta <- .binary_eta_newdata(stats::delete.response(stats::terms(pg)), pg$xlevels,
                                 stats::coef(pg), newdata, contrasts = pg$contrasts)
     p    <- as.numeric(stats::family(pg)$linkinv(peta))
-    Xall <- stats::model.matrix(stats::delete.response(stats::terms(fit$formula)), newdata)
-    b    <- fit$int_beta; Xb <- Xall[, names(b), drop = FALSE] %*% b
+    b    <- fit$int_beta
+    Xb   <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts, names(b)) %*% b
     lam  <- if (is.null(fit$fe)) as.numeric(exp(Xb))
             else { fe <- fit$intensity$fe[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- fit$int_fe_ref
                    as.numeric(exp(fe + Xb)) }
@@ -181,28 +186,28 @@
                   p, lam))
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "zi_cpb")) {
-    Xn <- stats::model.matrix(fit$int_terms, newdata, xlev = fit$int_xlev)
-    b  <- fit$coefficients; Xb <- Xn[, names(b), drop = FALSE] %*% b
+    b  <- fit$coefficients
+    Xb <- .ud_newdata_matrix(fit$int_terms, newdata, fit$int_xlev, fit$int_contrasts, names(b)) %*% b
     lam <- if (is.null(fit$fe)) as.numeric(exp(Xb))
            else { fe <- fit$fe_hat[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- mean(fit$fe_hat)
                   as.numeric(exp(fe + Xb)) }
     pit <- as.numeric(stats::plogis(.binary_eta_newdata(fit$zero_terms, fit$zero_xlev,
-                                                        fit$zero_coef, newdata)))
+                                                        fit$zero_coef, newdata, contrasts = fit$zero_contrasts)))
     a <- fit$alpha
     P <- t(mapply(function(pi, li) { c0 <- .cpb_pmf1(li, a, kmax, truncated = FALSE)
                                      row <- (1 - pi) * c0; row[1] <- pi + (1 - pi) * c0[1]; row }, pit, lam))
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "count_reg")) {
     fam <- .count_fam(fit$family)
-    X   <- stats::model.matrix(stats::delete.response(fit$terms), newdata, xlev = fit$levels)
-    lam <- as.numeric(exp(X[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
+    X   <- .ud_newdata_matrix(fit$terms, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
+    lam <- as.numeric(exp(X %*% fit$coefficients))
     P   <- t(vapply(lam, function(mu) { v <- fam$pvec(mu, fit$theta, kmax)
-                                        if (isTRUE(fit$truncated)) { v[1] <- 0; v <- v / max(sum(v), 1e-12) }; v },
+                                        if (isTRUE(fit$truncated)) { v[1] <- 0; v <- v / max(1 - fam$p0(mu, fit$theta), 1e-12) }; v },
                     numeric(kmax + 1)))
     y <- yof(fit$terms)
   } else if (inherits(fit, "hurdle_count")) {
     fam  <- .count_fam(fit$family)
-    p    <- as.numeric(stats::predict(fit$participation, newdata = newdata, type = "response"))
+    p    <- .ud_glm_predict(fit$participation, newdata)
     lam  <- exp(as.numeric(predict(fit$intensity, newdata = newdata, type = "link")))   # natural parameter
     P <- t(mapply(function(pi, li) { zt <- fam$pvec(li, fit$theta, kmax); zt[1] <- 0
                                      zt <- zt / max(1 - fam$p0(li, fit$theta), 1e-12)
@@ -210,8 +215,8 @@
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "zi_count")) {
     fam <- .count_fam(fit$family); linkinv <- stats::make.link(fit$link)$linkinv
-    Xc  <- stats::model.matrix(stats::delete.response(stats::terms(fit$formula)), newdata)
-    Zz  <- stats::model.matrix(fit$zero.formula, newdata)
+    Xc  <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$levels, fit$contrasts)
+    Zz  <- .ud_newdata_matrix(if (!is.null(fit$zero_terms)) fit$zero_terms else stats::terms(fit$zero.formula), newdata, fit$levels, fit$zero_contrasts)
     lam <- as.numeric(exp(Xc[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
     pit <- as.numeric(linkinv(Zz[, names(fit$zero.coefficients), drop = FALSE] %*% fit$zero.coefficients))
     P <- t(mapply(function(pi, li) { f0 <- fam$pvec(li, fit$theta, kmax)
@@ -219,27 +224,27 @@
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "gec_fe")) {                  # check before "gec": gec_fe inherits gec
     Tm  <- stats::delete.response(stats::terms(fit$formula))
-    X   <- stats::model.matrix(Tm, newdata, xlev = fit$levels)[, names(fit$coefficients), drop = FALSE]
+    X   <- .ud_newdata_matrix(Tm, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
     fe  <- fit$fe[as.character(newdata[[fit$fe_var]])]; fe[is.na(fe)] <- mean(fit$fe)
     P   <- gec_pmf_cpp(as.numeric(exp(fe + X %*% fit$coefficients)), fit$delta, kmax, fit$max.support)
     y   <- yof(fit$formula)
   } else if (inherits(fit, "gec")) {
-    X   <- stats::model.matrix(stats::delete.response(fit$terms), newdata, xlev = fit$levels,
-                               contrasts.arg = fit$contrasts)
-    lam <- as.numeric(exp(X[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
+    X   <- .ud_newdata_matrix(fit$terms, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
+    lam <- as.numeric(exp(X %*% fit$coefficients))
     P   <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support)
+    if (isTRUE(fit$truncated)) P <- .zt_rows(P)
     y   <- yof(fit$terms)
   } else if (inherits(fit, "hurdle_gec")) {
-    p    <- as.numeric(stats::predict(fit$participation, newdata = newdata, type = "response"))
-    Xall <- stats::model.matrix(stats::delete.response(stats::terms(fit$formula)), newdata)
+    p    <- .ud_glm_predict(fit$participation, newdata)
+    Xall <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts)
     lam  <- as.numeric(exp(Xall[, names(fit$int_beta), drop = FALSE] %*% fit$int_beta))
     U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support); p0 <- U[, 1]; U[, 1] <- 0; U <- U / pmax(1 - p0, 1e-12)
     P <- U * p; P[, 1] <- 1 - p
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "zi_gec")) {
     Ti  <- stats::delete.response(fit$int_terms)
-    Xn  <- stats::model.matrix(Ti, newdata, xlev = fit$int_xlev)
-    Zn  <- stats::model.matrix(fit$zero_terms, newdata, xlev = fit$zero_xlev)
+    Xn  <- .ud_newdata_matrix(Ti, newdata, fit$int_xlev, fit$int_contrasts, names(fit$coefficients))
+    Zn  <- .ud_newdata_matrix(fit$zero_terms, newdata, fit$zero_xlev, fit$zero_contrasts, names(fit$zero_coef))
     lam <- as.numeric(exp(Xn[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
     pit <- as.numeric(stats::plogis(Zn[, names(fit$zero_coef), drop = FALSE] %*% fit$zero_coef))
     U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support)
@@ -293,12 +298,14 @@ score <- function(fit, newdata = NULL, kmax = NULL) {
     pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax)
   }
   y <- pu$y; P <- pu$P
+  ## in-sample scores are frequency-weighted means, as the likelihood is
+  w <- if (is.null(newdata) && !is.null(fit$weights) && length(fit$weights) == length(y)) as.numeric(fit$weights) else rep(1, length(y))
   yk <- pmin(y, kmax)
   py <- P[cbind(seq_along(y), yk + 1L)]
-  ls <- -mean(log(pmax(py, 1e-12)))
+  ls <- -sum(w * log(pmax(py, 1e-12))) / sum(w)
   cdf <- t(apply(P, 1, cumsum))
   ind <- outer(yk, 0:kmax, function(a, b) as.numeric(a <= b))
-  rps <- mean(rowSums((cdf - ind)^2))
+  rps <- sum(w * rowSums((cdf - ind)^2)) / sum(w)
   c(logscore = ls, rps = rps)
 }
 

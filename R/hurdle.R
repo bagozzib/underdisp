@@ -108,14 +108,18 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
                        link = c("logit", "probit", "cloglog"), offset = NULL,
                        cluster = NULL, se = c("none", "bootstrap"), B = 500, weights = NULL,
                        cores = 1L, ...) {
+  .ud_no_formula_offset(formula, participation)
+  data <- .ud_drop_na_fe(data, list(fe, part_fe))
+  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
+  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); link <- match.arg(link)
   ## reduce to complete cases on all model variables so the two margins stay aligned
   mv <- unique(c(all.vars(formula), all.vars(if (is.null(participation)) formula[-2L] else participation), fe, part_fe))
   keep <- stats::complete.cases(data[, intersect(mv, names(data)), drop = FALSE])
+  cl_vals <- .ud_cluster_values(cluster, data, keep)           # checked before the rows are reduced
   if (!all(keep)) {
     if (!is.null(offset) && !is.character(offset)) offset <- offset[keep]
     if (!is.null(weights) && !is.character(weights)) weights <- weights[keep]
-    if (!is.null(cluster) && !is.character(cluster)) cluster <- cluster[keep]
     data <- data[keep, , drop = FALSE]
   }
   y <- stats::model.response(stats::model.frame(formula, data))
@@ -126,7 +130,7 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
                 else if (is.character(offset) && length(offset) == 1L) offset else offset[y > 0]
   ## carry a cluster identifier as a column so both margins can see it aligned
   if (!is.null(cluster) && !(is.character(cluster) && length(cluster) == 1L)) {
-    data[[".cluster"]] <- cluster; cluster <- ".cluster"
+    data[[".cluster"]] <- cl_vals; cluster <- ".cluster"
   }
   ## frequency weights as a column so both margins see them aligned
   if (!is.null(weights) && !(is.character(weights) && length(weights) == 1L)) {
@@ -212,7 +216,11 @@ print.hurdle_cpb <- function(x, ...) {
 predict.hurdle_cpb <- function(object, newdata = NULL,
                                type = c("response", "participation", "intensity"), ...) {
   type <- match.arg(type)
-  p <- stats::predict(object$participation, newdata = newdata, type = "response")
+  if (!is.null(newdata)) {
+    need <- setdiff(all.vars(stats::delete.response(stats::terms(object$participation))), names(newdata))
+    if (length(need)) stop("'newdata' is missing participation variable(s): ", paste(need, collapse = ", "), ".")
+  }
+  p <- .ud_glm_predict(object$participation, newdata)
   if (type == "participation") return(as.numeric(p))
   ## newdata = NULL: use the stored FULL-length intensity (lambda_full, one per
   ## observation), NOT predict(intensity) which returns only the positives-only
