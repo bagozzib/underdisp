@@ -21,7 +21,10 @@
 #' @param p Vector of probabilities.
 #' @param lambda Mean parameter (scalar or vector, recycled).
 #' @param alpha Shape parameter in (0, 1).
-#' @param truncated If `TRUE`, use the zero-truncated CPB.
+#' @param truncated If `TRUE`, use the zero-truncated CPB. Where the implied
+#'   ceiling `lambda / (1 - alpha)` is below 1 the CPB puts all its mass on 0,
+#'   and its zero-truncated form is the point mass at 1, the zero-truncated
+#'   distribution for every ceiling in [1, 2).
 #' @param log,log.p If `TRUE`, probabilities are given as log.
 #' @param lower.tail If `TRUE` (default), probabilities are \eqn{P(X \le x)}.
 #' @return `dcpb` a density, `pcpb` a distribution function, `qcpb` a quantile.

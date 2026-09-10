@@ -6,11 +6,7 @@
 ## ---------------------------------------------------------------------------
 
 ## mean of the (possibly truncated) CPB at a single lambda
-.cpb_mean1 <- function(lambda, alpha, truncated = FALSE) {
-  kmax <- floor(lambda / (1 - alpha)) + 1L
-  pm <- .cpb_pmf1(lambda, alpha, kmax, truncated = truncated)
-  sum((0:kmax) * pm)
-}
+.cpb_mean1 <- function(lambda, alpha, truncated = FALSE) .cpb_mean(lambda, alpha, truncated)
 
 ## --- implied_ceiling ------------------------------------------------------
 

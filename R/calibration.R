@@ -27,7 +27,7 @@
   pr <- .cpb_pmf_core(lambda, alpha)
   K  <- length(pr) - 1L
   if (truncated) {
-    if (K < 1) return(rep(NA_real_, kmax + 1))          # ceiling 0: the truncated pmf is undefined
+    if (K < 1) { out <- numeric(kmax + 1); if (kmax >= 1) out[2L] <- 1; return(out) }   # ceiling below 1: the point mass at 1
     pr[1] <- 0; pr <- pr / sum(pr)
   }
   out <- numeric(kmax + 1); m <- min(K + 1, kmax + 1); out[seq_len(m)] <- pr[seq_len(m)]
@@ -42,7 +42,7 @@
 .cpb_moments <- function(lambda, alpha, truncated = FALSE) {
   out <- vapply(lambda, function(l) {
     pr <- .cpb_pmf_core(l, alpha); k <- seq_along(pr) - 1
-    if (truncated) { if (length(pr) < 2L) return(c(NA_real_, NA_real_)); pr[1] <- 0; pr <- pr / sum(pr) }   # ceiling 0: undefined
+    if (truncated) { if (length(pr) < 2L) return(c(1, 0)); pr[1] <- 0; pr <- pr / sum(pr) }   # ceiling below 1: the point mass at 1
     m <- sum(k * pr); c(m, max(sum(k * k * pr) - m * m, 0))
   }, numeric(2))
   list(mean = out[1, ], var = out[2, ])
