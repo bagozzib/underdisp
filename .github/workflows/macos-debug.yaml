@@ -1,0 +1,70 @@
+# Diagnostic run for the macOS-only gec_fe() failure ("no feasible fit" at every
+# start). Runs only on the macos-debug branch or by hand. Each variant rebuilds
+# the package with different compiler flags and runs the same diagnostic script,
+# so the log shows whether the failure depends on optimization, floating-point
+# contraction, or undefined behaviour.
+on:
+  push:
+    branches: [macos-debug]
+  workflow_dispatch:
+
+name: macos-debug.yaml
+
+permissions: read-all
+
+jobs:
+  debug:
+    runs-on: macos-latest
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          r-version: release
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          dependencies: '"hard"'
+          cache-version: macos-debug-1
+
+      - name: Toolchain
+        run: |
+          R CMD config CXX
+          R CMD config CXX17FLAGS
+          R CMD config LDFLAGS
+          clang++ --version
+
+      - name: Build with the default flags
+        run: R CMD INSTALL --preclean .
+      - name: Diagnose (default flags)
+        continue-on-error: true
+        run: Rscript .github/debug/gec_fe_macos.R
+
+      - name: Build with -O0
+        run: |
+          mkdir -p ~/.R
+          for v in CXXFLAGS CXX11FLAGS CXX14FLAGS CXX17FLAGS CXX20FLAGS; do echo "$v=-O0 -g"; done > ~/.R/Makevars
+          R CMD INSTALL --preclean .
+      - name: Diagnose (-O0)
+        continue-on-error: true
+        run: Rscript .github/debug/gec_fe_macos.R
+
+      - name: Build with -O2 -ffp-contract=off
+        run: |
+          for v in CXXFLAGS CXX11FLAGS CXX14FLAGS CXX17FLAGS CXX20FLAGS; do echo "$v=-O2 -ffp-contract=off"; done > ~/.R/Makevars
+          R CMD INSTALL --preclean .
+      - name: Diagnose (-ffp-contract=off)
+        continue-on-error: true
+        run: Rscript .github/debug/gec_fe_macos.R
+
+      - name: Build with UBSan
+        continue-on-error: true
+        run: |
+          { for v in CXXFLAGS CXX11FLAGS CXX14FLAGS CXX17FLAGS CXX20FLAGS; do echo "$v=-O1 -g -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize-recover=undefined"; done; echo "LDFLAGS=-fsanitize=undefined"; } > ~/.R/Makevars
+          R CMD INSTALL --preclean .
+      - name: Diagnose (UBSan)
+        continue-on-error: true
+        run: Rscript .github/debug/gec_fe_macos.R
