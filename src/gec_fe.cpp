@@ -82,6 +82,7 @@ static bool gec_dlogpmf_fe(int y, double mu, double delta, int max_support, doub
   return true;
 }
 
+namespace {   // internal linkage: cpb_fe.cpp defines a different Unit
 struct Unit {
   const IntegerVector& Y; const std::vector<double>& o; const NumericVector& w;
   int lo, hi; double delta; int max_support;
@@ -106,6 +107,7 @@ struct Unit {
     }
   }
 };
+}  // namespace
 
 static const double KINK_EPS = 1e-8;
 static const double GR = 0.6180339887498949;
