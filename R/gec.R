@@ -169,13 +169,16 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
 }
 
 #' @method print gec
-## direction label for the printed dispersion: the pooled fit is cheap to test
-## against its Poisson nest, so the label reports that test; the concentrated
-## and two-part fits fall back to the point estimate with its band stated
+## direction label for the printed dispersion: the pooled fit's label reports the
+## likelihood-ratio test when the calibration rule admits its asymptotic
+## distribution (a print method runs no bootstrap); otherwise, and for the
+## concentrated and two-part fits, it is the point estimate with its band stated
 .gec_direction <- function(x) {
   d <- x$delta
   p <- if (inherits(x, "gec") && !inherits(x, "gec_fe"))
-         tryCatch(suppressWarnings(dispersion_test(x)$p.value), error = function(e) NA_real_) else NA_real_
+         tryCatch({ dt <- suppressWarnings(dispersion_test(x, B = 0))
+                    if (isTRUE(dt$asymptotic_ok)) dt$p.value else NA_real_ },
+                  error = function(e) NA_real_) else NA_real_
   if (is.finite(p)) {
     if (p >= 0.05) sprintf("equidispersion not rejected (LR p = %.2f)", p)
     else if (d < 1) sprintf("underdispersed (LR p = %.2g)", p) else sprintf("overdispersed (LR p = %.2g)", p)

@@ -62,7 +62,7 @@ test_that("the concentrated fixed-effects likelihood attains the full-dummy maxi
   expect_gte(ll_u(fe$fe[u]), max(vapply(grid, ll_u, numeric(1))) - 0.02)
 })
 
-test_that("max.support that binds is reported and a negative LR carries no p-value", {
+test_that("max.support that binds is reported and a guard-stopped LR takes its boundary value", {
   set.seed(801); m <- 300; xx <- rnorm(m)
   big <- data.frame(y = rpois(m, exp(4.6 + 0.2 * xx)), x = xx)      # mean ~ 100, equidispersed
   expect_warning(f <- cpb(y ~ x, big, truncated = FALSE, se = "none", max.support = 500), "max.support")
@@ -70,7 +70,7 @@ test_that("max.support that binds is reported and a negative LR carries no p-val
   expect_error(cpb(y ~ x, big, truncated = FALSE, se = "none", max.support = 100), "no feasible fit")
   over <- data.frame(y = rnbinom(m, mu = exp(1.2 + 0.5 * xx), size = 1), x = xx)
   so <- summary(suppressWarnings(cpb(y ~ x, over, truncated = FALSE, se = "none")))
-  if (so$LR < 0) expect_true(is.na(so$LR.p)) else expect_true(is.finite(so$LR.p))
+  if (isTRUE(so$support_binding)) { expect_gte(so$LR, 0); expect_lte(so$LR.p, 0.5) } else if (so$LR < 0) expect_true(is.na(so$LR.p)) else expect_true(is.finite(so$LR.p))
   expect_output(print(so), "Poisson")
 })
 

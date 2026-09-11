@@ -220,7 +220,7 @@
 .ud_no_formula_offset <- function(...) {
   for (f in list(...)) {
     if (!inherits(f, "formula")) next
-    if (!is.null(attr(stats::terms(f), "offset")))
+    if (!is.null(attr(stats::terms(f, allowDotAsName = TRUE), "offset")))
       stop("offset() terms in a formula are not supported; supply the exposure on the log scale ",
            "through offset = (a column name or a vector).", call. = FALSE)
     if (grepl("|", paste(deparse(f), collapse = ""), fixed = TRUE))

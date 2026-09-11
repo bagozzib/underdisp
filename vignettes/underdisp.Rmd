@@ -137,7 +137,16 @@ panel <- do.call(rbind, lapply(1:50, function(i) {
 }))
 fe_fit <- cpb_fe(y ~ x, data = panel, fe = "unit")
 fe_fit
-dispersion_test(fe_fit)      # against a Poisson with the same unit effects
+dispersion_test(fe_fit, B = 0)   # the statistic against a Poisson with the same unit effects
+```
+
+With unit fixed effects the asymptotic distribution of that statistic does not
+apply, so its p-value comes from a parametric bootstrap under the fitted
+Poisson. Every replicate refits the model, which makes the bootstrap about 199
+times as slow as the fit; it is not run here:
+
+```{r fe-boot, eval = FALSE}
+dispersion_test(fe_fit, cores = 2)   # parametric-bootstrap p-value, 199 replicates
 ```
 
 ## Comparing the family

@@ -7,7 +7,9 @@
 dispersion_test(
   object,
   alternative = c("two.sided", "under", "over"),
-  method = c("lr", "auxiliary")
+  method = c("lr", "auxiliary"),
+  B = NULL,
+  cores = 1L
 )
 }
 \arguments{
@@ -21,20 +23,33 @@ model (for \code{method = "auxiliary"}, a \code{count_reg} fit with
 \item{method}{\code{"lr"} (likelihood ratio against the Poisson refit; default)
 or \code{"auxiliary"} (the Cameron--Trivedi auxiliary regression for a
 Poisson fit).}
+
+\item{B}{Parametric-bootstrap replicates for \code{method = "lr"}: \code{NULL} (the
+default) applies the calibration rule in Details (199 replicates when the
+bootstrap is needed), \code{0} requests the asymptotic distribution, and a
+positive whole number forces the bootstrap.}
+
+\item{cores}{Worker processes for the bootstrap replicates.}
 }
 \value{
 An object of class \code{c("dispersion_test", "htest")} with the
 statistic, the p-value, the estimated dispersion parameter and its Poisson
-value, the two log-likelihoods (LR method), and the alternative.
+value, the two log-likelihoods, and the alternative; for \code{method = "lr"}
+also \code{calibration} (\code{"asymptotic"} or \code{"parametric bootstrap"}), \code{B} and
+\code{B_ok} (replicates requested and completed), \code{boot} (the simulated
+statistics), \code{first_order_size} (the asymptotic 5\\% test's first-order
+size), \code{asymptotic_ok} (whether the calibration rule admits the asymptotic
+distribution), and \code{note} where a statistic or p-value needs one.
 }
 \description{
 Tests whether a fitted count model's dispersion departs from the Poisson,
 conditional on the covariates. For a fit from a family with a dispersion
 parameter (\code{method = "lr"}, the default), the test is the likelihood-ratio
 test of that parameter against its Poisson value, with the Poisson refit on
-the same design (fixed effects included); the alternative can be two-sided
-or directional (see Details). For a Poisson fit, \code{method = "auxiliary"} runs
-the Cameron--Trivedi (1990) auxiliary regression, which needs no
+the same design (fixed effects included); its p-value comes from the
+asymptotic distribution or from a parametric bootstrap under the fitted
+Poisson, by the rule in Details. For a Poisson fit, \code{method = "auxiliary"}
+runs the Cameron--Trivedi (1990) auxiliary regression, which needs no
 alternative family.
 }
 \details{
@@ -43,20 +58,47 @@ parameter: \code{alpha = 1} (CPB), \code{delta = 1} (GEC), \code{nu = 1} (both C
 parameterizations), \code{lambda = 0} (generalized Poisson), \code{alpha = 1}
 (gamma-count), \code{theta = 1} (double Poisson), and \code{1/theta = 0} (negative
 binomial). When that value is interior to the parameter space the
-likelihood-ratio statistic is \eqn{\chi^2_1} under the null; a directional
-alternative (\code{"under"} or \code{"over"}) uses the signed root
-\eqn{r = \pm\sqrt{LR}}, signed toward underdispersion when the estimate lies
-on the underdispersed side of the Poisson value, which is standard normal
-under the null, so the one-sided p-value is \eqn{1 - \Phi(r)} for
-\code{"under"} and \eqn{\Phi(r)} for \code{"over"}. When the Poisson value is on the
-boundary (the CPB, whose \code{alpha} lives in (0, 1); the negative binomial,
-whose overdispersion parameter is non-negative) the null distribution of the
-statistic is the \eqn{\tfrac12\chi^2_0 + \tfrac12\chi^2_1} mixture of Self
-and Liang (1987), the test is one-sided by construction, and \code{alternative}
-is fixed accordingly (\code{"under"} for the CPB, \code{"over"} for the negative
-binomial). For the concentrated fixed-effects fits the Poisson null carries
-the same unit effects, profiled out in closed form (Poisson) or by a
-per-unit Newton step (zero-truncated Poisson).
+likelihood-ratio statistic is asymptotically \eqn{\chi^2_1} under the null; a
+directional alternative (\code{"under"} or \code{"over"}) uses the signed root
+\eqn{r = \pm\sqrt{LR}}, positive when the estimate lies on the underdispersed
+side of the Poisson value, which is asymptotically standard normal. When the
+Poisson value is on the boundary (the CPB, whose \code{alpha} lives in (0, 1); the
+negative binomial, whose overdispersion parameter is non-negative) the
+asymptotic null distribution is the
+\eqn{\tfrac12\chi^2_0 + \tfrac12\chi^2_1} mixture (Self and Liang 1987;
+Andrews 1999) and the test is one-sided by construction (\code{"under"} for the
+CPB, \code{"over"} for the negative binomial). The CPB qualifies although its
+support moves with its parameters: near \code{alpha = 1} its ceiling
+\code{lambda / (1 - alpha)} diverges, the log-likelihood is regular on that side,
+and its score there is the classical dispersion score
+\eqn{-[(y - \lambda)^2 - y] / (2\lambda)}. Because the Poisson is the CPB's
+limit as \code{alpha} approaches 1, the statistic cannot be negative in principle;
+when the \code{max.support} guard stops \code{alpha} short of that limit and the fitted
+log-likelihood lands just below the Poisson's, the statistic takes its
+boundary value 0. Any other negative statistic means the optimizer fell
+short, and no p-value is reported.
+
+\strong{Calibration.} The asymptotic distribution ignores that the null's mean
+parameters are estimated. To first order this moves the signed root toward
+underdispersion by \eqn{p/\sqrt{2n}} standard deviations for \eqn{p} mean
+parameters (unit intercepts included) on \eqn{n} observations (the weight
+total), the bias Dean and Lawless (1989) remove from the score test. With
+\code{B = NULL} (the default) the asymptotic distribution is used when that shift
+keeps the first-order size of a 5\\% test at or below 6\\% and the fit has no
+unit fixed effects. Otherwise the p-value is a parametric bootstrap with 199
+replicates: responses are simulated from the Poisson (zero-truncated
+Poisson) fitted to the same design, offset, weights, and unit effects, both
+models are refit to each, and the p-value is the share of simulated
+statistics at least as extreme as the observed one, counting the observed
+one, among the replicates whose two fits both succeeded. Simulating at the
+Poisson value itself keeps the bootstrap valid at the boundary. With unit
+fixed effects the asymptotic distribution does not apply at any size: the
+unit intercepts bias the dispersion estimate toward underdispersion by an
+amount of order 1/T, so \code{B = 0} returns the statistic without a p-value.
+Otherwise \code{B = 0} forces the asymptotic distribution, and a positive \code{B}
+forces the bootstrap with that many replicates. Every replicate refits both
+models, so the bootstrap takes about \code{B} times as long as the original fit;
+\code{cores} spreads the replicates over worker processes.
 }
 \examples{
 set.seed(2); n <- 400; x <- rnorm(n)
@@ -65,12 +107,16 @@ dispersion_test(count_reg(y ~ x, d, family = "gammacount"), alternative = "under
 dispersion_test(count_reg(y ~ x, d, family = "poisson"), method = "auxiliary")
 }
 \references{
-Cameron, A. C. and Trivedi, P. K. (1990). Regression-based
-tests for overdispersion in the Poisson model. \emph{Journal of
-Econometrics}, 46(3), 347-364. Self, S. G. and Liang, K.-Y. (1987).
-Asymptotic properties of maximum likelihood estimators and likelihood
-ratio tests under nonstandard conditions. \emph{Journal of the American
-Statistical Association}, 82(398), 605-610.
+Andrews, D. W. K. (1999). Estimation when a parameter is on a
+boundary. \emph{Econometrica}, 67(6), 1341-1383. Cameron, A. C. and
+Trivedi, P. K. (1990). Regression-based tests for overdispersion in the
+Poisson model. \emph{Journal of Econometrics}, 46(3), 347-364. Dean, C. and
+Lawless, J. F. (1989). Tests for detecting overdispersion in Poisson
+regression models. \emph{Journal of the American Statistical Association},
+84(406), 467-472. Self, S. G. and Liang, K.-Y. (1987). Asymptotic
+properties of maximum likelihood estimators and likelihood ratio tests
+under nonstandard conditions. \emph{Journal of the American Statistical
+Association}, 82(398), 605-610.
 }
 \seealso{
 \code{\link[=count_reg]{count_reg()}}, \code{\link[=dispersion_profile]{dispersion_profile()}}, \code{\link[=zi_test]{zi_test()}}

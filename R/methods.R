@@ -65,16 +65,22 @@ summary.cpb <- function(object, ...) {
   ctab <- cbind(Estimate = object$coefficients, `Std. Error` = object$se.beta,
                 `z value` = z, `Pr(>|z|)` = 2 * pnorm(-abs(z)))
   aci <- .cpb_alpha_profile_ci(object)
-  LR  <- if (is.na(object$loglik.null)) NA_real_ else -2 * (object$loglik.null - object$loglik)
-  ## a negative statistic means the CPB fit sits below its own Poisson nest (the
-  ## data are not underdispersed and/or max.support binds): reported, no p-value
-  ## a negative statistic means the CPB fit sits below its own Poisson nest (the
-  ## data are not underdispersed and/or max.support binds): reported, no p-value
+  ## the likelihood-ratio statistic against the (zero-truncated) Poisson limit and
+  ## its asymptotic boundary-mixture p-value, by the rule dispersion_test()
+  ## states: a value the support guard pushed below zero is the boundary value 0,
+  ## and the p-value is flagged when the estimated mean parameters push the
+  ## asymptotic test's first-order size past the calibration tolerance
+  lr  <- .disp_boundary_lr(if (is.na(object$loglik.null)) NA_real_ else -2 * (object$loglik.null - object$loglik),
+                           isTRUE(object$support_binding))
+  des <- .disp_design(object); size1 <- .disp_first_order_size(des$p, des$n, "under")
+  if (is.finite(lr$p) && size1 > .disp_size_tol)
+    lr$note <- c(lr$note, sprintf(paste0("the p-value is asymptotic; with %d mean parameters on %s observations its ",
+                                         "first-order size at the 5%% level is %.3f, and dispersion_test() calibrates ",
+                                         "it by parametric bootstrap"), as.integer(des$p), format(des$n), size1))
   out <- list(call = object$call, truncated = object$truncated, coefficients = ctab,
               alpha = object$alpha, alpha.ci = aci, ceiling = object$ceiling,
               loglik = object$loglik, aic = -2 * object$loglik + 2 * object$df,
-              # alpha = 1 is on the parameter boundary: null is 0.5*chi2_0 + 0.5*chi2_1 (Self & Liang 1987)
-              LR = LR, LR.p = if (is.na(LR) || LR < 0) NA_real_ else 0.5 * pchisq(LR, 1, lower.tail = FALSE),
+              LR = lr$LR, LR.p = lr$p, LR.note = lr$note,
               support_binding = isTRUE(object$support_binding), converged = object$converged,
               n = object$n, nobs = nobs(object), se.type = object$se.type,
               nboot_ok = if (!is.null(object$boot)) attr(object$boot, "nboot_ok") else NA)
@@ -95,12 +101,10 @@ print.summary.cpb <- function(x, ...) {
   cat("Implied ceiling lambda/(1-alpha): median", round(stats::median(x$ceiling), 2),
       "  range", paste(round(range(x$ceiling), 2), collapse = " to "), "\n")
   cat("logLik =", round(x$loglik, 2), "   AIC =", round(x$aic, 2), "\n")
-  if (!is.na(x$LR) && x$LR >= 0)
+  if (!is.na(x$LR))
     cat(sprintf("LR vs %sPoisson (H0: alpha = 1): %.2f, p %s\n",
                 if (x$truncated) "ZT-" else "", x$LR, format.pval(x$LR.p)))
-  else if (!is.na(x$LR))
-    cat(sprintf("LR vs %sPoisson: %.2f -- the CPB fit does not attain its Poisson nest: the data are not\nunderdispersed in the CPB sense (compare gec()); no p-value is reported.\n",
-                if (x$truncated) "ZT-" else "", x$LR))
+  for (nt in x$LR.note) cat("Note: ", nt, ".\n", sep = "")
   if (isTRUE(x$support_binding))
     cat("Note: the fitted ceiling reaches max.support; alpha is bounded by the guard, not the data.\n")
   if (!is.na(x$nboot_ok))

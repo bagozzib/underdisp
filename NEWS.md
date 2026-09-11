@@ -23,9 +23,13 @@
 * `dispersion_test()`: the likelihood-ratio test of a fitted family's
   dispersion parameter against its Poisson value on the fitted design (fixed
   effects included, the unit effects profiled out of the Poisson null), with
-  two-sided or directional alternatives by the signed root and the Self-Liang
-  boundary mixture where the Poisson value is on the boundary (CPB, negative
-  binomial); and the Cameron-Trivedi auxiliary-regression test for a Poisson fit.
+  two-sided or directional alternatives by the signed root and the boundary
+  mixture where the Poisson value is on the boundary (CPB, negative binomial);
+  and the Cameron-Trivedi auxiliary-regression test for a Poisson fit. The
+  asymptotic p-value is used only when the first-order bias from the null's
+  estimated mean parameters, p / sqrt(2n) standard deviations, keeps a 5% test's
+  size at or below 6% and the fit has no unit fixed effects; otherwise the
+  p-value is a parametric bootstrap under the fitted Poisson (`B`, `cores`).
 * `dispersion_profile()`: the empirical conditional variance-to-mean ratio by
   bins of the fitted mean against the ratio each fitted family implies, with a
   `plot()` method, so the mechanism behind an underdispersed outcome (a hard
@@ -147,8 +151,8 @@
 * `max.support` defaults to `max(500, 10 * max(y))`; a fit whose largest
   implied ceiling reaches the guard warns and records `$support_binding`; a
   fit whose every start is infeasible errors instead of returning the starting
-  values; a CPB fit that sits below its own Poisson nest reports the negative
-  likelihood-ratio statistic with no p-value.
+  values; a CPB fit that the guard stops short of its Poisson limit reports the
+  likelihood-ratio statistic at its boundary value 0.
 * The concentrated fixed-effects fits solve each unit's intercept exactly.
   The unit objective is a saw-tooth in the intercept (the support floor moves
   as the rate crosses integer multiples of `1 - alpha`, and the objective drops
