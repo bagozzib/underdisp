@@ -21,7 +21,8 @@
 ## Poisson's plus theta * [k - lambda/2 - k(k-1)/(2 lambda)] + O(theta^2) per
 ## observation, whose score is the classical dispersion score
 ## -[(y - lambda)^2 - y] / (2 lambda), with information 1/2 per observation and
-## orthogonal to the regression coefficients (Andrews 1999). The asymptotic
+## orthogonal to the regression coefficients (Self and Liang 1987; Andrews 2001);
+## the zero-truncated model reaches the same mixture through its efficient score. The asymptotic
 ## distribution ignores that the null's mean parameters are estimated: to first
 ## order the signed root moves toward underdispersion by p / sqrt(2 n) standard
 ## deviations for p mean parameters (unit intercepts included) on n observations
@@ -59,12 +60,13 @@
 #' negative binomial, whose overdispersion parameter is non-negative) the
 #' asymptotic null distribution is the
 #' \eqn{\tfrac12\chi^2_0 + \tfrac12\chi^2_1} mixture (Self and Liang 1987;
-#' Andrews 1999) and the test is one-sided by construction (`"under"` for the
+#' Andrews 2001) and the test is one-sided by construction (`"under"` for the
 #' CPB, `"over"` for the negative binomial). The CPB qualifies although its
 #' support moves with its parameters: near `alpha = 1` its ceiling
 #' `lambda / (1 - alpha)` diverges, the log-likelihood is regular on that side,
 #' and its score there is the classical dispersion score
-#' \eqn{-[(y - \lambda)^2 - y] / (2\lambda)}. Because the Poisson is the CPB's
+#' \eqn{-[(y - \lambda)^2 - y] / (2\lambda)}; the zero-truncated model reaches
+#' the same mixture through its efficient score. Because the Poisson is the CPB's
 #' limit as `alpha` approaches 1, the statistic cannot be negative in principle;
 #' when the `max.support` guard stops `alpha` short of that limit and the fitted
 #' log-likelihood lands just below the Poisson's, the statistic takes its
@@ -114,8 +116,9 @@
 #'   statistics), `first_order_size` (the asymptotic 5\% test's first-order
 #'   size), `asymptotic_ok` (whether the calibration rule admits the asymptotic
 #'   distribution), and `note` where a statistic or p-value needs one.
-#' @references Andrews, D. W. K. (1999). Estimation when a parameter is on a
-#'   boundary. \emph{Econometrica}, 67(6), 1341-1383. Cameron, A. C. and
+#' @references Andrews, D. W. K. (2001). Testing when a parameter is on the
+#'   boundary of the maintained hypothesis. \emph{Econometrica}, 69(3), 683-734.
+#'   Cameron, A. C. and
 #'   Trivedi, P. K. (1990). Regression-based tests for overdispersion in the
 #'   Poisson model. \emph{Journal of Econometrics}, 46(3), 347-364. Dean, C. and
 #'   Lawless, J. F. (1989). Tests for detecting overdispersion in Poisson

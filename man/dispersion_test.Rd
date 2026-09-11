@@ -66,12 +66,13 @@ Poisson value is on the boundary (the CPB, whose \code{alpha} lives in (0, 1); t
 negative binomial, whose overdispersion parameter is non-negative) the
 asymptotic null distribution is the
 \eqn{\tfrac12\chi^2_0 + \tfrac12\chi^2_1} mixture (Self and Liang 1987;
-Andrews 1999) and the test is one-sided by construction (\code{"under"} for the
+Andrews 2001) and the test is one-sided by construction (\code{"under"} for the
 CPB, \code{"over"} for the negative binomial). The CPB qualifies although its
 support moves with its parameters: near \code{alpha = 1} its ceiling
 \code{lambda / (1 - alpha)} diverges, the log-likelihood is regular on that side,
 and its score there is the classical dispersion score
-\eqn{-[(y - \lambda)^2 - y] / (2\lambda)}. Because the Poisson is the CPB's
+\eqn{-[(y - \lambda)^2 - y] / (2\lambda)}; the zero-truncated model reaches
+the same mixture through its efficient score. Because the Poisson is the CPB's
 limit as \code{alpha} approaches 1, the statistic cannot be negative in principle;
 when the \code{max.support} guard stops \code{alpha} short of that limit and the fitted
 log-likelihood lands just below the Poisson's, the statistic takes its
@@ -107,8 +108,9 @@ dispersion_test(count_reg(y ~ x, d, family = "gammacount"), alternative = "under
 dispersion_test(count_reg(y ~ x, d, family = "poisson"), method = "auxiliary")
 }
 \references{
-Andrews, D. W. K. (1999). Estimation when a parameter is on a
-boundary. \emph{Econometrica}, 67(6), 1341-1383. Cameron, A. C. and
+Andrews, D. W. K. (2001). Testing when a parameter is on the
+boundary of the maintained hypothesis. \emph{Econometrica}, 69(3), 683-734.
+Cameron, A. C. and
 Trivedi, P. K. (1990). Regression-based tests for overdispersion in the
 Poisson model. \emph{Journal of Econometrics}, 46(3), 347-364. Dean, C. and
 Lawless, J. F. (1989). Tests for detecting overdispersion in Poisson
