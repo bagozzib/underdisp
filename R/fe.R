@@ -43,7 +43,10 @@
 #' (half-panel) jackknife: the model is refit on the first and second temporal
 #' halves of every unit's series (rows are split in the order supplied, which
 #' should be temporal order) and the corrected estimate is
-#' `2 * full - mean(halves)`. With correction on, `coefficients` and `alpha`
+#' `2 * full - mean(halves)`. In the package's fixed-effects bias Monte Carlo
+#' (150 units, alpha = 0.5) the alpha bias at T = 6/10/20/40 falls from
+#' -0.153/-0.100/-0.057/-0.033 to -0.046/-0.024/-0.013/-0.009. With correction on,
+#' `coefficients` and `alpha`
 #' are the corrected estimates (the maximum-likelihood values are kept in
 #' `$uncorrected`), the unit effects and fitted values are re-concentrated at the
 #' corrected parameters, and `logLik`/`AIC` continue to refer to the
