@@ -113,7 +113,7 @@ d <- data.frame(y = rbinom(n, N, 0.5), x = x)
 ud_screen(y ~ x, data = d)                     # screen
 fit <- cpb(y ~ x, data = d, truncated = FALSE, se = "none")
 summary(fit)
-dispersion_test(fit)                           # alpha = 1 (Poisson) on the boundary
+dispersion_test(fit, cores = 2)                # boundary null: parametric-bootstrap p-value
 implied_ceiling(fit, newdata = data.frame(x = 0))
 compare_dispersion(y ~ x, data = d)$table
 dispersion_profile(cpb = fit,                  # which mechanism fits?

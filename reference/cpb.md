@@ -188,4 +188,5 @@ summary(fit)
 #> Implied ceiling lambda/(1-alpha): median 9.37   range 2.21 to 36.5 
 #> logLik = -559.53    AIC = 1125.06 
 #> LR vs ZT-Poisson (H0: alpha = 1): 51.09, p 4.4046e-13
+#> Note: the p-value is asymptotic, which over-rejects in finite samples at this boundary; dispersion_test() gives the parametric-bootstrap p-value.
 ```

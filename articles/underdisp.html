@@ -107,7 +107,7 @@ counts).</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; MARGINAL verdict: UNDERDISPERSED </span></span>
 <span><span class="co">#&gt;    Pearson=0.564  prop.slope=-0.391 (p=&lt;2e-16)</span></span>
-<span><span class="co">#&gt;    NB vs Poisson LR = -0.01 (p= 0.5 ; sig =&gt; overdispersion)</span></span>
+<span><span class="co">#&gt;    NB vs Poisson LR = -0.01 (p= 0.5 asymptotic, conservative at this boundary ; sig =&gt; overdispersion)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; AT-RISK (y&gt;0) verdict:UNDERDISPERSED  [n_pos=393]</span></span>
 <span><span class="co">#&gt;    ZTP-Pearson = 0.569  (underdispersed if &lt; 0.885, the calibrated 5% threshold)</span></span>
@@ -138,7 +138,8 @@ counts of a zero-inflated outcome.</p>
 <span><span class="co">#&gt; alpha = 0.5256   (profile 95% CI: 0.487 to 0.613)</span></span>
 <span><span class="co">#&gt; Implied ceiling lambda/(1-alpha): median 10.22   range 2.48 to 37.8 </span></span>
 <span><span class="co">#&gt; logLik = -745.05    AIC = 1496.1 </span></span>
-<span><span class="co">#&gt; LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15</span></span></code></pre></div>
+<span><span class="co">#&gt; LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15</span></span>
+<span><span class="co">#&gt; Note: the p-value is asymptotic, which over-rejects in finite samples at this boundary; dispersion_test() gives the parametric-bootstrap p-value.</span></span></code></pre></div>
 <p>The dispersion parameter <code>alpha</code> summarizes the
 compression, and each observation carries an implied ceiling
 <code>lambda / (1 - alpha)</code>. The CPB is a binomial with a
@@ -174,18 +175,22 @@ the GEC, <code>nu = 1</code> for the COM-Poisson, and so on), so
 parameter against its Poisson value by a likelihood-ratio test on the
 fitted design, with fixed effects carried into the null. Where the
 Poisson value sits on the boundary of the parameter space (the CPB, the
-negative binomial) the test uses the Self–Liang mixture and is
-one-sided; elsewhere the alternative can be two-sided or directional.
-For a plain Poisson fit the Cameron–Trivedi auxiliary regression is
-available as <code>method = "auxiliary"</code>.</p>
+negative binomial) the test is one-sided, and its p-value comes by
+default from a parametric bootstrap under the fitted Poisson, because
+the asymptotic Self–Liang mixture over-rejects in finite samples;
+<code>B = 0</code> gives the quick asymptotic value shown here.
+Elsewhere the alternative can be two-sided or directional. For a plain
+Poisson fit the Cameron–Trivedi auxiliary regression is available as
+<code>method = "auxiliary"</code>.</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/dispersion_test.html">dispersion_test</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span>
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/dispersion_test.html">dispersion_test</a></span><span class="op">(</span><span class="va">fit</span>, B <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>   <span class="co"># asymptotic value; the default is the bootstrap p-value</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null, Self-Liang mixture)</span></span>
+<span><span class="co">#&gt; Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null; asymptotic 1/2 chi2_0 + 1/2 chi2_1 mixture)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; data: y ~ x</span></span>
 <span><span class="co">#&gt; LR = 58.6579  (logLik: fitted family = -745.05, Poisson = -774.38),  p-value = 9.381e-15</span></span>
 <span><span class="co">#&gt; alternative hypothesis: underdispersion</span></span>
+<span><span class="co">#&gt; note: the p-value is asymptotic; at a boundary null the statistic is skewed toward rejection in finite samples, and the default (B = NULL) calibrates it by parametric bootstrap</span></span>
 <span><span class="co">#&gt; estimate: alpha = 0.5256  (Poisson value 1)</span></span>
 <span><span class="fu"><a href="../reference/dispersion_test.html">dispersion_test</a></span><span class="op">(</span><span class="fu"><a href="../reference/count_reg.html">count_reg</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, data <span class="op">=</span> <span class="va">d</span>, family <span class="op">=</span> <span class="st">"poisson"</span><span class="op">)</span>,</span>
 <span>                method <span class="op">=</span> <span class="st">"auxiliary"</span>, alternative <span class="op">=</span> <span class="st">"under"</span><span class="op">)</span></span>
@@ -223,6 +228,7 @@ a socket cluster seeded from the session.</p>
 <span><span class="co">#&gt; Implied ceiling lambda/(1-alpha): median 10.22   range 2.48 to 37.8 </span></span>
 <span><span class="co">#&gt; logLik = -745.05    AIC = 1496.1 </span></span>
 <span><span class="co">#&gt; LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15</span></span>
+<span><span class="co">#&gt; Note: the p-value is asymptotic, which over-rejects in finite samples at this boundary; dispersion_test() gives the parametric-bootstrap p-value.</span></span>
 <span><span class="co">#&gt; (99 bootstrap resamples converged)</span></span>
 <span><span class="fu"><a href="../reference/irr.html">irr</a></span><span class="op">(</span><span class="va">fit_b</span><span class="op">)</span>             <span class="co"># rate ratios with percentile intervals</span></span>
 <span><span class="co">#&gt;         term equation ratio estimate lower upper             method</span></span>
@@ -285,14 +291,21 @@ to thousands of units.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; alpha (shape parameter): 0.4735   median implied bound: 2.25 </span></span>
 <span><span class="co">#&gt; Note: alpha is subject to incidental-parameters bias for short panels; see ?cpb_fe.</span></span>
-<span><span class="fu"><a href="../reference/dispersion_test.html">dispersion_test</a></span><span class="op">(</span><span class="va">fe_fit</span><span class="op">)</span>      <span class="co"># against a Poisson with the same unit effects</span></span>
+<span><span class="fu"><a href="../reference/dispersion_test.html">dispersion_test</a></span><span class="op">(</span><span class="va">fe_fit</span>, B <span class="op">=</span> <span class="fl">0</span><span class="op">)</span>   <span class="co"># the statistic against a Poisson with the same unit effects</span></span>
 <span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null, Self-Liang mixture)</span></span>
+<span><span class="co">#&gt; Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null; asymptotic 1/2 chi2_0 + 1/2 chi2_1 mixture)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; data: y ~ x</span></span>
-<span><span class="co">#&gt; LR = 216.3068  (logLik: fitted family = -599.47, Poisson = -707.63),  p-value = &lt; 2.2e-16</span></span>
+<span><span class="co">#&gt; LR = 216.3068  (logLik: fitted family = -599.47, Poisson = -707.63),  p-value = NA</span></span>
 <span><span class="co">#&gt; alternative hypothesis: underdispersion</span></span>
+<span><span class="co">#&gt; note: unit fixed effects bias the dispersion estimate toward underdispersion, so the asymptotic distribution does not apply; B &gt; 0 gives the parametric-bootstrap p-value</span></span>
 <span><span class="co">#&gt; estimate: alpha = 0.4735  (Poisson value 1)</span></span></code></pre></div>
+<p>With unit fixed effects the asymptotic distribution of that statistic
+does not apply, so its p-value comes from a parametric bootstrap under
+the fitted Poisson. Every replicate refits the model, which makes the
+bootstrap about 199 times as slow as the fit; it is not run here:</p>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/dispersion_test.html">dispersion_test</a></span><span class="op">(</span><span class="va">fe_fit</span>, cores <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>   <span class="co"># parametric-bootstrap p-value, 199 replicates</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="comparing-the-family">Comparing the family<a class="anchor" aria-label="anchor" href="#comparing-the-family"></a>
@@ -301,7 +314,7 @@ to thousands of units.</p>
 binomial, the native soft-tail COM-Poisson, the free-dispersion GEC, and
 the hard-ceiling CPB, and reports a fit comparison plus the CPB’s
 ceiling-exceedance share.</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/compare_dispersion.html">compare_dispersion</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">)</span><span class="op">$</span><span class="va">table</span></span>
 <span><span class="co">#&gt;             df    logLik      AIC      BIC logscore       rps    zero_fit</span></span>
 <span><span class="co">#&gt; Poisson      2 -798.9009 1601.802 1609.785 1.997252 0.9855061 0.024243957</span></span>
@@ -327,7 +340,7 @@ zero-truncation, hurdle and zero-inflated forms, offsets, frequency
 weights, robust and cluster-robust standard errors, and every method in
 the package, so <code><a href="../reference/compare_models.html">compare_models()</a></code> places them next to the
 CPB on one footing.</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">fits</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/list.html" class="external-link">list</a></span><span class="op">(</span></span>
 <span>  CPB          <span class="op">=</span> <span class="fu"><a href="../reference/cpb.html">cpb</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, data <span class="op">=</span> <span class="va">d</span>, truncated <span class="op">=</span> <span class="cn">FALSE</span>, se <span class="op">=</span> <span class="st">"none"</span><span class="op">)</span>,</span>
 <span>  Poisson      <span class="op">=</span> <span class="fu"><a href="../reference/count_reg.html">count_reg</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, data <span class="op">=</span> <span class="va">d</span>, family <span class="op">=</span> <span class="st">"poisson"</span><span class="op">)</span>,</span>
@@ -352,7 +365,7 @@ win on AIC and the proper scores. The families differ in how their
 dispersion moves with the mean, and <code><a href="../reference/dispersion_profile.html">dispersion_profile()</a></code>
 sets the empirical conditional variance-to-mean ratio, by bins of the
 fitted mean, against the curve each family implies:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/dispersion_profile.html">dispersion_profile</a></span><span class="op">(</span>CPB <span class="op">=</span> <span class="va">fits</span><span class="op">$</span><span class="va">CPB</span>, NB <span class="op">=</span> <span class="va">fits</span><span class="op">$</span><span class="va">NB</span>, GammaCount <span class="op">=</span> <span class="va">fits</span><span class="op">$</span><span class="va">GammaCount</span>,</span>
 <span>                   GenPoisson <span class="op">=</span> <span class="va">fits</span><span class="op">$</span><span class="va">GenPoisson</span><span class="op">)</span></span></code></pre></div>
 <p><img src="underdisp_files/figure-html/profile-1.png" class="r-plt" alt="" width="576"></p>
@@ -373,7 +386,7 @@ package’s central move: marginally the count looks overdispersed, but
 conditioning on country fixed effects and benchmarking the positive
 counts against a zero-truncated Poisson, the at-risk process is
 underdispersed.</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/data.html" class="external-link">data</a></span><span class="op">(</span><span class="va">peacekeeping</span><span class="op">)</span></span>
 <span><span class="fu"><a href="../reference/ud_screen.html">ud_screen</a></span><span class="op">(</span><span class="va">contributions</span> <span class="op">~</span> <span class="va">democracy</span> <span class="op">+</span> <span class="va">lgdppc</span> <span class="op">+</span> <span class="va">lpop</span> <span class="op">+</span> <span class="va">milper</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">iso3</span><span class="op">)</span>,</span>
 <span>          data <span class="op">=</span> <span class="va">peacekeeping</span>, run_cpb <span class="op">=</span> <span class="cn">FALSE</span>, run_gp <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
@@ -384,7 +397,7 @@ underdispersed.</p>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; MARGINAL verdict: OVERDISPERSED </span></span>
 <span><span class="co">#&gt;    Pearson=1.086  prop.slope=0.191 (p=&lt;2e-16)</span></span>
-<span><span class="co">#&gt;    NB vs Poisson LR = 18.11 (p= 1e-05 ; sig =&gt; overdispersion)</span></span>
+<span><span class="co">#&gt;    NB vs Poisson LR = 18.11 (p= 1e-05 asymptotic, conservative at this boundary ; sig =&gt; overdispersion)</span></span>
 <span><span class="co">#&gt; </span></span>
 <span><span class="co">#&gt; AT-RISK (y&gt;0) verdict:UNDERDISPERSED  [n_pos=2602]</span></span>
 <span><span class="co">#&gt;    ZTP-Pearson = 0.841  (underdispersed if &lt; 0.955, the calibrated 5% threshold)</span></span>
@@ -397,7 +410,7 @@ intensity. <code><a href="../reference/hurdle_cpb.html">hurdle_cpb()</a></code> 
 zero-truncated CPB, and <code><a href="../reference/zi_cpb.html">zi_cpb()</a></code> fits the structural-zero
 mixture; <code><a href="../reference/zi_test.html">zi_test()</a></code> and <code><a href="../reference/compare_models.html">compare_models()</a></code>
 adjudicate between them.</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">z</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span>
 <span><span class="va">yh</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rhurdle_cpb.html">rhurdle_cpb</a></span><span class="op">(</span><span class="va">n</span>, lambda <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">1.2</span> <span class="op">+</span> <span class="fl">0.3</span> <span class="op">*</span> <span class="va">x</span><span class="op">)</span>, alpha <span class="op">=</span> <span class="fl">0.5</span>,</span>
 <span>                  p <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Logistic.html" class="external-link">plogis</a></span><span class="op">(</span><span class="fl">0.3</span> <span class="op">+</span> <span class="fl">0.8</span> <span class="op">*</span> <span class="va">z</span><span class="op">)</span><span class="op">)</span></span>
@@ -424,7 +437,7 @@ intensity.</p>
 <code>w</code> is equivalent to <code>w</code> copies of the row, in the
 likelihood, the information, and the bootstrap), so tabulated data fit
 exactly as the expanded data would:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">w</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">3</span>, <span class="va">n</span>, <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>weighted <span class="op">=</span> <span class="fu"><a href="../reference/count_reg.html">count_reg</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, data <span class="op">=</span> <span class="va">d</span>, family <span class="op">=</span> <span class="st">"gammacount"</span>, weights <span class="op">=</span> <span class="va">w</span><span class="op">)</span><span class="op">$</span><span class="va">loglik</span>,</span>
 <span>  expanded <span class="op">=</span> <span class="fu"><a href="../reference/count_reg.html">count_reg</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, data <span class="op">=</span> <span class="va">d</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span>, <span class="va">w</span><span class="op">)</span>, <span class="op">]</span>, family <span class="op">=</span> <span class="st">"gammacount"</span><span class="op">)</span><span class="op">$</span><span class="va">loglik</span><span class="op">)</span></span>
@@ -440,7 +453,7 @@ unit, <code>alpha</code> is biased <em>downward</em> (the panel looks
 more underdispersed than it is). <code>bias_correct = "jackknife"</code>
 removes the leading bias term by the split-panel jackknife of Dhaene and
 Jochmans (2015), refitting on each unit’s temporal halves.</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">short</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fl">1</span><span class="op">:</span><span class="fl">30</span>, <span class="kw">function</span><span class="op">(</span><span class="va">i</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="va">xx</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">8</span><span class="op">)</span>; <span class="va">NN</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">1.0</span> <span class="op">+</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="fl">1</span>, <span class="fl">0</span>, <span class="fl">0.4</span><span class="op">)</span> <span class="op">+</span> <span class="fl">0.3</span> <span class="op">*</span> <span class="va">xx</span><span class="op">)</span> <span class="op">/</span> <span class="fl">0.5</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>unit <span class="op">=</span> <span class="va">i</span>, x <span class="op">=</span> <span class="va">xx</span>, y <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fl">8</span>, <span class="va">NN</span>, <span class="fl">0.5</span><span class="op">)</span><span class="op">)</span></span>
@@ -468,7 +481,7 @@ dispersion regime changes and all smooth unmodeled trends.</p>
 <p>Every fitted model in the package has a <code><a href="https://rdrr.io/r/stats/simulate.html" class="external-link">simulate()</a></code>
 method, so the whole family plugs into <code>DHARMa</code>’s
 simulated-residual diagnostics.</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sims</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/simulate.html" class="external-link">simulate</a></span><span class="op">(</span><span class="va">h</span>, nsim <span class="op">=</span> <span class="fl">100</span>, seed <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
 <span><span class="va">res</span> <span class="op">&lt;-</span> <span class="fu">DHARMa</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/DHARMa/man/createDHARMa.html" class="external-link">createDHARMa</a></span><span class="op">(</span>simulatedResponse <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/matrix.html" class="external-link">as.matrix</a></span><span class="op">(</span><span class="va">sims</span><span class="op">)</span>,</span>
 <span>                            observedResponse  <span class="op">=</span> <span class="va">dh</span><span class="op">$</span><span class="va">y</span>,</span>

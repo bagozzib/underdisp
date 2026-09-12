@@ -26,7 +26,8 @@ ud_screen(
   ztp_threshold = c("calibrated", "bootstrap"),
   ztp_boot_B = 199L,
   cores = 1L,
-  digits = 3
+  digits = 3,
+  nb_boot = NULL
 )
 ```
 
@@ -99,19 +100,32 @@ ud_screen(
 
   Printing precision.
 
+- nb_boot:
+
+  Whether the NB-vs-Poisson p-value is a parametric bootstrap under the
+  fitted Poisson (`ztp_boot_B` replicates over `cores`), the package
+  default at a boundary null (see
+  [`dispersion_test()`](https://bagozzib.github.io/underdisp/reference/dispersion_test.md)).
+  `NULL` (default) bootstraps it when `ztp_threshold = "bootstrap"` and
+  the mean model is within `comp_max_par` and `comp_max_n`; otherwise
+  the p-value is the asymptotic boundary mixture, which is conservative
+  for this test. The bootstrap restores the random-number state, so
+  every other result is the same with or without it.
+
 ## Value
 
 An object of class `"ud_screen"` with `verdict_marginal`,
 `verdict_atrisk`, the conditional and at-risk (ZTP-benchmarked) Pearson
-statistics, the NB-vs-Poisson LR test, a log-likelihood comparison,
-(when fit) the CPB alpha and ceiling-exceedance share, and the
-over-conditioning guard state: `atrisk_skipped` (`TRUE` when the mean
-model nearly saturates the positive counts, so the at-risk statistic is
-not computed and the printout says why), `sat_ratio` (the fitted
-parameter share of the positives), and `overconditioned` (`TRUE` when
-that share reaches 0.10, the region where the calibrated threshold is
-anti-conservative; the printout then flags the verdict as diagnostic
-rather than probative and recommends `ztp_threshold = "bootstrap"`).
+statistics, the NB-vs-Poisson LR test (`p_nb_method` records how its
+p-value was computed), a log-likelihood comparison, (when fit) the CPB
+alpha and ceiling-exceedance share, and the over-conditioning guard
+state: `atrisk_skipped` (`TRUE` when the mean model nearly saturates the
+positive counts, so the at-risk statistic is not computed and the
+printout says why), `sat_ratio` (the fitted parameter share of the
+positives), and `overconditioned` (`TRUE` when that share reaches 0.10,
+the region where the calibrated threshold is anti-conservative; the
+printout then flags the verdict as diagnostic rather than probative and
+recommends `ztp_threshold = "bootstrap"`).
 
 ## Details
 
@@ -151,7 +165,7 @@ ud_screen(y ~ x, data = data.frame(y = y, x = x))
 #> 
 #> MARGINAL verdict: UNDERDISPERSED 
 #>    Pearson=0.370  prop.slope=-0.627 (p=<2e-16)
-#>    NB vs Poisson LR = 0 (p= 0.5 ; sig => overdispersion)
+#>    NB vs Poisson LR = 0 (p= 0.5 asymptotic, conservative at this boundary ; sig => overdispersion)
 #> 
 #> AT-RISK (y>0) verdict:UNDERDISPERSED  [n_pos=250]
 #>    ZTP-Pearson = 0.429  (underdispersed if < 0.856, the calibrated 5% threshold)

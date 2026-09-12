@@ -3,16 +3,18 @@
 conditional on the covariates. For a fit from a family with a dispersion
 parameter (method = &quot;lr&quot;, the default), the test is the likelihood-ratio
 test of that parameter against its Poisson value, with the Poisson refit on
-the same design (fixed effects included); the alternative can be two-sided
-or directional (see Details). For a Poisson fit, method = &quot;auxiliary&quot; runs
-the Cameron–Trivedi (1990) auxiliary regression, which needs no
+the same design (fixed effects included); its p-value comes from the
+asymptotic distribution or from a parametric bootstrap under the fitted
+Poisson, by the rule in Details. For a Poisson fit, method = &quot;auxiliary&quot;
+runs the Cameron–Trivedi (1990) auxiliary regression, which needs no
 alternative family."><meta property="og:description" content="Tests whether a fitted count model's dispersion departs from the Poisson,
 conditional on the covariates. For a fit from a family with a dispersion
 parameter (method = &quot;lr&quot;, the default), the test is the likelihood-ratio
 test of that parameter against its Poisson value, with the Poisson refit on
-the same design (fixed effects included); the alternative can be two-sided
-or directional (see Details). For a Poisson fit, method = &quot;auxiliary&quot; runs
-the Cameron–Trivedi (1990) auxiliary regression, which needs no
+the same design (fixed effects included); its p-value comes from the
+asymptotic distribution or from a parametric bootstrap under the fitted
+Poisson, by the rule in Details. For a Poisson fit, method = &quot;auxiliary&quot;
+runs the Cameron–Trivedi (1990) auxiliary regression, which needs no
 alternative family."></head><body>
     <a href="#main" class="visually-hidden-focusable">Skip to contents</a>
 
@@ -57,9 +59,10 @@ alternative family."></head><body>
 conditional on the covariates. For a fit from a family with a dispersion
 parameter (<code>method = "lr"</code>, the default), the test is the likelihood-ratio
 test of that parameter against its Poisson value, with the Poisson refit on
-the same design (fixed effects included); the alternative can be two-sided
-or directional (see Details). For a Poisson fit, <code>method = "auxiliary"</code> runs
-the Cameron–Trivedi (1990) auxiliary regression, which needs no
+the same design (fixed effects included); its p-value comes from the
+asymptotic distribution or from a parametric bootstrap under the fitted
+Poisson, by the rule in Details. For a Poisson fit, <code>method = "auxiliary"</code>
+runs the Cameron–Trivedi (1990) auxiliary regression, which needs no
 alternative family.</p>
     </div>
 
@@ -68,7 +71,9 @@ alternative family.</p>
     <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">dispersion_test</span><span class="op">(</span></span>
 <span>  <span class="va">object</span>,</span>
 <span>  alternative <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"two.sided"</span>, <span class="st">"under"</span>, <span class="st">"over"</span><span class="op">)</span>,</span>
-<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"lr"</span>, <span class="st">"auxiliary"</span><span class="op">)</span></span>
+<span>  method <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"lr"</span>, <span class="st">"auxiliary"</span><span class="op">)</span>,</span>
+<span>  B <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  cores <span class="op">=</span> <span class="fl">1L</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -92,12 +97,28 @@ model (for <code>method = "auxiliary"</code>, a <code>count_reg</code> fit with
 or <code>"auxiliary"</code> (the Cameron–Trivedi auxiliary regression for a
 Poisson fit).</p></dd>
 
+
+<dt id="arg-b">B<a class="anchor" aria-label="anchor" href="#arg-b"></a></dt>
+<dd><p>Parametric-bootstrap replicates for <code>method = "lr"</code>: <code>NULL</code> (the
+default) applies the calibration rule in Details (199 replicates when the
+bootstrap is needed), <code>0</code> requests the asymptotic distribution, and a
+positive whole number forces the bootstrap.</p></dd>
+
+
+<dt id="arg-cores">cores<a class="anchor" aria-label="anchor" href="#arg-cores"></a></dt>
+<dd><p>Worker processes for the bootstrap replicates.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class <code>c("dispersion_test", "htest")</code> with the
 statistic, the p-value, the estimated dispersion parameter and its Poisson
-value, the two log-likelihoods (LR method), and the alternative.</p>
+value, the two log-likelihoods, and the alternative; for <code>method = "lr"</code>
+also <code>calibration</code> (<code>"asymptotic"</code> or <code>"parametric bootstrap"</code>), <code>B</code> and
+<code>B_ok</code> (replicates requested and completed), <code>boot</code> (the simulated
+statistics), <code>first_order_size</code> (the asymptotic 5\<!-- % test's first-order -->
+size), <code>asymptotic_ok</code> (whether the calibration rule admits the asymptotic
+distribution), and <code>note</code> where a statistic or p-value needs one.</p>
     </div>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
@@ -106,29 +127,63 @@ parameter: <code>alpha = 1</code> (CPB), <code>delta = 1</code> (GEC), <code>nu 
 parameterizations), <code>lambda = 0</code> (generalized Poisson), <code>alpha = 1</code>
 (gamma-count), <code>theta = 1</code> (double Poisson), and <code>1/theta = 0</code> (negative
 binomial). When that value is interior to the parameter space the
-likelihood-ratio statistic is \(\chi^2_1\) under the null; a directional
-alternative (<code>"under"</code> or <code>"over"</code>) uses the signed root
-\(r = \pm\sqrt{LR}\), signed toward underdispersion when the estimate lies
-on the underdispersed side of the Poisson value, which is standard normal
-under the null, so the one-sided p-value is \(1 - \Phi(r)\) for
-<code>"under"</code> and \(\Phi(r)\) for <code>"over"</code>. When the Poisson value is on the
-boundary (the CPB, whose <code>alpha</code> lives in (0, 1); the negative binomial,
-whose overdispersion parameter is non-negative) the null distribution of the
-statistic is the \(\tfrac12\chi^2_0 + \tfrac12\chi^2_1\) mixture of Self
-and Liang (1987), the test is one-sided by construction, and <code>alternative</code>
-is fixed accordingly (<code>"under"</code> for the CPB, <code>"over"</code> for the negative
-binomial). For the concentrated fixed-effects fits the Poisson null carries
-the same unit effects, profiled out in closed form (Poisson) or by a
-per-unit Newton step (zero-truncated Poisson).</p>
+likelihood-ratio statistic is asymptotically \(\chi^2_1\) under the null; a
+directional alternative (<code>"under"</code> or <code>"over"</code>) uses the signed root
+\(r = \pm\sqrt{LR}\), positive when the estimate lies on the underdispersed
+side of the Poisson value, which is asymptotically standard normal. When the
+Poisson value is on the boundary (the CPB, whose <code>alpha</code> lives in (0, 1); the
+negative binomial, whose overdispersion parameter is non-negative) the
+asymptotic null distribution is the
+\(\tfrac12\chi^2_0 + \tfrac12\chi^2_1\) mixture (Self and Liang 1987;
+Andrews 2001) and the test is one-sided by construction (<code>"under"</code> for the
+CPB, <code>"over"</code> for the negative binomial). The CPB qualifies although its
+support moves with its parameters: near <code>alpha = 1</code> its ceiling
+<code>lambda / (1 - alpha)</code> diverges, the log-likelihood is regular on that side,
+and its score there is the classical dispersion score
+\(-[(y - \lambda)^2 - y] / (2\lambda)\); the zero-truncated model reaches
+the same mixture through its efficient score. Because the Poisson is the CPB's
+limit as <code>alpha</code> approaches 1, the statistic cannot be negative in principle;
+when the <code>max.support</code> guard stops <code>alpha</code> short of that limit and the fitted
+log-likelihood lands just below the Poisson's, the statistic takes its
+boundary value 0. Any other negative statistic means the optimizer fell
+short, and no p-value is reported.</p>
+<p><strong>Calibration.</strong> Where the Poisson value is on the boundary of the family's
+parameter space (the CPB, the negative binomial), or the fit has unit fixed
+effects, the p-value is by default a parametric bootstrap with 199
+replicates. The one-sided boundary statistic is skewed toward rejection in
+finite samples, and unit intercepts bias the dispersion estimate toward
+underdispersion by an amount of order 1/T; in both cases the asymptotic
+distribution over-rejects. Where the Poisson value is interior, the
+asymptotic distribution is used unless the estimated mean parameters shift
+it too far: to first order they move the signed root toward
+underdispersion by \(p/\sqrt{2n}\) standard deviations for \(p\) mean
+parameters on \(n\) observations (the weight total), the bias Dean and
+Lawless (1989) remove from the score test, and the bootstrap takes over when
+that shift pushes the first-order size of a 5\<!-- % test above 6\\%. The bootstrap -->
+simulates responses from the Poisson (zero-truncated Poisson) fitted to the
+same design, offset, weights, and unit effects, refits both models to each,
+and reports the share of simulated statistics at least as extreme as the
+observed one, counting the observed one, among the replicates whose two fits
+both succeeded. Simulating at the Poisson value itself keeps the bootstrap
+valid at the boundary. <code>B = 0</code> requests the asymptotic distribution (with
+unit fixed effects it returns the statistic without a p-value), and a
+positive <code>B</code> sets the number of bootstrap replicates. Every replicate refits
+both models, so the bootstrap takes about <code>B</code> times as long as the original
+fit; <code>cores</code> spreads the replicates over worker processes.</p>
     </div>
     <div class="section level2">
     <h2 id="references">References<a class="anchor" aria-label="anchor" href="#references"></a></h2>
-    <p>Cameron, A. C. and Trivedi, P. K. (1990). Regression-based
-tests for overdispersion in the Poisson model. <em>Journal of
-Econometrics</em>, 46(3), 347-364. Self, S. G. and Liang, K.-Y. (1987).
-Asymptotic properties of maximum likelihood estimators and likelihood
-ratio tests under nonstandard conditions. <em>Journal of the American
-Statistical Association</em>, 82(398), 605-610.</p>
+    <p>Andrews, D. W. K. (2001). Testing when a parameter is on the
+boundary of the maintained hypothesis. <em>Econometrica</em>, 69(3), 683-734.
+Cameron, A. C. and
+Trivedi, P. K. (1990). Regression-based tests for overdispersion in the
+Poisson model. <em>Journal of Econometrics</em>, 46(3), 347-364. Dean, C. and
+Lawless, J. F. (1989). Tests for detecting overdispersion in Poisson
+regression models. <em>Journal of the American Statistical Association</em>,
+84(406), 467-472. Self, S. G. and Liang, K.-Y. (1987). Asymptotic
+properties of maximum likelihood estimators and likelihood ratio tests
+under nonstandard conditions. <em>Journal of the American Statistical
+Association</em>, 82(398), 605-610.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>
@@ -141,7 +196,7 @@ Statistical Association</em>, 82(398), 605-610.</p>
 <span class="r-in"><span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="fu"><a href="gammacount-distribution.html">rgammacount</a></span><span class="op">(</span><span class="va">n</span>, <span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">1</span> <span class="op">+</span> <span class="fl">0.4</span> <span class="op">*</span> <span class="va">x</span><span class="op">)</span>, alpha <span class="op">=</span> <span class="fl">2</span><span class="op">)</span>, x <span class="op">=</span> <span class="va">x</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="fu">dispersion_test</span><span class="op">(</span><span class="fu"><a href="count_reg.html">count_reg</a></span><span class="op">(</span><span class="va">y</span> <span class="op">~</span> <span class="va">x</span>, <span class="va">d</span>, family <span class="op">=</span> <span class="st">"gammacount"</span><span class="op">)</span>, alternative <span class="op">=</span> <span class="st">"under"</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Likelihood-ratio test of equidispersion (Gamma-count vs Poisson)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Likelihood-ratio test of equidispersion (Gamma-count vs Poisson; asymptotic chi-square)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> data: y ~ x</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> LR = 52.1022  (logLik: fitted family = -647.24, Poisson = -673.30),  p-value = 2.634e-13</span>

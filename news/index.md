@@ -35,9 +35,23 @@
   against its Poisson value on the fitted design (fixed effects
   included, the unit effects profiled out of the Poisson null), with
   two-sided or directional alternatives by the signed root and the
-  Self-Liang boundary mixture where the Poisson value is on the boundary
-  (CPB, negative binomial); and the Cameron-Trivedi auxiliary-regression
-  test for a Poisson fit.
+  boundary mixture where the Poisson value is on the boundary (CPB,
+  negative binomial); and the Cameron-Trivedi auxiliary-regression test
+  for a Poisson fit. The p-value is a parametric bootstrap under the
+  fitted Poisson (`B`, `cores`) whenever the Poisson value is on the
+  boundary of the family’s parameter space (CPB, negative binomial) or
+  the fit has unit fixed effects; where it is interior, the asymptotic
+  p-value is used unless the first-order bias from the null’s estimated
+  mean parameters, p / sqrt(2n) standard deviations, pushes a 5% test’s
+  size above 6%. [`summary()`](https://rdrr.io/r/base/summary.html) of a
+  CPB fit flags its asymptotic p-value.
+- [`ud_screen()`](https://bagozzib.github.io/underdisp/reference/ud_screen.md):
+  in `ztp_threshold = "bootstrap"` mode the NB-vs-Poisson p-value is a
+  parametric bootstrap under the fitted Poisson (`nb_boot`) when the
+  mean model is within the comparator gates; the fast mode’s asymptotic
+  value is labeled conservative. The bootstrap restores the
+  random-number state, so the at-risk threshold and every other result
+  are unchanged.
 - [`dispersion_profile()`](https://bagozzib.github.io/underdisp/reference/dispersion_profile.md):
   the empirical conditional variance-to-mean ratio by bins of the fitted
   mean against the ratio each fitted family implies, with a
@@ -217,9 +231,9 @@
 - `max.support` defaults to `max(500, 10 * max(y))`; a fit whose largest
   implied ceiling reaches the guard warns and records
   `$support_binding`; a fit whose every start is infeasible errors
-  instead of returning the starting values; a CPB fit that sits below
-  its own Poisson nest reports the negative likelihood-ratio statistic
-  with no p-value.
+  instead of returning the starting values; a CPB fit that the guard
+  stops short of its Poisson limit reports the likelihood-ratio
+  statistic at its boundary value 0.
 - The concentrated fixed-effects fits solve each unit’s intercept
   exactly. The unit objective is a saw-tooth in the intercept (the
   support floor moves as the rate crosses integer multiples of

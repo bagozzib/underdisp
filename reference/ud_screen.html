@@ -80,7 +80,8 @@ comparator.</p>
 <span>  ztp_threshold <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"calibrated"</span>, <span class="st">"bootstrap"</span><span class="op">)</span>,</span>
 <span>  ztp_boot_B <span class="op">=</span> <span class="fl">199L</span>,</span>
 <span>  cores <span class="op">=</span> <span class="fl">1L</span>,</span>
-<span>  digits <span class="op">=</span> <span class="fl">3</span></span>
+<span>  digits <span class="op">=</span> <span class="fl">3</span>,</span>
+<span>  nb_boot <span class="op">=</span> <span class="cn">NULL</span></span>
 <span><span class="op">)</span></span></code></pre></div>
     </div>
 
@@ -155,12 +156,24 @@ regime.</p></dd>
 <dt id="arg-digits">digits<a class="anchor" aria-label="anchor" href="#arg-digits"></a></dt>
 <dd><p>Printing precision.</p></dd>
 
+
+<dt id="arg-nb-boot">nb_boot<a class="anchor" aria-label="anchor" href="#arg-nb-boot"></a></dt>
+<dd><p>Whether the NB-vs-Poisson p-value is a parametric bootstrap
+under the fitted Poisson (<code>ztp_boot_B</code> replicates over <code>cores</code>), the
+package default at a boundary null (see <code><a href="dispersion_test.html">dispersion_test()</a></code>). <code>NULL</code>
+(default) bootstraps it when <code>ztp_threshold = "bootstrap"</code> and the mean
+model is within <code>comp_max_par</code> and <code>comp_max_n</code>; otherwise the p-value is
+the asymptotic boundary mixture, which is conservative for this test. The
+bootstrap restores the random-number state, so every other result is the
+same with or without it.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An object of class <code>"ud_screen"</code> with <code>verdict_marginal</code>, <code>verdict_atrisk</code>,
 the conditional and at-risk (ZTP-benchmarked) Pearson statistics, the NB-vs-Poisson
-LR test, a log-likelihood comparison, (when fit) the CPB alpha and
+LR test (<code>p_nb_method</code> records how its p-value was computed), a log-likelihood
+comparison, (when fit) the CPB alpha and
 ceiling-exceedance share, and the over-conditioning guard state:
 <code>atrisk_skipped</code> (<code>TRUE</code> when the mean model nearly saturates the positive
 counts, so the at-risk statistic is not computed and the printout says why),
@@ -204,7 +217,7 @@ Companion manuscript.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> MARGINAL verdict: UNDERDISPERSED </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    Pearson=0.370  prop.slope=-0.627 (p=&lt;2e-16)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    NB vs Poisson LR = 0 (p= 0.5 ; sig =&gt; overdispersion)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    NB vs Poisson LR = 0 (p= 0.5 asymptotic, conservative at this boundary ; sig =&gt; overdispersion)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> AT-RISK (y&gt;0) verdict:UNDERDISPERSED  [n_pos=250]</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>    ZTP-Pearson = 0.429  (underdispersed if &lt; 0.856, the calibrated 5% threshold)</span>

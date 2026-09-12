@@ -47,7 +47,7 @@ ud_screen(y ~ x, data = d, run_cpb = FALSE)
 #> 
 #> MARGINAL verdict: UNDERDISPERSED 
 #>    Pearson=0.564  prop.slope=-0.391 (p=<2e-16)
-#>    NB vs Poisson LR = -0.01 (p= 0.5 ; sig => overdispersion)
+#>    NB vs Poisson LR = -0.01 (p= 0.5 asymptotic, conservative at this boundary ; sig => overdispersion)
 #> 
 #> AT-RISK (y>0) verdict:UNDERDISPERSED  [n_pos=393]
 #>    ZTP-Pearson = 0.569  (underdispersed if < 0.885, the calibrated 5% threshold)
@@ -82,6 +82,7 @@ summary(fit)
 #> Implied ceiling lambda/(1-alpha): median 10.22   range 2.48 to 37.8 
 #> logLik = -745.05    AIC = 1496.1 
 #> LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15
+#> Note: the p-value is asymptotic, which over-rejects in finite samples at this boundary; dispersion_test() gives the parametric-bootstrap p-value.
 ```
 
 The dispersion parameter `alpha` summarizes the compression, and each
@@ -119,20 +120,24 @@ COM-Poisson, and so on), so
 tests a fitted model’s dispersion parameter against its Poisson value by
 a likelihood-ratio test on the fitted design, with fixed effects carried
 into the null. Where the Poisson value sits on the boundary of the
-parameter space (the CPB, the negative binomial) the test uses the
-Self–Liang mixture and is one-sided; elsewhere the alternative can be
-two-sided or directional. For a plain Poisson fit the Cameron–Trivedi
-auxiliary regression is available as `method = "auxiliary"`.
+parameter space (the CPB, the negative binomial) the test is one-sided,
+and its p-value comes by default from a parametric bootstrap under the
+fitted Poisson, because the asymptotic Self–Liang mixture over-rejects
+in finite samples; `B = 0` gives the quick asymptotic value shown here.
+Elsewhere the alternative can be two-sided or directional. For a plain
+Poisson fit the Cameron–Trivedi auxiliary regression is available as
+`method = "auxiliary"`.
 
 ``` r
 
-dispersion_test(fit)
+dispersion_test(fit, B = 0)   # asymptotic value; the default is the bootstrap p-value
 #> 
-#> Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null, Self-Liang mixture)
+#> Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null; asymptotic 1/2 chi2_0 + 1/2 chi2_1 mixture)
 #> 
 #> data: y ~ x
 #> LR = 58.6579  (logLik: fitted family = -745.05, Poisson = -774.38),  p-value = 9.381e-15
 #> alternative hypothesis: underdispersion
+#> note: the p-value is asymptotic; at a boundary null the statistic is skewed toward rejection in finite samples, and the default (B = NULL) calibrates it by parametric bootstrap
 #> estimate: alpha = 0.5256  (Poisson value 1)
 dispersion_test(count_reg(y ~ x, data = d, family = "poisson"),
                 method = "auxiliary", alternative = "under")
@@ -172,6 +177,7 @@ summary(fit_b)
 #> Implied ceiling lambda/(1-alpha): median 10.22   range 2.48 to 37.8 
 #> logLik = -745.05    AIC = 1496.1 
 #> LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15
+#> Note: the p-value is asymptotic, which over-rejects in finite samples at this boundary; dispersion_test() gives the parametric-bootstrap p-value.
 #> (99 bootstrap resamples converged)
 irr(fit_b)             # rate ratios with percentile intervals
 #>         term equation ratio estimate lower upper             method
@@ -244,14 +250,25 @@ fe_fit
 #> 
 #> alpha (shape parameter): 0.4735   median implied bound: 2.25 
 #> Note: alpha is subject to incidental-parameters bias for short panels; see ?cpb_fe.
-dispersion_test(fe_fit)      # against a Poisson with the same unit effects
+dispersion_test(fe_fit, B = 0)   # the statistic against a Poisson with the same unit effects
 #> 
-#> Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null, Self-Liang mixture)
+#> Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null; asymptotic 1/2 chi2_0 + 1/2 chi2_1 mixture)
 #> 
 #> data: y ~ x
-#> LR = 216.3068  (logLik: fitted family = -599.47, Poisson = -707.63),  p-value = < 2.2e-16
+#> LR = 216.3068  (logLik: fitted family = -599.47, Poisson = -707.63),  p-value = NA
 #> alternative hypothesis: underdispersion
+#> note: unit fixed effects bias the dispersion estimate toward underdispersion, so the asymptotic distribution does not apply; B > 0 gives the parametric-bootstrap p-value
 #> estimate: alpha = 0.4735  (Poisson value 1)
+```
+
+With unit fixed effects the asymptotic distribution of that statistic
+does not apply, so its p-value comes from a parametric bootstrap under
+the fitted Poisson. Every replicate refits the model, which makes the
+bootstrap about 199 times as slow as the fit; it is not run here:
+
+``` r
+
+dispersion_test(fe_fit, cores = 2)   # parametric-bootstrap p-value, 199 replicates
 ```
 
 ## Comparing the family
@@ -360,7 +377,7 @@ ud_screen(contributions ~ democracy + lgdppc + lpop + milper + factor(iso3),
 #> 
 #> MARGINAL verdict: OVERDISPERSED 
 #>    Pearson=1.086  prop.slope=0.191 (p=<2e-16)
-#>    NB vs Poisson LR = 18.11 (p= 1e-05 ; sig => overdispersion)
+#>    NB vs Poisson LR = 18.11 (p= 1e-05 asymptotic, conservative at this boundary ; sig => overdispersion)
 #> 
 #> AT-RISK (y>0) verdict:UNDERDISPERSED  [n_pos=2602]
 #>    ZTP-Pearson = 0.841  (underdispersed if < 0.955, the calibrated 5% threshold)
