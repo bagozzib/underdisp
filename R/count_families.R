@@ -165,6 +165,7 @@
     shape_name = "log(nu)", shape_link = log, shape_inv = exp, shape_starts = c(1, 2),
     shape_line = function(theta) sprintf("\nnu (COM-Poisson dispersion; > 1 underdispersed): %.4f\n", theta),
     null_shape = 1,
+    log_mean = function(eta, theta) eta / theta,     # log lambda^(1/nu), the mean scale (see .count_excursion)
     logpmf  = function(y, mu, theta) y * log(mu) - theta * lgamma(y + 1) - .compois_logZ(mu, theta),
     pvec    = function(mu, theta, kmax) .compois_pmf1(mu, theta, kmax),
     p0      = function(mu, theta) exp(-.compois_logZ(mu, theta)),

@@ -17,15 +17,25 @@
 ## exactly as duplicated rows would.
 ## ---------------------------------------------------------------------------
 
+## An optimizer excursion: a fitted mean outside [1e-12, 1e8]. The bound applies on the family's mean
+## scale, which for the rate-parameterized COM-Poisson is lambda^(1/nu), its mean to leading order. On a
+## nearly degenerate series the COM-Poisson likelihood rises along a ridge on which nu grows and lambda,
+## about the mode to the power nu, grows without bound, so a bound on lambda itself would stop the fit
+## short of the maximum.
+.count_excursion <- function(eta, theta, fam) {
+  le <- if (is.null(fam$log_mean)) eta else fam$log_mean(eta, theta)
+  any(!is.finite(le)) || any(le > log(1e8)) || any(le < log(1e-12))
+}
+
 ## per-observation log-likelihood in (beta, shape) for a count family, with
 ## optional zero-truncation. par = c(beta, shape_link(theta)) when the family
 ## has a shape.
 .count_llik_i <- function(par, X, Y, fam, truncated, offset = 0) {
   p <- ncol(X)
   eta <- offset + as.numeric(X %*% par[seq_len(p)])       # offset enters the log-mean, exp(offset + x'b)
-  mu <- exp(eta)
-  if (any(!is.finite(mu)) || any(mu > 1e8) || any(mu < 1e-12)) return(rep(-Inf, length(Y)))   # optimizer excursion
   theta <- if (fam$nshape) fam$shape_inv(par[p + 1L]) else NA_real_
+  if (.count_excursion(eta, theta, fam)) return(rep(-Inf, length(Y)))
+  mu <- exp(eta)
   li <- fam$logpmf(Y, mu, theta)
   if (truncated) li <- li - log1p(-fam$p0(mu, theta))   # condition on Y >= 1
   li
@@ -417,10 +427,11 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
 ## structural-zero probability uses an arbitrary link (logit/probit/cloglog).
 .zi_llik_i <- function(par, Xc, Zz, Y, fam, linkinv = stats::plogis, offset = 0) {
   pc <- ncol(Xc); pz <- ncol(Zz)
-  mu <- exp(offset + as.numeric(Xc %*% par[seq_len(pc)]))
-  if (any(!is.finite(mu)) || any(mu > 1e8) || any(mu < 1e-12)) return(rep(-Inf, length(Y)))
-  pistar <- linkinv(as.numeric(Zz %*% par[pc + seq_len(pz)]))
+  eta <- offset + as.numeric(Xc %*% par[seq_len(pc)])
   theta <- if (fam$nshape) fam$shape_inv(par[pc + pz + 1L]) else NA_real_
+  if (.count_excursion(eta, theta, fam)) return(rep(-Inf, length(Y)))
+  mu <- exp(eta)
+  pistar <- linkinv(as.numeric(Zz %*% par[pc + seq_len(pz)]))
   f0 <- fam$p0(mu, theta)
   ifelse(Y == 0, log(pistar + (1 - pistar) * f0), log1p(-pistar) + fam$logpmf(Y, mu, theta))
 }
