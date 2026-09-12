@@ -32,6 +32,11 @@
   interior, the asymptotic p-value is used unless the first-order bias from the
   null's estimated mean parameters, p / sqrt(2n) standard deviations, pushes a
   5% test's size above 6%. `summary()` of a CPB fit flags its asymptotic p-value.
+* `ud_screen()`: in `ztp_threshold = "bootstrap"` mode the NB-vs-Poisson p-value
+  is a parametric bootstrap under the fitted Poisson (`nb_boot`) when the mean
+  model is within the comparator gates; the fast mode's asymptotic value is
+  labeled conservative. The bootstrap restores the random-number state, so the
+  at-risk threshold and every other result are unchanged.
 * `dispersion_profile()`: the empirical conditional variance-to-mean ratio by
   bins of the fitted mean against the ratio each fitted family implies, with a
   `plot()` method, so the mechanism behind an underdispersed outcome (a hard

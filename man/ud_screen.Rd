@@ -16,7 +16,8 @@ ud_screen(
   ztp_threshold = c("calibrated", "bootstrap"),
   ztp_boot_B = 199L,
   cores = 1L,
-  digits = 3
+  digits = 3,
+  nb_boot = NULL
 )
 }
 \arguments{
@@ -65,11 +66,21 @@ regime.}
 (default 1); see \code{\link[=cpb]{cpb()}}.}
 
 \item{digits}{Printing precision.}
+
+\item{nb_boot}{Whether the NB-vs-Poisson p-value is a parametric bootstrap
+under the fitted Poisson (\code{ztp_boot_B} replicates over \code{cores}), the
+package default at a boundary null (see \code{\link[=dispersion_test]{dispersion_test()}}). \code{NULL}
+(default) bootstraps it when \code{ztp_threshold = "bootstrap"} and the mean
+model is within \code{comp_max_par} and \code{comp_max_n}; otherwise the p-value is
+the asymptotic boundary mixture, which is conservative for this test. The
+bootstrap restores the random-number state, so every other result is the
+same with or without it.}
 }
 \value{
 An object of class \code{"ud_screen"} with \code{verdict_marginal}, \code{verdict_atrisk},
 the conditional and at-risk (ZTP-benchmarked) Pearson statistics, the NB-vs-Poisson
-LR test, a log-likelihood comparison, (when fit) the CPB alpha and
+LR test (\code{p_nb_method} records how its p-value was computed), a log-likelihood
+comparison, (when fit) the CPB alpha and
 ceiling-exceedance share, and the over-conditioning guard state:
 \code{atrisk_skipped} (\code{TRUE} when the mean model nearly saturates the positive
 counts, so the at-risk statistic is not computed and the printout says why),

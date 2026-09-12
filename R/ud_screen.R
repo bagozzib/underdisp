@@ -129,9 +129,18 @@
 #' @param cores Worker processes for the parametric-bootstrap replicates
 #'   (default 1); see [cpb()].
 #' @param digits Printing precision.
+#' @param nb_boot Whether the NB-vs-Poisson p-value is a parametric bootstrap
+#'   under the fitted Poisson (`ztp_boot_B` replicates over `cores`), the
+#'   package default at a boundary null (see [dispersion_test()]). `NULL`
+#'   (default) bootstraps it when `ztp_threshold = "bootstrap"` and the mean
+#'   model is within `comp_max_par` and `comp_max_n`; otherwise the p-value is
+#'   the asymptotic boundary mixture, which is conservative for this test. The
+#'   bootstrap restores the random-number state, so every other result is the
+#'   same with or without it.
 #' @return An object of class `"ud_screen"` with `verdict_marginal`, `verdict_atrisk`,
 #'   the conditional and at-risk (ZTP-benchmarked) Pearson statistics, the NB-vs-Poisson
-#'   LR test, a log-likelihood comparison, (when fit) the CPB alpha and
+#'   LR test (`p_nb_method` records how its p-value was computed), a log-likelihood
+#'   comparison, (when fit) the CPB alpha and
 #'   ceiling-exceedance share, and the over-conditioning guard state:
 #'   `atrisk_skipped` (`TRUE` when the mean model nearly saturates the positive
 #'   counts, so the at-risk statistic is not computed and the printout says why),
@@ -155,7 +164,7 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
                       run_gp = TRUE, run_comp = TRUE, comp_max_par = 30,
                       comp_max_n = 5000,
                       ztp_threshold = c("calibrated", "bootstrap"),
-                      ztp_boot_B = 199L, cores = 1L, digits = 3) {
+                      ztp_boot_B = 199L, cores = 1L, digits = 3, nb_boot = NULL) {
   .ud_no_formula_offset(formula)
   ztp_threshold <- match.arg(ztp_threshold)
   mf <- model.frame(formula, data, na.action = na.omit)
@@ -173,6 +182,37 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
   ## the LR null is the 1/2 chi^2_0 + 1/2 chi^2_1 mixture -- same correction the
   ## alpha-existence test uses (methods.R). Halving keeps the two coherent.
   p_nb  <- if (!is.na(lr_nb)) 0.5 * pchisq(max(lr_nb, 0), df = 1, lower.tail = FALSE) else NA_real_
+  ## In bootstrap mode the NB p-value is a parametric bootstrap under the fitted
+  ## Poisson, the package default at a boundary null (dispersion_test()), when the
+  ## mean model is within the comparator gates; otherwise it is the asymptotic
+  ## mixture above, which is conservative for this test. The bootstrap restores the
+  ## random-number state, so every other result is the same with or without it.
+  p_nb_method <- "asymptotic"; nb_B_ok <- NA_integer_
+  if (is.null(nb_boot)) nb_boot <- identical(ztp_threshold, "bootstrap")
+  if (isTRUE(nb_boot) && is.finite(lr_nb) && k <= comp_max_par && n <= comp_max_n) {
+    had_seed <- exists(".Random.seed", envir = globalenv(), inherits = FALSE)
+    old_seed <- if (had_seed) get(".Random.seed", envir = globalenv()) else NULL
+    mu0 <- fitted(pois)
+    LRb <- tryCatch(unlist(.ud_lapply(seq_len(ztp_boot_B), function(b) {
+      yb <- stats::rpois(length(mu0), mu0)
+      pf <- tryCatch(stats::glm.fit(X, yb, family = stats::poisson()), error = function(e) NULL)
+      nf <- tryCatch(suppressWarnings(MASS::glm.nb(yb ~ 0 + X)), error = function(e) NULL)
+      if (is.null(pf) || is.null(nf)) return(NA_real_)
+      max(2 * (as.numeric(stats::logLik(nf)) - sum(stats::dpois(yb, pf$fitted.values, log = TRUE))), 0)
+    }, cores), use.names = FALSE),
+    finally = {
+      if (had_seed) assign(".Random.seed", old_seed, envir = globalenv())
+      else if (exists(".Random.seed", envir = globalenv(), inherits = FALSE)) rm(".Random.seed", envir = globalenv())
+    })
+    nb_B_ok <- sum(is.finite(LRb))
+    if (nb_B_ok >= 0.8 * ztp_boot_B) {
+      p_nb <- (1 + sum(LRb[is.finite(LRb)] >= lr_nb - 1e-10)) / (1 + nb_B_ok)
+      p_nb_method <- "parametric bootstrap"
+    } else {
+      warning("ud_screen: the NB-vs-Poisson bootstrap failed on ", ztp_boot_B - nb_B_ok, " of ", ztp_boot_B,
+              " replicates; the p-value stays asymptotic.")
+    }
+  }
   verdict_marg <- .ud_verdict_marg(dd, p_nb)
   idx_uncond <- var(yv) / mean(yv); pct_zero <- mean(yv == 0)
 
@@ -311,7 +351,7 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
     idx_uncond = idx_uncond, pct_zero = pct_zero, mean = mean(yv), max = max(yv),
     dd = dd, pearson_ztp = pearson_ztp, ztp_threshold = thr, ztp_threshold_hi = thr_hi,
     ztp_threshold_method = ztp_threshold, ztp_ll = ztp_ll,
-    lr_nb = lr_nb, p_nb = p_nb,
+    lr_nb = lr_nb, p_nb = p_nb, p_nb_method = p_nb_method, nb_boot_B_ok = nb_B_ok,
     overconditioned = overconditioned, sat_ratio = sat_ratio,
     atrisk_skipped = atrisk_skipped,
     ll = c(Poisson = as.numeric(logLik(pois)),
@@ -335,6 +375,8 @@ print.ud_screen <- function(x, ...) {
               format.pval(x$dd$p, digits = 2)))
   if (!is.na(x$p_nb))
     cat("   NB vs Poisson LR =", round(x$lr_nb, 2), "(p=", format.pval(x$p_nb, digits = 2),
+        if (identical(x$p_nb_method, "parametric bootstrap")) "by parametric bootstrap"
+        else "asymptotic, conservative at this boundary",
         "; sig => overdispersion)\n")
   if (isTRUE(x$atrisk_skipped))
     cat(sprintf("\nAT-RISK screen SKIPPED -- over-conditioning: the mean model (nearly)\nsaturates the positive counts (%d parameters vs n_pos = %d); any within-unit\ntightness at this saturation would be manufactured by the specification,\nnot measured.\n",
