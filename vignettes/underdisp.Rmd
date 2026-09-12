@@ -82,13 +82,15 @@ The Poisson is the equidispersed member of every family in the package (`alpha
 on), so `dispersion_test()` tests a fitted model's dispersion parameter against
 its Poisson value by a likelihood-ratio test on the fitted design, with
 fixed effects carried into the null. Where the Poisson value sits on the
-boundary of the parameter space (the CPB, the negative binomial) the test uses
-the Self--Liang mixture and is one-sided; elsewhere the alternative can be
-two-sided or directional. For a plain Poisson fit the Cameron--Trivedi
+boundary of the parameter space (the CPB, the negative binomial) the test is
+one-sided, and its p-value comes by default from a parametric bootstrap under
+the fitted Poisson, because the asymptotic Self--Liang mixture over-rejects in
+finite samples; `B = 0` gives the quick asymptotic value shown here. Elsewhere
+the alternative can be two-sided or directional. For a plain Poisson fit the Cameron--Trivedi
 auxiliary regression is available as `method = "auxiliary"`.
 
 ```{r dtest}
-dispersion_test(fit)
+dispersion_test(fit, B = 0)   # asymptotic value; the default is the bootstrap p-value
 dispersion_test(count_reg(y ~ x, data = d, family = "poisson"),
                 method = "auxiliary", alternative = "under")
 ```

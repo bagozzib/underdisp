@@ -20,16 +20,22 @@ test_that("the LR test equals twice the log-likelihood gap to the Poisson refit"
   expect_output(print(dt), "Likelihood-ratio")
 })
 
-test_that("boundary nulls use the Self-Liang mixture and force the one-sided alternative", {
+test_that("boundary nulls bootstrap by default; B = 0 gives the one-sided Self-Liang mixture", {
   f <- cpb(y ~ x, d_gc, truncated = FALSE, se = "none")
-  dt <- dispersion_test(f)
+  dt <- dispersion_test(f, B = 0)
   expect_true(dt$boundary)
+  expect_false(dt$asymptotic_ok)                       # a boundary null bootstraps by default
   expect_identical(dt$calibration, "asymptotic")
   expect_equal(dt$p.value, 0.5 * pchisq(unname(dt$statistic), 1, lower.tail = FALSE))
-  expect_warning(dispersion_test(f, alternative = "over"), "one-sided")
+  expect_match(paste(dt$note, collapse = " "), "boundary null")
+  expect_warning(dispersion_test(f, alternative = "over", B = 0), "one-sided")
   nb <- count_reg(y ~ x, d_po, family = "negbin")
-  dn <- dispersion_test(nb)
-  expect_true(dn$boundary); expect_match(dn$alternative, "over")
+  dn <- dispersion_test(nb, B = 0)
+  expect_true(dn$boundary); expect_match(dn$alternative, "over"); expect_false(dn$asymptotic_ok)
+  set.seed(7); dnb <- dispersion_test(nb, B = 9)
+  expect_identical(dnb$calibration, "parametric bootstrap")
+  m <- count_reg(y ~ x, d_gc, family = "gammacount")
+  expect_true(dispersion_test(m, B = 0)$asymptotic_ok)  # an interior null keeps the asymptotic distribution
 })
 
 test_that("the calibration rule keeps the asymptotic distribution only for small first-order shifts", {
@@ -123,7 +129,7 @@ test_that("a CPB stopped by the support guard reports the boundary value; a shor
   f <- suppressWarnings(cpb(y ~ x, pd, truncated = FALSE, se = "none", max.support = 40))
   expect_true(f$support_binding)
   expect_lt(f$loglik, f$loglik.null)                    # the guard holds the fit below its Poisson limit
-  dt <- dispersion_test(f)
+  dt <- dispersion_test(f, B = 0)
   expect_equal(unname(dt$statistic), 0)
   expect_equal(dt$p.value, 0.5)
   expect_match(paste(dt$note, collapse = " "), "boundary value 0")

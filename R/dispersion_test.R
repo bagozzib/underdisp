@@ -26,10 +26,14 @@
 ## distribution ignores that the null's mean parameters are estimated: to first
 ## order the signed root moves toward underdispersion by p / sqrt(2 n) standard
 ## deviations for p mean parameters (unit intercepts included) on n observations
-## (the bias Dean and Lawless 1989 remove from the score test). The asymptotic
-## distribution is used when that shift keeps the first-order size of a 5% test
-## at or below 6% and the fit has no unit fixed effects; otherwise the p-value
-## is a parametric bootstrap under the Poisson fitted to the same design. The
+## (the bias Dean and Lawless 1989 remove from the score test). The p-value is a
+## parametric bootstrap under the Poisson fitted to the same design whenever the
+## Poisson value is on the boundary (the one-sided statistic is skewed toward
+## rejection in finite samples: the package's size simulations found the
+## asymptotic CPB test over-rejecting with 60 to 200 observations) or the fit has
+## unit fixed effects; where the Poisson value is interior the asymptotic
+## distribution is used unless that shift pushes a 5% test's first-order size
+## above 6%. The
 ## bootstrap simulates at the Poisson value itself, so it is not the bootstrap
 ## from a boundary estimate that fails.
 ## ---------------------------------------------------------------------------
@@ -73,27 +77,29 @@
 #' boundary value 0. Any other negative statistic means the optimizer fell
 #' short, and no p-value is reported.
 #'
-#' **Calibration.** The asymptotic distribution ignores that the null's mean
-#' parameters are estimated. To first order this moves the signed root toward
+#' **Calibration.** Where the Poisson value is on the boundary of the family's
+#' parameter space (the CPB, the negative binomial), or the fit has unit fixed
+#' effects, the p-value is by default a parametric bootstrap with 199
+#' replicates. The one-sided boundary statistic is skewed toward rejection in
+#' finite samples, and unit intercepts bias the dispersion estimate toward
+#' underdispersion by an amount of order 1/T; in both cases the asymptotic
+#' distribution over-rejects. Where the Poisson value is interior, the
+#' asymptotic distribution is used unless the estimated mean parameters shift
+#' it too far: to first order they move the signed root toward
 #' underdispersion by \eqn{p/\sqrt{2n}} standard deviations for \eqn{p} mean
-#' parameters (unit intercepts included) on \eqn{n} observations (the weight
-#' total), the bias Dean and Lawless (1989) remove from the score test. With
-#' `B = NULL` (the default) the asymptotic distribution is used when that shift
-#' keeps the first-order size of a 5\% test at or below 6\% and the fit has no
-#' unit fixed effects. Otherwise the p-value is a parametric bootstrap with 199
-#' replicates: responses are simulated from the Poisson (zero-truncated
-#' Poisson) fitted to the same design, offset, weights, and unit effects, both
-#' models are refit to each, and the p-value is the share of simulated
-#' statistics at least as extreme as the observed one, counting the observed
-#' one, among the replicates whose two fits both succeeded. Simulating at the
-#' Poisson value itself keeps the bootstrap valid at the boundary. With unit
-#' fixed effects the asymptotic distribution does not apply at any size: the
-#' unit intercepts bias the dispersion estimate toward underdispersion by an
-#' amount of order 1/T, so `B = 0` returns the statistic without a p-value.
-#' Otherwise `B = 0` forces the asymptotic distribution, and a positive `B`
-#' forces the bootstrap with that many replicates. Every replicate refits both
-#' models, so the bootstrap takes about `B` times as long as the original fit;
-#' `cores` spreads the replicates over worker processes.
+#' parameters on \eqn{n} observations (the weight total), the bias Dean and
+#' Lawless (1989) remove from the score test, and the bootstrap takes over when
+#' that shift pushes the first-order size of a 5\% test above 6\%. The bootstrap
+#' simulates responses from the Poisson (zero-truncated Poisson) fitted to the
+#' same design, offset, weights, and unit effects, refits both models to each,
+#' and reports the share of simulated statistics at least as extreme as the
+#' observed one, counting the observed one, among the replicates whose two fits
+#' both succeeded. Simulating at the Poisson value itself keeps the bootstrap
+#' valid at the boundary. `B = 0` requests the asymptotic distribution (with
+#' unit fixed effects it returns the statistic without a p-value), and a
+#' positive `B` sets the number of bootstrap replicates. Every replicate refits
+#' both models, so the bootstrap takes about `B` times as long as the original
+#' fit; `cores` spreads the replicates over worker processes.
 #'
 #' @param object A fitted `cpb`, `cpb_fe`, `gec`, `gec_fe`, or `count_reg`
 #'   model (for `method = "auxiliary"`, a `count_reg` fit with
@@ -337,7 +343,7 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
   } else if (alt_missing) alternative <- "two.sided"
   des <- .disp_design(object)
   size1 <- .disp_first_order_size(des$p, des$n, alternative)
-  asym_ok <- !des$fe && size1 <= .disp_size_tol
+  asym_ok <- !fam$boundary && !des$fe && size1 <= .disp_size_tol
   ll1 <- object$loglik
   null0 <- .disp_null_fit(object); ll0 <- null0$loglik
   neg <- .disp_negative_lr(2 * (ll1 - ll0), fam$boundary && isTRUE(object$support_binding), fam$label)
@@ -375,9 +381,12 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
            under = stats::pnorm(stat, lower.tail = FALSE),
            over  = stats::pnorm(stat))
     if (!asym_ok)
-      note <- c(note, sprintf(paste0("the p-value is asymptotic; with %d mean parameters on %s observations its first-order ",
-                                     "size at the 5%% level is %.3f, and B > 0 calibrates it by parametric bootstrap"),
-                              as.integer(des$p), format(des$n), size1))
+      note <- c(note, if (fam$boundary)
+        paste0("the p-value is asymptotic; at a boundary null the statistic is skewed toward rejection in finite ",
+               "samples, and the default (B = NULL) calibrates it by parametric bootstrap")
+        else sprintf(paste0("the p-value is asymptotic; with %d mean parameters on %s observations its first-order ",
+                            "size at the 5%% level is %.3f, and the default (B = NULL) calibrates it by parametric bootstrap"),
+                     as.integer(des$p), format(des$n), size1))
   }
   structure(list(statistic = c(LR = LR), parameter = c(df = 1), p.value = p, note = note,
                  estimate = stats::setNames(fam$est, fam$par), null.value = stats::setNames(fam$null, fam$par),

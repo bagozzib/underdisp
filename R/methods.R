@@ -66,17 +66,14 @@ summary.cpb <- function(object, ...) {
                 `z value` = z, `Pr(>|z|)` = 2 * pnorm(-abs(z)))
   aci <- .cpb_alpha_profile_ci(object)
   ## the likelihood-ratio statistic against the (zero-truncated) Poisson limit and
-  ## its asymptotic boundary-mixture p-value, by the rule dispersion_test()
-  ## states: a value the support guard pushed below zero is the boundary value 0,
-  ## and the p-value is flagged when the estimated mean parameters push the
-  ## asymptotic test's first-order size past the calibration tolerance
+  ## its asymptotic boundary-mixture p-value: a value the support guard pushed
+  ## below zero is the boundary value 0, and the p-value is flagged as asymptotic
+  ## because dispersion_test() calibrates boundary nulls by parametric bootstrap
   lr  <- .disp_boundary_lr(if (is.na(object$loglik.null)) NA_real_ else -2 * (object$loglik.null - object$loglik),
                            isTRUE(object$support_binding))
-  des <- .disp_design(object); size1 <- .disp_first_order_size(des$p, des$n, "under")
-  if (is.finite(lr$p) && size1 > .disp_size_tol)
-    lr$note <- c(lr$note, sprintf(paste0("the p-value is asymptotic; with %d mean parameters on %s observations its ",
-                                         "first-order size at the 5%% level is %.3f, and dispersion_test() calibrates ",
-                                         "it by parametric bootstrap"), as.integer(des$p), format(des$n), size1))
+  if (is.finite(lr$p))
+    lr$note <- c(lr$note, paste0("the p-value is asymptotic, which over-rejects in finite samples at this boundary; ",
+                                 "dispersion_test() gives the parametric-bootstrap p-value"))
   out <- list(call = object$call, truncated = object$truncated, coefficients = ctab,
               alpha = object$alpha, alpha.ci = aci, ceiling = object$ceiling,
               loglik = object$loglik, aic = -2 * object$loglik + 2 * object$df,

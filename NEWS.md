@@ -26,10 +26,12 @@
   two-sided or directional alternatives by the signed root and the boundary
   mixture where the Poisson value is on the boundary (CPB, negative binomial);
   and the Cameron-Trivedi auxiliary-regression test for a Poisson fit. The
-  asymptotic p-value is used only when the first-order bias from the null's
-  estimated mean parameters, p / sqrt(2n) standard deviations, keeps a 5% test's
-  size at or below 6% and the fit has no unit fixed effects; otherwise the
-  p-value is a parametric bootstrap under the fitted Poisson (`B`, `cores`).
+  p-value is a parametric bootstrap under the fitted Poisson (`B`, `cores`)
+  whenever the Poisson value is on the boundary of the family's parameter space
+  (CPB, negative binomial) or the fit has unit fixed effects; where it is
+  interior, the asymptotic p-value is used unless the first-order bias from the
+  null's estimated mean parameters, p / sqrt(2n) standard deviations, pushes a
+  5% test's size above 6%. `summary()` of a CPB fit flags its asymptotic p-value.
 * `dispersion_profile()`: the empirical conditional variance-to-mean ratio by
   bins of the fitted mean against the ratio each fitted family implies, with a
   `plot()` method, so the mechanism behind an underdispersed outcome (a hard

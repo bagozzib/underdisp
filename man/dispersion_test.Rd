@@ -79,27 +79,29 @@ log-likelihood lands just below the Poisson's, the statistic takes its
 boundary value 0. Any other negative statistic means the optimizer fell
 short, and no p-value is reported.
 
-\strong{Calibration.} The asymptotic distribution ignores that the null's mean
-parameters are estimated. To first order this moves the signed root toward
+\strong{Calibration.} Where the Poisson value is on the boundary of the family's
+parameter space (the CPB, the negative binomial), or the fit has unit fixed
+effects, the p-value is by default a parametric bootstrap with 199
+replicates. The one-sided boundary statistic is skewed toward rejection in
+finite samples, and unit intercepts bias the dispersion estimate toward
+underdispersion by an amount of order 1/T; in both cases the asymptotic
+distribution over-rejects. Where the Poisson value is interior, the
+asymptotic distribution is used unless the estimated mean parameters shift
+it too far: to first order they move the signed root toward
 underdispersion by \eqn{p/\sqrt{2n}} standard deviations for \eqn{p} mean
-parameters (unit intercepts included) on \eqn{n} observations (the weight
-total), the bias Dean and Lawless (1989) remove from the score test. With
-\code{B = NULL} (the default) the asymptotic distribution is used when that shift
-keeps the first-order size of a 5\\% test at or below 6\\% and the fit has no
-unit fixed effects. Otherwise the p-value is a parametric bootstrap with 199
-replicates: responses are simulated from the Poisson (zero-truncated
-Poisson) fitted to the same design, offset, weights, and unit effects, both
-models are refit to each, and the p-value is the share of simulated
-statistics at least as extreme as the observed one, counting the observed
-one, among the replicates whose two fits both succeeded. Simulating at the
-Poisson value itself keeps the bootstrap valid at the boundary. With unit
-fixed effects the asymptotic distribution does not apply at any size: the
-unit intercepts bias the dispersion estimate toward underdispersion by an
-amount of order 1/T, so \code{B = 0} returns the statistic without a p-value.
-Otherwise \code{B = 0} forces the asymptotic distribution, and a positive \code{B}
-forces the bootstrap with that many replicates. Every replicate refits both
-models, so the bootstrap takes about \code{B} times as long as the original fit;
-\code{cores} spreads the replicates over worker processes.
+parameters on \eqn{n} observations (the weight total), the bias Dean and
+Lawless (1989) remove from the score test, and the bootstrap takes over when
+that shift pushes the first-order size of a 5\\% test above 6\\%. The bootstrap
+simulates responses from the Poisson (zero-truncated Poisson) fitted to the
+same design, offset, weights, and unit effects, refits both models to each,
+and reports the share of simulated statistics at least as extreme as the
+observed one, counting the observed one, among the replicates whose two fits
+both succeeded. Simulating at the Poisson value itself keeps the bootstrap
+valid at the boundary. \code{B = 0} requests the asymptotic distribution (with
+unit fixed effects it returns the statistic without a p-value), and a
+positive \code{B} sets the number of bootstrap replicates. Every replicate refits
+both models, so the bootstrap takes about \code{B} times as long as the original
+fit; \code{cores} spreads the replicates over worker processes.
 }
 \examples{
 set.seed(2); n <- 400; x <- rnorm(n)
