@@ -72,7 +72,9 @@ test_that("rank deficiency and within-unit constancy are refused with the column
   expect_error(gec(y ~ x + I(2 * x), d0, se = "none"), "rank deficient")
   expect_error(count_reg(y ~ x + I(2 * x), d0), "rank deficient")
   g <- factor(sample(c("a", "b", "z"), n, TRUE, prob = c(.5, .5, 0)), levels = c("a", "b", "z"))
-  expect_error(cpb(y ~ g, transform(d0, g = g), truncated = FALSE, se = "none"), "gz")
+  ## an unused level is not a rank deficiency: it is dropped from the model frame, as lm() and glm() drop it
+  expect_equal(suppressWarnings(cpb(y ~ g, transform(d0, g = g), truncated = FALSE, se = "none"))$loglik,
+               suppressWarnings(cpb(y ~ g, transform(d0, g = droplevels(g)), truncated = FALSE, se = "none"))$loglik)
   dd <- d0; dd$zc <- as.numeric(dd$u)                       # constant within units
   expect_error(cpb_fe(y ~ x + zc, dd, fe = "u"), "do not vary within units")
   expect_error(gec_fe(y ~ x + zc, dd, fe = "u"), "do not vary within units")
