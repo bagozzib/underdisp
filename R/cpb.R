@@ -192,7 +192,7 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
   .ud_no_formula_offset(formula)
   se <- match.arg(se)
   cl <- match.call()
-  mf <- model.frame(formula, data, na.action = na.omit)
+  mf <- model.frame(formula, data, na.action = na.omit, drop.unused.levels = TRUE)
   Y  <- model.response(mf); X <- model.matrix(formula, mf)
   n  <- length(Y); p <- ncol(X); rows <- .ud_kept_rows(mf, data)
   if (!is.numeric(Y)) stop("Response must be a numeric count; got ", class(Y)[1L], ".")
@@ -224,6 +224,7 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
     stop("Response must be non-negative integer counts.")
   if (truncated && any(Y < 1))
     stop("truncated = TRUE requires all Y >= 1; use truncated = FALSE for zero-inclusive data.")
+  .ud_warn_all_zero(Y)
   .ud_rank_check(X)
   if (is.null(max.support)) max.support <- max(500L, 10L * max(Y))
 

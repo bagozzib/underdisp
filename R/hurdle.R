@@ -125,6 +125,7 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
   y <- stats::model.response(stats::model.frame(formula, data))
   if (!is.numeric(y)) stop("Response must be a numeric count; got ", class(y)[1L], ".")
   if (any(y < 0) || any(y != floor(y))) stop("The response must be nonnegative integer counts.")
+  .ud_warn_all_zero(y)
   d <- as.integer(y > 0)
   int_offset <- if (is.null(offset)) NULL                       # offset applies to the intensity
                 else if (is.character(offset) && length(offset) == 1L) offset else offset[y > 0]

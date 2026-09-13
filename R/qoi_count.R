@@ -29,8 +29,9 @@ predict.hurdle_count <- function(object, newdata = NULL,
     p  <- .ud_glm_predict(object$participation, newdata)
     mu <- exp(predict(object$intensity, newdata = newdata, type = "link", offset = offset))   # natural parameter
   }
-  if (type == "participation") return(as.numeric(p))
-  ztmean <- fam$meanfun(mu, object$theta) / (1 - fam$p0(mu, object$theta))   # E(Y | Y > 0)
+  bad <- is.na(mu) | is.na(p); mu[bad] <- 1                    # a missing covariate predicts NA
+  if (type == "participation") return(.ud_mask(as.numeric(p), bad))
+  ztmean <- .ud_mask(fam$meanfun(mu, object$theta) / (1 - fam$p0(mu, object$theta)), bad)   # E(Y | Y > 0)
   if (type == "intensity") return(ztmean)
   as.numeric(p) * ztmean                                 # marginal E(Y)
 }
@@ -67,8 +68,10 @@ predict.zi_count <- function(object, newdata = NULL, type = c("response", "count
     lam    <- exp(eta)
     pistar <- as.numeric(linkinv(Zz[, names(object$zero.coefficients), drop = FALSE] %*% object$zero.coefficients))
   }
-  if (type == "zero") return(pistar)
+  bad <- is.na(lam) | is.na(pistar); lam[bad] <- 1             # a missing covariate or offset predicts NA
+  if (type == "zero") return(.ud_mask(pistar, bad))
   cmean <- fam$meanfun(lam, object$theta)                # E(Y) of the count component
+  cmean <- .ud_mask(cmean, bad)
   if (type == "count") return(cmean)
   (1 - pistar) * cmean
 }

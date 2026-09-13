@@ -63,8 +63,10 @@ predict.cpb <- function(object, newdata = NULL,
     off <- if (is.null(offset)) rep_len(0, nrow(X))
            else as.numeric(if (is.character(offset) && length(offset) == 1L) newdata[[offset]] else offset)
   }
+  bad <- if (is.null(newdata)) FALSE else .ud_na_rows(X, off)     # a missing covariate or offset predicts NA
+  if (any(bad)) { X[bad, ] <- 0; off[bad] <- 0 }
   eta <- as.numeric(off + X %*% object$coefficients); lam <- exp(eta)
-  switch(type,
+  out <- switch(type,
     link     = eta,
     rate     = lam,
     response = .cpb_mean(lam, object$alpha, isTRUE(object$truncated)),
@@ -75,6 +77,7 @@ predict.cpb <- function(object, newdata = NULL,
       if (length(yv) != length(lam)) stop("'at' must be length 1 or nrow(newdata).")
       .cpb_prob_at(lam, object$alpha, yv, object$truncated, object$max.support)
     })
+  .ud_mask(out, bad)
 }
 
 #' Implied ceiling with a profile-likelihood interval

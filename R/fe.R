@@ -137,11 +137,12 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
     data[[".cpb_w"]] <- as.numeric(weights); weights <- ".cpb_w"
   }
   data <- data[order(data[[fe]]), , drop = FALSE]
-  mf <- model.frame(formula, data, na.action = na.omit)
+  mf <- model.frame(formula, data, na.action = na.omit, drop.unused.levels = TRUE)
   rows <- .ud_kept_rows(mf, data)
   Y  <- model.response(mf)
   if (!is.numeric(Y)) stop("Response must be a numeric count; got ", class(Y)[1L], ".")
   if (any(Y < 0) || any(Y != floor(Y))) stop("Response must be non-negative integer counts.")
+  .ud_warn_all_zero(Y)
   if (truncated && any(Y < 1)) stop("truncated = TRUE requires all Y >= 1.")
   Y <- as.integer(Y)
   off <- if (is.null(offset)) rep_len(0, length(Y)) else as.numeric(data[[offset]][rows])
@@ -309,9 +310,11 @@ predict.cpb_fe <- function(object, newdata = NULL, type = c("response", "rate", 
     if (length(miss))
       stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
     X  <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
+    bad <- .ud_na_rows(X); if (any(bad)) X[bad, ] <- 0         # a missing covariate predicts NA
     lam <- as.numeric(exp(mean(object$fe) + X %*% object$coefficients))
   }
-  switch(type, link = log(lam), rate = lam,
+  if (is.null(newdata)) bad <- FALSE
+  .ud_mask(switch(type, link = log(lam), rate = lam,
          response = .cpb_mean(lam, object$alpha, isTRUE(object$truncated)),
-         ceiling = lam / (1 - object$alpha))
+         ceiling = lam / (1 - object$alpha)), bad)
 }

@@ -262,15 +262,39 @@
   if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".", call. = FALSE)
   for (nm in intersect(names(contrasts), names(newdata)))
     if (is.factor(newdata[[nm]]) && !is.null(attr(newdata[[nm]], "contrasts"))) attr(newdata[[nm]], "contrasts") <- NULL
+  ## a column holding only missing values reads as logical (data.frame(x = NA)); it is a missing value of
+  ## the fitted variable's own type, so its rows predict NA like any other missing covariate
+  for (nm in intersect(all.vars(terms_obj), names(newdata)))
+    if (is.logical(newdata[[nm]]) && all(is.na(newdata[[nm]])))
+      newdata[[nm]] <- if (nm %in% names(xlev)) factor(newdata[[nm]], levels = xlev[[nm]]) else as.numeric(newdata[[nm]])
   mf <- stats::model.frame(terms_obj, newdata, xlev = xlev, na.action = stats::na.pass)
   X <- stats::model.matrix(terms_obj, mf, contrasts.arg = contrasts)
   if (!is.null(coefnames)) {
     lack <- setdiff(coefnames, colnames(X))
     if (length(lack)) stop("'newdata' does not reproduce the fit's design columns (", paste(lack, collapse = ", "),
-                           "): its factors must carry the levels and coding of the fitting data.", call. = FALSE)
+                           "): each variable must have the type it had in the fitting data, and factors must ",
+                           "carry its levels and coding.", call. = FALSE)
     X <- X[, coefnames, drop = FALSE]
   }
   X
+}
+
+## Rows of newdata with a missing covariate or offset predict NA, as in predict.glm(). The distribution
+## routines take no missing rates, so those rows are evaluated at a placeholder and masked afterwards.
+.ud_na_rows <- function(X, off = NULL) {
+  bad <- !stats::complete.cases(X)
+  if (!is.null(off)) bad <- bad | is.na(rep_len(off, nrow(X)))
+  bad
+}
+.ud_mask <- function(x, bad) { if (any(bad)) x[bad] <- NA; x }
+
+## A response without a single positive count leaves the rate at its lower bound and the dispersion
+## parameter without information; the fit still returns, so it says so.
+.ud_warn_all_zero <- function(y) {
+  if (length(y) && all(y == 0))
+    warning("every count is zero: the rate runs to its lower bound, so the coefficients diverge and the ",
+            "dispersion parameter is not identified by these data.", call. = FALSE)
+  invisible(NULL)
 }
 
 ## Predicted probabilities of a participation/inflation glm on `newdata`, in the

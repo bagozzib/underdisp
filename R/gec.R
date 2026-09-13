@@ -69,12 +69,13 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
                 offset = NULL, weights = NULL, cores = 1L, max.support = 500, maxit = 20000, reltol = 1e-8) {
   .ud_no_formula_offset(formula)
   se <- match.arg(se); cl <- match.call()
-  mf <- stats::model.frame(formula, data, na.action = stats::na.omit)
+  mf <- stats::model.frame(formula, data, na.action = stats::na.omit, drop.unused.levels = TRUE)
   Y  <- stats::model.response(mf); X <- stats::model.matrix(formula, mf)
   n  <- length(Y); p <- ncol(X); rows <- .ud_kept_rows(mf, data)
   if (!is.numeric(Y)) stop("Response must be a numeric count; got ", class(Y)[1L], ".")
   if (n == 0L) stop("No complete cases on the model variables.")
   if (any(Y < 0) || any(Y != floor(Y))) stop("Response must be non-negative integer counts.")
+  .ud_warn_all_zero(Y)
   if (truncated && any(Y < 1)) stop("truncated = TRUE requires all Y >= 1.")
   Y <- as.integer(Y)
   .ud_rank_check(X)
@@ -256,8 +257,10 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
     off <- if (is.null(offset)) rep_len(0, nrow(X))
            else as.numeric(if (is.character(offset) && length(offset) == 1L) newdata[[offset]] else offset)
   }
+  bad <- if (is.null(newdata)) FALSE else .ud_na_rows(X, off)     # a missing covariate or offset predicts NA
+  if (any(bad)) { X[bad, ] <- 0; off[bad] <- 0 }
   mu <- as.numeric(exp(off + X %*% object$coefficients))
-  switch(type,
+  out <- switch(type,
     link = log(mu),
     response = .gec_mean_guarded(mu, object$delta, object$max.support, isTRUE(object$truncated),
                                  function() gec_lp0_cpp(c(object$coefficients, log(object$delta)), X, rep(0L, length(mu)), off, object$max.support)[, 2]),
@@ -270,6 +273,7 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
       if (isTRUE(object$truncated)) pk <- ifelse(yv == 0L, 0, pk / (1 - m[, 2]))  # condition on Y > 0
       pk
     })
+  .ud_mask(out, bad)
 }
 
 ## ---------------------------------------------------------------------------
@@ -362,11 +366,12 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
     data[[".gec_w"]] <- as.numeric(weights); weights <- ".gec_w"
   }
   data <- data[order(data[[fe]]), , drop = FALSE]
-  mf <- stats::model.frame(formula, data, na.action = stats::na.omit)
+  mf <- stats::model.frame(formula, data, na.action = stats::na.omit, drop.unused.levels = TRUE)
   rows <- .ud_kept_rows(mf, data)
   Y  <- stats::model.response(mf)
   if (!is.numeric(Y)) stop("Response must be a numeric count; got ", class(Y)[1L], ".")
   if (any(Y < 0) || any(Y != floor(Y))) stop("Response must be non-negative integer counts.")
+  .ud_warn_all_zero(Y)
   Y <- as.integer(Y)
   off <- if (is.null(offset)) rep_len(0, length(Y)) else as.numeric(data[[offset]][rows])
   if (anyNA(off)) stop("'offset' has missing values on the estimation rows.")
@@ -504,7 +509,9 @@ predict.gec_fe <- function(object, newdata = NULL, type = c("response", "link"),
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
     X <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
+    bad <- .ud_na_rows(X); if (any(bad)) X[bad, ] <- 0         # a missing covariate predicts NA
     rate <- as.numeric(exp(mean(object$fe) + X %*% object$coefficients))
   }
-  switch(type, link = log(rate), response = .gec_mean_guarded(rate, object$delta, object$max.support, FALSE))
+  if (is.null(newdata)) bad <- FALSE
+  .ud_mask(switch(type, link = log(rate), response = .gec_mean_guarded(rate, object$delta, object$max.support, FALSE)), bad)
 }

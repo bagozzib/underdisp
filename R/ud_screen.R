@@ -8,7 +8,7 @@
 ## and step-halved on the log-likelihood, this converges where VGAM's IRLS can
 ## stop internally on dummy-heavy designs; a converged fit is the same MLE.
 .ztp_fisher <- function(formula, data_pos, maxit = 200L) {
-  mf <- tryCatch(stats::model.frame(formula, data_pos), error = function(e) NULL)
+  mf <- tryCatch(stats::model.frame(formula, data_pos, drop.unused.levels = TRUE), error = function(e) NULL)
   if (is.null(mf)) return(NULL)
   X <- stats::model.matrix(attr(mf, "terms"), mf)
   y <- as.numeric(stats::model.response(mf))
@@ -167,7 +167,7 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
                       ztp_boot_B = 199L, cores = 1L, digits = 3, nb_boot = NULL) {
   .ud_no_formula_offset(formula)
   ztp_threshold <- match.arg(ztp_threshold)
-  mf <- model.frame(formula, data, na.action = na.omit)
+  mf <- model.frame(formula, data, na.action = na.omit, drop.unused.levels = TRUE)
   y  <- model.response(mf)
   if (any(y < 0) || any(y != floor(y)))
     stop("Response must be a non-negative integer count.")
@@ -289,7 +289,7 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
         ## Parametric bootstrap of the ZTP null at the fitted rates: the exact
         ## finite-sample null of THIS design, so the cutoff carries the
         ## fixed-effects estimation drift that the calibrated rule does not.
-        mfz <- stats::model.frame(formula, data_pos)
+        mfz <- stats::model.frame(formula, data_pos, drop.unused.levels = TRUE)
         Xz  <- stats::model.matrix(attr(mfz, "terms"), mfz)
         p0  <- exp(-lam)
         Tb <- unlist(.ud_lapply(seq_len(ztp_boot_B), function(b) {

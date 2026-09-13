@@ -171,10 +171,11 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
 
 .zi_cpb_fit <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, max.support = 500, maxit = 200,
                         tol = 1e-6, method = "ml", offset = NULL, weights = NULL) {
-  mf <- stats::model.frame(formula, data)
+  mf <- stats::model.frame(formula, data, drop.unused.levels = TRUE)
   y  <- stats::model.response(mf)
   if (!is.numeric(y)) stop("Response must be a numeric count; got ", class(y)[1L], ".")
   if (any(y < 0) || any(y != floor(y))) stop("The response must be nonnegative integer counts.")
+  .ud_warn_all_zero(y)
   y  <- as.integer(y)
   X  <- stats::model.matrix(formula, data); .ud_rank_check(X, "count design")
   w  <- .ud_w1(.ud_weights(weights, data, seq_len(nrow(data))), nrow(X))
@@ -185,7 +186,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   Z  <- stats::model.matrix(Zt, data); .ud_rank_check(Z, "zero design")
   int_terms0 <- stats::delete.response(stats::terms(formula))            # stored factor levels so
   int_xlev  <- stats::.getXlevels(int_terms0, mf)                        # predict(newdata=) does not
-  zero_xlev <- stats::.getXlevels(Zt, stats::model.frame(Zt, data))      # drop levels absent from newdata
+  zero_xlev <- stats::.getXlevels(Zt, stats::model.frame(Zt, data, drop.unused.levels = TRUE))      # drop levels absent from newdata
   int_contrasts <- attr(X, "contrasts"); zero_contrasts <- attr(Z, "contrasts")   # the fit's factor coding
   n  <- length(y); kmax <- max(y); is0 <- y == 0
 

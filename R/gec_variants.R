@@ -63,6 +63,7 @@ hurdle_gec <- function(formula, data, participation = NULL, part_fe = NULL,
   y <- stats::model.response(stats::model.frame(formula, data))
   if (!is.numeric(y)) stop("Response must be a numeric count; got ", class(y)[1L], ".")
   if (any(y < 0) || any(y != floor(y))) stop("The response must be nonnegative integer counts.")
+  .ud_warn_all_zero(y)
   d <- as.integer(y > 0)
   int_offset <- if (is.null(offset)) NULL
                 else if (is.character(offset) && length(offset) == 1L) offset else offset[y > 0]
@@ -139,9 +140,10 @@ predict.hurdle_gec <- function(object, newdata = NULL,
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
     lam <- as.numeric(exp(.ud_newdata_matrix(Terms, newdata, object$intensity$levels, object$intensity$contrasts, names(object$int_beta)) %*% object$int_beta))
   }
+  bad <- is.na(lam) | is.na(p); lam[bad] <- 1                 # a missing covariate predicts NA
   p0    <- gec_pmf_cpp(lam, object$delta, 0L, object$max.support)[, 1]
   tmean <- gec_mean_cpp(lam, object$delta, object$max.support) / pmax(1 - p0, 1e-8)   # exact E(Y | Y > 0)
-  as.numeric(switch(type, participation = p, intensity = tmean, response = p * tmean))
+  .ud_mask(as.numeric(switch(type, participation = p, intensity = tmean, response = p * tmean)), bad)
 }
 
 #' @method logLik hurdle_gec
@@ -216,10 +218,11 @@ zi_gec <- function(formula, data, zero = NULL, zero_fe = NULL, se = c("none", "b
   if (!is.null(cluster) && !(is.character(cluster) && length(cluster) == 1L)) cluster <- cl_vals
   data <- data[keep, , drop = FALSE]
   fitfun <- function(dat) {
-    mf <- stats::model.frame(formula, dat)
+    mf <- stats::model.frame(formula, dat, drop.unused.levels = TRUE)
     y  <- stats::model.response(mf)
     if (!is.numeric(y)) stop("Response must be a numeric count; got ", class(y)[1L], ".")
     if (any(y < 0) || any(y != floor(y))) stop("The response must be nonnegative integer counts.")
+    .ud_warn_all_zero(y)
     y  <- as.integer(y)
     X  <- stats::model.matrix(formula, dat); .ud_rank_check(X, "count design")
     off <- if (is.null(offset)) rep(0, nrow(X)) else as.numeric(dat[[offset]])
@@ -293,8 +296,8 @@ zi_gec <- function(formula, data, zero = NULL, zero_fe = NULL, se = c("none", "b
                  weights = if (is.null(weights)) NULL else r$w,
                  nobs_weighted = if (is.null(weights)) r$n else sum(r$w), converged = r$converged,
                  int_terms = Ti0, zero_terms = r$Zt,
-                 int_xlev = stats::.getXlevels(Ti0, stats::model.frame(Ti0, data)),
-                 zero_xlev = stats::.getXlevels(r$Zt, stats::model.frame(r$Zt, data)),
+                 int_xlev = stats::.getXlevels(Ti0, stats::model.frame(Ti0, data, drop.unused.levels = TRUE)),
+                 zero_xlev = stats::.getXlevels(r$Zt, stats::model.frame(r$Zt, data, drop.unused.levels = TRUE)),
                  int_contrasts = attr(stats::model.matrix(Ti0, data), "contrasts"),
                  zero_contrasts = attr(stats::model.matrix(r$Zt, data), "contrasts"),
                  max.support = as.integer(max.support), formula = formula, zero_formula = zero,
@@ -336,8 +339,9 @@ predict.zi_gec <- function(object, newdata = NULL, type = c("response", "zero", 
     lam <- as.numeric(exp(.ud_newdata_matrix(Ti, newdata, object$int_xlev, object$int_contrasts, names(object$coefficients)) %*% object$coefficients))
     pit <- as.numeric(stats::plogis(.ud_newdata_matrix(Tz, newdata, object$zero_xlev, object$zero_contrasts, names(object$zero_coef)) %*% object$zero_coef))
   }
+  bad <- is.na(lam) | is.na(pit); lam[bad] <- 1               # a missing covariate predicts NA
   cmean <- gec_mean_cpp(lam, object$delta, object$max.support)
-  switch(type, zero = pit, intensity = cmean, response = (1 - pit) * cmean)
+  .ud_mask(switch(type, zero = pit, intensity = cmean, response = (1 - pit) * cmean), bad)
 }
 
 #' @method logLik zi_gec

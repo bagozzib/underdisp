@@ -259,11 +259,12 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
     formula <- stats::reformulate(c(labels(stats::terms(formula)), paste0("factor(", fe, ")")),  # fe may name >1 column (two-way FE)
                                   response = all.vars(formula)[1L])
   }
-  mf <- stats::model.frame(formula, data, na.action = stats::na.omit)
+  mf <- stats::model.frame(formula, data, na.action = stats::na.omit, drop.unused.levels = TRUE)
   Y <- stats::model.response(mf); X <- stats::model.matrix(formula, mf)
   n <- length(Y); p <- ncol(X); rows <- .ud_kept_rows(mf, data)
   if (!is.numeric(Y)) stop("Response must be a numeric count; got ", class(Y)[1L], ".")
   if (any(Y < 0) || any(Y != floor(Y))) stop("Response must be non-negative integer counts.")
+  .ud_warn_all_zero(Y)
   if (truncated && any(Y < 1)) stop("truncated = TRUE requires all Y >= 1.")
   .ud_rank_check(X)
   off <- 0                                                   # log-scale exposure offset
@@ -489,11 +490,12 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
     zrhs <- stats::reformulate(c(labels(stats::terms(zrhs)), paste0("factor(", zero_fe, ")")))
   allform <- stats::reformulate(unique(c(labels(stats::terms(cform)), labels(stats::terms(zrhs)))),
                                 response = all.vars(formula)[1L])
-  mf <- stats::model.frame(allform, data, na.action = stats::na.omit)
+  mf <- stats::model.frame(allform, data, na.action = stats::na.omit, drop.unused.levels = TRUE)
   Y <- stats::model.response(mf); Xc <- stats::model.matrix(cform, mf); Zz <- stats::model.matrix(zrhs, mf)
   n <- length(Y); pc <- ncol(Xc); pz <- ncol(Zz); rows <- .ud_kept_rows(mf, data)
   if (!is.numeric(Y)) stop("Response must be a numeric count; got ", class(Y)[1L], ".")
   if (any(Y < 0) || any(Y != floor(Y))) stop("Response must be non-negative integer counts.")
+  .ud_warn_all_zero(Y)
   .ud_rank_check(Xc, "count design"); .ud_rank_check(Zz, "inflation design")
   if (!is.null(cluster) && se != "cluster")
     warning("'cluster' is ignored unless se = \"cluster\".")
@@ -640,20 +642,22 @@ predict.count_reg <- function(object, newdata = NULL, type = c("response", "link
       eta <- eta + as.numeric(ov)
     }
   }
+  bad <- if (is.null(newdata)) FALSE else is.na(eta)          # a missing covariate or offset predicts NA
+  if (any(bad)) eta[bad] <- 0
   mu <- exp(eta)
-  if (type == "link") return(eta)
+  if (type == "link") return(.ud_mask(eta, bad))
   if (type == "prob") {
     if (is.null(at)) stop("type = \"prob\" needs 'at' (a non-negative integer count).")
-    return(vapply(mu, function(m) {
+    return(.ud_mask(vapply(mu, function(m) {
       pk <- fam$pvec(m, object$theta, at)[at + 1L]           # P(Y = at)
       if (isTRUE(object$truncated))                          # condition on Y > 0: P(Y=at)/(1-P(0))
         pk <- if (at == 0L) 0 else pk / (1 - fam$p0(m, object$theta))
       pk
-    }, numeric(1)))
+    }, numeric(1)), bad))
   }
   m <- fam$meanfun(mu, object$theta)
   if (isTRUE(object$truncated)) m <- m / pmax(1 - fam$p0(mu, object$theta), 1e-12)   # E(Y | Y > 0)
-  m
+  .ud_mask(m, bad)
 }
 #' @method summary count_reg
 #' @export
