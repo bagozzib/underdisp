@@ -219,6 +219,14 @@
   are differenced at an absolute step of 1e-3 in the scaled
   parameterization (numDeriv’s default relative step left the family’s
   support at large fitted means and returned `NA` standard errors).
+- [`predict()`](https://rdrr.io/r/stats/predict.html) with `newdata`
+  returns `NA` for a row whose covariate or offset is missing, as
+  [`predict.glm()`](https://rdrr.io/r/stats/predict.glm.html) does,
+  instead of failing inside the distribution routines. A column holding
+  only missing values (which R reads as logical) is treated as a missing
+  value of the fitted variable’s type, and a variable supplied with a
+  different type than in the fitting data is refused with a message that
+  says so.
 
 ### Estimation and numerics
 
@@ -350,6 +358,14 @@
   `gec_fe` uses the stored factor levels; the exported d/p/q/r functions
   return `numeric(0)` for zero-length input and refuse a vector
   dispersion parameter.
+- Every estimator drops unused factor levels from its model frame, as
+  [`lm()`](https://rdrr.io/r/stats/lm.html) and
+  [`glm()`](https://rdrr.io/r/stats/glm.html) do, so data subset from a
+  larger set no longer trip the rank-deficiency refusal on an empty
+  level.
+- A response whose counts are all zero still fits, with a warning that
+  the rate runs to its lower bound and the dispersion parameter is not
+  identified.
 
 ### Package
 
