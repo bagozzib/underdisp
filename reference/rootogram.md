@@ -3,7 +3,9 @@
 Draws a Tukey hanging rootogram: bars for the observed frequencies hang
 from the curve of expected frequencies, both on the square-root scale.
 Bars that hang below the zero line mark counts the model under-predicts;
-bars that stop short mark counts it over-predicts.
+bars that stop short mark counts it over-predicts. A fit with frequency
+weights counts each row as many times as its weight in both the observed
+and the expected frequencies.
 
 ## Usage
 
@@ -22,7 +24,9 @@ rootogram(
 
 - fit:
 
-  A `"cpb"` or `"hurdle_cpb"` object.
+  A fitted `underdisp` count model (any class
+  [`score()`](https://bagozzib.github.io/underdisp/reference/score.md)
+  takes).
 
 - kmax:
 

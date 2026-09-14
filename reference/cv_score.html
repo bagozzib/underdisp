@@ -68,7 +68,15 @@ test.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">cv_score</span><span class="op">(</span><span class="va">fitfun</span>, <span class="va">data</span>, k <span class="op">=</span> <span class="fl">5</span>, kmax <span class="op">=</span> <span class="cn">NULL</span>, folds <span class="op">=</span> <span class="cn">NULL</span>, cores <span class="op">=</span> <span class="fl">1L</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">cv_score</span><span class="op">(</span></span>
+<span>  <span class="va">fitfun</span>,</span>
+<span>  <span class="va">data</span>,</span>
+<span>  k <span class="op">=</span> <span class="fl">5</span>,</span>
+<span>  kmax <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  folds <span class="op">=</span> <span class="cn">NULL</span>,</span>
+<span>  cores <span class="op">=</span> <span class="fl">1L</span>,</span>
+<span>  weights <span class="op">=</span> <span class="cn">NULL</span></span>
+<span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -102,6 +110,14 @@ folds are drawn at random.</p></dd>
 
 <dt id="arg-cores">cores<a class="anchor" aria-label="anchor" href="#arg-cores"></a></dt>
 <dd><p>Worker processes for the fold refits (default 1); see <code><a href="cpb.html">cpb()</a></code>.</p></dd>
+
+
+<dt id="arg-weights">weights<a class="anchor" aria-label="anchor" href="#arg-weights"></a></dt>
+<dd><p>Optional frequency weights for the held-out scores: a column
+name of <code>data</code> or a numeric vector with one value per row. The mean scores
+are then weighted means, so a row of weight w counts as w held-out
+observations (the folds assign whole rows). The fold fits see the weights
+only through <code>fitfun</code>, so pass them there as well.</p></dd>
 
 </dl></div>
     <div class="section level2">

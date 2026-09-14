@@ -169,6 +169,30 @@
   [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) on a
   `hurdle_gec` is the exact conditional mean that
   [`predict()`](https://rdrr.io/r/stats/predict.html) returns.
+- [`cv_score()`](https://bagozzib.github.io/underdisp/reference/cv_score.md),
+  [`rootogram()`](https://bagozzib.github.io/underdisp/reference/rootogram.md),
+  [`pit_hist()`](https://bagozzib.github.io/underdisp/reference/pit_hist.md),
+  and
+  [`dispersion_profile()`](https://bagozzib.github.io/underdisp/reference/dispersion_profile.md)
+  apply frequency weights as
+  [`score()`](https://bagozzib.github.io/underdisp/reference/score.md)
+  does, so a row of weight w counts as w copies of itself: the
+  rootogram’s observed and expected frequencies, the PIT histogram, the
+  dispersion profile’s bins (equal weight, rows kept whole) and bin
+  means, and, through a new `weights` argument, the mean held-out scores
+  of
+  [`cv_score()`](https://bagozzib.github.io/underdisp/reference/cv_score.md)
+  and `score(newdata =)`.
+  [`rootogram()`](https://bagozzib.github.io/underdisp/reference/rootogram.md)
+  no longer fails when `kmax` exceeds the largest count.
+- [`pit_hist()`](https://bagozzib.github.io/underdisp/reference/pit_hist.md)
+  read the lower bound F(y - 1) out of row order wherever a zero count
+  preceded a positive one, so its histogram was wrong for data with
+  zeros; the bound is now looked up row by row.
+- [`ud_screen()`](https://bagozzib.github.io/underdisp/reference/ud_screen.md)
+  reports the NB-vs-Poisson likelihood ratio at its boundary value 0
+  when `glm.nb()` stops short of the Poisson limit, and prints “at the
+  Poisson boundary” there rather than an overdispersion reading.
 - The zero-truncated CPB at an implied ceiling below 1 is the point mass
   at 1 in the pmf, the moments, the first differences, and the simulator
   alike (the zero-truncated distribution for every ceiling in \[1, 2)),
@@ -366,6 +390,22 @@
 - A response whose counts are all zero still fits, with a warning that
   the rate runs to its lower bound and the dispersion parameter is not
   identified.
+- `max.support`, `inner_it`, `alpha.start`, and `B` (with
+  `se = "bootstrap"`) are checked on entry and refused by name before
+  any fitting: a support below 1 or beyond the integer range, a
+  fractional or negative count, fewer than two bootstrap replicates, a
+  start outside (0, 1).
+- The support guard’s warning comes once, from the fit the user asked
+  for: the refits of a bootstrap, a bootstrap first difference, or the
+  split-panel jackknife, the start values of the zero-inflated fits, the
+  nest that
+  [`zi_test()`](https://bagozzib.github.io/underdisp/reference/zi_test.md)
+  fits from a formula, and the hurdle arm of
+  [`compare_dispersion()`](https://bagozzib.github.io/underdisp/reference/compare_dispersion.md)
+  no longer repeat it, and a
+  [`gec()`](https://bagozzib.github.io/underdisp/reference/gec.md) or
+  [`gec_fe()`](https://bagozzib.github.io/underdisp/reference/gec_fe.md)
+  fit no longer issues it twice.
 
 ### Package
 

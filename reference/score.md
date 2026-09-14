@@ -8,7 +8,7 @@ natural way to compare the calibration of competing count models.
 ## Usage
 
 ``` r
-score(fit, newdata = NULL, kmax = NULL)
+score(fit, newdata = NULL, kmax = NULL, weights = NULL)
 ```
 
 ## Arguments
@@ -34,6 +34,13 @@ score(fit, newdata = NULL, kmax = NULL)
   in the log score, so an observation outside a hard-ceiling model's
   support contributes 27.6 to it.
 
+- weights:
+
+  Frequency weights for the rows of `newdata`: a column name of
+  `newdata` or a numeric vector with one value per row. The held-out
+  scores are then weighted means, as the in-sample scores of a weighted
+  fit are.
+
 ## Value
 
 A named numeric vector `c(logscore, rps)`.
@@ -41,8 +48,8 @@ A named numeric vector `c(logscore, rps)`.
 ## Details
 
 By default the scores are computed **in sample** (against the data the
-model was fit to). Supply `newdata` to score a fitted model on
-**held-out** observations, or use
+model was fit to, as means weighted by its frequency weights). Supply
+`newdata` to score a fitted model on **held-out** observations, or use
 [`cv_score()`](https://bagozzib.github.io/underdisp/reference/cv_score.md)
 for a cross-validated score; an in-sample log score equals `-logLik/n`
 and does not penalize model complexity, so for comparing models of

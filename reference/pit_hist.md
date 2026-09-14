@@ -23,7 +23,10 @@ pit_hist(
 
 - fit:
 
-  A `"cpb"` or `"hurdle_cpb"` object.
+  A fitted `underdisp` count model (any class
+  [`score()`](https://bagozzib.github.io/underdisp/reference/score.md)
+  takes); a fit with frequency weights counts each row as many times as
+  its weight.
 
 - bins:
 

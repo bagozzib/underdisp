@@ -14,7 +14,11 @@ at small means, and the negative binomial's ratio rises linearly. The
 profile therefore shows which mechanism the data follow, where a
 family's variance function fails, and whether the observed
 underdispersion is confined to a range of means. Zero-truncated fits are
-profiled on their conditional moments.
+profiled on their conditional moments. With frequency weights (those of
+the first model) the bins hold equal weight rather than equal numbers of
+rows, each row kept whole, every bin statistic is a weighted mean, and
+`n` is the bin's weight total, so a weighted fit is profiled as the data
+it stands for.
 
 ## Usage
 

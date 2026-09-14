@@ -13,7 +13,15 @@ a paired, cluster-robust test.
 ## Usage
 
 ``` r
-cv_score(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L)
+cv_score(
+  fitfun,
+  data,
+  k = 5,
+  kmax = NULL,
+  folds = NULL,
+  cores = 1L,
+  weights = NULL
+)
 ```
 
 ## Arguments
@@ -47,6 +55,14 @@ cv_score(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L)
 
   Worker processes for the fold refits (default 1); see
   [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
+
+- weights:
+
+  Optional frequency weights for the held-out scores: a column name of
+  `data` or a numeric vector with one value per row. The mean scores are
+  then weighted means, so a row of weight w counts as w held-out
+  observations (the folds assign whole rows). The fold fits see the
+  weights only through `fitfun`, so pass them there as well.
 
 ## Value
 

@@ -47,7 +47,7 @@ ud_screen(y ~ x, data = d, run_cpb = FALSE)
 #> 
 #> MARGINAL verdict: UNDERDISPERSED 
 #>    Pearson=0.564  prop.slope=-0.391 (p=<2e-16)
-#>    NB vs Poisson LR = -0.01 (p= 0.5 asymptotic, conservative at this boundary ; sig => overdispersion)
+#>    NB vs Poisson LR = 0, at the Poisson boundary (p= 0.5 asymptotic, conservative at this boundary )
 #> 
 #> AT-RISK (y>0) verdict:UNDERDISPERSED  [n_pos=393]
 #>    ZTP-Pearson = 0.569  (underdispersed if < 0.885, the calibrated 5% threshold)

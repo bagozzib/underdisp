@@ -53,7 +53,7 @@ the calibration of competing count models.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">score</span><span class="op">(</span><span class="va">fit</span>, newdata <span class="op">=</span> <span class="cn">NULL</span>, kmax <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">score</span><span class="op">(</span><span class="va">fit</span>, newdata <span class="op">=</span> <span class="cn">NULL</span>, kmax <span class="op">=</span> <span class="cn">NULL</span>, weights <span class="op">=</span> <span class="cn">NULL</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -80,6 +80,12 @@ contains larger values. Predicted probabilities are floored at 1e-12 in
 the log score, so an observation outside a hard-ceiling model's support
 contributes 27.6 to it.</p></dd>
 
+
+<dt id="arg-weights">weights<a class="anchor" aria-label="anchor" href="#arg-weights"></a></dt>
+<dd><p>Frequency weights for the rows of <code>newdata</code>: a column name of
+<code>newdata</code> or a numeric vector with one value per row. The held-out scores
+are then weighted means, as the in-sample scores of a weighted fit are.</p></dd>
+
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
@@ -88,7 +94,8 @@ contributes 27.6 to it.</p></dd>
     <div class="section level2">
     <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
     <p>By default the scores are computed <strong>in sample</strong> (against the data the model
-was fit to). Supply <code>newdata</code> to score a fitted model on <strong>held-out</strong>
+was fit to, as means weighted by its frequency weights). Supply <code>newdata</code> to
+score a fitted model on <strong>held-out</strong>
 observations, or use <code><a href="cv_score.html">cv_score()</a></code> for a cross-validated score; an in-sample
 log score equals <code>-logLik/n</code> and does not penalize model complexity, so for
 comparing models of different size the held-out or cross-validated score is
