@@ -177,7 +177,9 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
   X <- model.matrix(pois); k <- ncol(X); yv <- pois$y
   dd <- .ud_disp(yv, fitted(pois), k)
   nb <- tryCatch(suppressWarnings(MASS::glm.nb(formula, data = data)), error = function(e) NULL)
-  lr_nb <- if (!is.null(nb)) as.numeric(2 * (logLik(nb) - logLik(pois))) else NA_real_
+  ## the NB nests the Poisson at theta -> Inf, so the LR is at least zero: a
+  ## negative difference is glm.nb() stopping short of that boundary
+  lr_nb <- if (!is.null(nb)) max(as.numeric(2 * (logLik(nb) - logLik(pois))), 0) else NA_real_
   ## boundary-corrected: the NB nests the Poisson at theta -> Inf (a boundary), so
   ## the LR null is the 1/2 chi^2_0 + 1/2 chi^2_1 mixture -- same correction the
   ## alpha-existence test uses (methods.R). Halving keeps the two coherent.
@@ -373,11 +375,14 @@ print.ud_screen <- function(x, ...) {
   cat("\nMARGINAL verdict:", x$verdict_marginal, "\n")
   cat(sprintf("   Pearson=%.3f  prop.slope=%.3f (p=%s)\n", x$dd$pearson, x$dd$slope,
               format.pval(x$dd$p, digits = 2)))
-  if (!is.na(x$p_nb))
-    cat("   NB vs Poisson LR =", round(x$lr_nb, 2), "(p=", format.pval(x$p_nb, digits = 2),
-        if (identical(x$p_nb_method, "parametric bootstrap")) "by parametric bootstrap"
-        else "asymptotic, conservative at this boundary",
-        "; sig => overdispersion)\n")
+  if (!is.na(x$p_nb)) {
+    how <- if (identical(x$p_nb_method, "parametric bootstrap")) "by parametric bootstrap"
+           else "asymptotic, conservative at this boundary"
+    if (round(x$lr_nb, 2) > 0)
+      cat("   NB vs Poisson LR =", round(x$lr_nb, 2), "(p=", format.pval(x$p_nb, digits = 2), how,
+          "; sig => overdispersion)\n")
+    else cat("   NB vs Poisson LR = 0, at the Poisson boundary (p=", format.pval(x$p_nb, digits = 2), how, ")\n")
+  }
   if (isTRUE(x$atrisk_skipped))
     cat(sprintf("\nAT-RISK screen SKIPPED -- over-conditioning: the mean model (nearly)\nsaturates the positive counts (%d parameters vs n_pos = %d); any within-unit\ntightness at this saturation would be manufactured by the specification,\nnot measured.\n",
                 as.integer(round(x$sat_ratio * max(x$n_pos, 1L))), x$n_pos))

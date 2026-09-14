@@ -69,6 +69,8 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
                 offset = NULL, weights = NULL, cores = 1L, max.support = 500, maxit = 20000, reltol = 1e-8) {
   .ud_no_formula_offset(formula)
   se <- match.arg(se); cl <- match.call()
+  .ud_check_whole(max.support, "max.support")
+  if (se == "bootstrap") .ud_check_whole(B, "B", lower = 2)
   mf <- stats::model.frame(formula, data, na.action = stats::na.omit, drop.unused.levels = TRUE)
   Y  <- stats::model.response(mf); X <- stats::model.matrix(formula, mf)
   n  <- length(Y); p <- ncol(X); rows <- .ud_kept_rows(mf, data)
@@ -132,7 +134,6 @@ gec <- function(formula, data, truncated = FALSE, se = c("none", "bootstrap"), B
   mu     <- as.numeric(exp(off + X %*% beta))
   fitted <- if (!truncated) gec_mean_cpp(mu, delta, ms)
             else { p0 <- gec_lp0_cpp(c(beta, log(delta)), X, Y, off, ms)[, 2]; gec_mean_cpp(mu, delta, ms) / pmax(1 - p0, 1e-8) }
-  support_binding <- .gec_guard_binding(mu, delta, ms)
   support_binding <- .gec_guard_binding(mu, delta, ms)
 
   se.beta <- setNames(rep(NA_real_, p), colnames(X)); se.delta <- NA_real_; boot <- NULL; ci.beta <- NULL
@@ -352,8 +353,9 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
   .ud_no_formula_offset(formula)
   data <- .ud_drop_na_fe(data, fe)
   offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
-  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); bias_correct <- match.arg(bias_correct)
+  .ud_check_whole(max.support, "max.support", null_ok = TRUE); .ud_check_whole(inner_it, "inner_it")
+  if (se == "bootstrap") .ud_check_whole(B, "B", lower = 2)
   if (!is.character(fe) || length(fe) != 1L || !fe %in% names(data)) stop("'fe' must name a column of 'data'.")
   if (!is.null(cluster) && se != "bootstrap")
     warning("'cluster' only affects the bootstrap; it is ignored with se = \"none\" (use se = \"bootstrap\").")
@@ -403,7 +405,6 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
   rate <- as.numeric(exp(off + fe_hat[as.integer(uf)] + X %*% beta))
   fitted <- gec_mean_cpp(rate, delta, ms)
   support_binding <- .gec_guard_binding(rate, delta, ms)
-  support_binding <- .gec_guard_binding(rate, delta, ms)
 
   se.beta <- setNames(rep(NA_real_, p), keep); ci.beta <- NULL; boot <- NULL; clab <- NULL
   if (se == "bootstrap") {
@@ -417,8 +418,9 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
       rws  <- unlist(grp[gs], use.names = FALSE)
       bunit <- unlist(lapply(seq_along(gs), function(k) paste0(k, "_", fev[grp[[gs[k]]]])), use.names = FALSE)
       bd <- dest[rws, , drop = FALSE]; bd[[".bootunit"]] <- bunit
-      fb <- tryCatch(gec_fe(formula, data = bd, fe = ".bootunit", se = "none", offset = offset, weights = weights,
-                            max.support = max.support, inner_it = inner_it, maxit = maxit, reltol = reltol),
+      fb <- tryCatch(.ud_quiet_guard(gec_fe(formula, data = bd, fe = ".bootunit", se = "none", offset = offset,
+                                            weights = weights, max.support = max.support, inner_it = inner_it,
+                                            maxit = maxit, reltol = reltol)),
                      error = function(e) NULL)
       if (!is.null(fb)) fb$coefficients[keep] else rep(NA_real_, p)
     }
@@ -439,8 +441,8 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
   if (bias_correct == "jackknife") {
     dest <- data[rows, , drop = FALSE]
     refit <- function(dd) tryCatch({
-      f <- gec_fe(formula, data = dd, fe = fe, se = "none", offset = offset, weights = weights,
-                  max.support = max.support, inner_it = inner_it, maxit = maxit, reltol = reltol)
+      f <- .ud_quiet_guard(gec_fe(formula, data = dd, fe = fe, se = "none", offset = offset, weights = weights,
+                                  max.support = max.support, inner_it = inner_it, maxit = maxit, reltol = reltol))
       c(f$coefficients[keep], f$delta)
     }, error = function(e) NULL)
     jk <- .fe_jackknife(dest, uf, refit, c(beta, delta),
@@ -459,8 +461,7 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
       fe_hat <- gec_fe_intercepts_cpp(c(beta, log(delta)), X, Y, off, wv, ustart, nu, ms, it)
       rate   <- as.numeric(exp(off + fe_hat[as.integer(uf)] + X %*% beta))
       fitted <- gec_mean_cpp(rate, delta, ms)
-  support_binding <- .gec_guard_binding(rate, delta, ms)
-  support_binding <- .gec_guard_binding(rate, delta, ms)
+      support_binding <- .gec_guard_binding(rate, delta, ms)
       if (!is.null(ci.beta)) {                        # recenter the normal-approx interval
         z <- stats::qnorm(0.975)
         ci.beta <- cbind(lower = beta - z * se.beta, upper = beta + z * se.beta)

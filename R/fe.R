@@ -123,8 +123,9 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
   .ud_no_formula_offset(formula)
   data <- .ud_drop_na_fe(data, fe)
   offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
-  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); bias_correct <- match.arg(bias_correct)
+  .ud_check_whole(max.support, "max.support", null_ok = TRUE); .ud_check_whole(inner_it, "inner_it")
+  if (se == "bootstrap") .ud_check_whole(B, "B", lower = 2)
   if (!is.character(fe) || length(fe) != 1L || !fe %in% names(data)) stop("'fe' must name a column of 'data'.")
   if (!is.null(cluster) && se != "bootstrap")
     warning("'cluster' only affects the bootstrap; it is ignored with se = \"none\" (use se = \"bootstrap\").")
@@ -198,9 +199,10 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
       bunit <- unlist(lapply(seq_along(gs), function(k) paste0(k, "_", fev[grp[[gs[k]]]])),
                       use.names = FALSE)
       bd <- dest[rws, , drop = FALSE]; bd[[".bootunit"]] <- bunit
-      fb <- tryCatch(cpb_fe(formula, data = bd, fe = ".bootunit", truncated = truncated,
-                            se = "none", offset = offset, weights = weights, max.support = max.support,
-                            inner_it = inner_it, maxit = maxit, reltol = reltol), error = function(e) NULL)
+      fb <- tryCatch(.ud_quiet_guard(cpb_fe(formula, data = bd, fe = ".bootunit", truncated = truncated,
+                                            se = "none", offset = offset, weights = weights, max.support = max.support,
+                                            inner_it = inner_it, maxit = maxit, reltol = reltol)),
+                     error = function(e) NULL)
       if (!is.null(fb)) fb$coefficients[keep] else rep(NA_real_, p)
     }
     boot <- do.call(rbind, .ud_lapply(seq_len(B), one, cores))
@@ -224,9 +226,9 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
   if (bias_correct == "jackknife") {
     dest <- data[rows, , drop = FALSE]
     refit <- function(dd) tryCatch({
-      f <- cpb_fe(formula, data = dd, fe = fe, truncated = truncated, se = "none",
-                  offset = offset, weights = weights, max.support = max.support, inner_it = inner_it,
-                  maxit = maxit, reltol = reltol)
+      f <- .ud_quiet_guard(cpb_fe(formula, data = dd, fe = fe, truncated = truncated, se = "none",
+                                  offset = offset, weights = weights, max.support = max.support, inner_it = inner_it,
+                                  maxit = maxit, reltol = reltol))
       c(f$coefficients[keep], f$alpha)
     }, error = function(e) NULL)
     jk <- .fe_jackknife(dest, uf, refit, c(beta, alpha),

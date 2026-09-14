@@ -175,6 +175,7 @@ rzinbinom <- function(n, mu, pi, size)
 #' @name gec-distribution
 #' @export
 dgec <- function(x, lambda, delta, max.support = 500, log = FALSE) {
+  .ud_check_whole(max.support, "max.support")
   if (!length(x) || !length(lambda)) return(numeric(0))
   if (length(delta) != 1L) stop("'delta' must be a single value.")
   n <- max(length(x), length(lambda)); x <- rep_len(x, n); lambda <- rep_len(lambda, n)
@@ -187,6 +188,7 @@ dgec <- function(x, lambda, delta, max.support = 500, log = FALSE) {
 #' @rdname gec-distribution
 #' @export
 pgec <- function(q, lambda, delta, max.support = 500, lower.tail = TRUE, log.p = FALSE) {
+  .ud_check_whole(max.support, "max.support")
   if (!length(q) || !length(lambda)) return(numeric(0))
   if (length(delta) != 1L) stop("'delta' must be a single value.")
   n <- max(length(q), length(lambda)); q <- rep_len(q, n); lambda <- rep_len(lambda, n)
@@ -201,6 +203,7 @@ pgec <- function(q, lambda, delta, max.support = 500, lower.tail = TRUE, log.p =
 #' @rdname gec-distribution
 #' @export
 qgec <- function(p, lambda, delta, max.support = 500, lower.tail = TRUE, log.p = FALSE) {
+  .ud_check_whole(max.support, "max.support")
   if (!length(p) || !length(lambda)) return(numeric(0))
   if (length(delta) != 1L) stop("'delta' must be a single value.")
   if (log.p) p <- exp(p); if (!lower.tail) p <- 1 - p
@@ -214,6 +217,7 @@ qgec <- function(p, lambda, delta, max.support = 500, lower.tail = TRUE, log.p =
 #' @rdname gec-distribution
 #' @export
 rgec <- function(n, lambda, delta, max.support = 500) {
+  .ud_check_whole(max.support, "max.support")
   if (n == 0) return(numeric(0))
   if (length(delta) != 1L) stop("'delta' must be a single value.")
   lambda <- rep_len(lambda, n)

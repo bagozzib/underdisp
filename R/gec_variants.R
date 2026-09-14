@@ -50,7 +50,6 @@ hurdle_gec <- function(formula, data, participation = NULL, part_fe = NULL,
   .ud_no_formula_offset(formula, participation)
   data <- .ud_drop_na_fe(data, list(part_fe))
   offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
-  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); link <- match.arg(link)
   mv <- unique(c(all.vars(formula), all.vars(if (is.null(participation)) formula[-2L] else participation), part_fe))
   keep <- stats::complete.cases(data[, intersect(mv, names(data)), drop = FALSE])
@@ -199,8 +198,9 @@ zi_gec <- function(formula, data, zero = NULL, zero_fe = NULL, se = c("none", "b
   .ud_no_formula_offset(formula, zero)
   data <- .ud_drop_na_fe(data, list(zero_fe))
   offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
-  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); cl <- match.call()
+  .ud_check_whole(max.support, "max.support")
+  if (se == "bootstrap") .ud_check_whole(B, "B", lower = 2)
   if (!is.null(offset) && !(is.character(offset) && length(offset) == 1L)) {
     if (length(offset) != nrow(data)) stop("'offset' must have one value per row of 'data'.")
     data[[".zi_off"]] <- as.numeric(offset); offset <- ".zi_off"    # vector -> column, subsets with data
@@ -233,8 +233,8 @@ zi_gec <- function(formula, data, zero = NULL, zero_fe = NULL, se = c("none", "b
     Zt <- stats::terms(stats::update(zrhs, ~ .)); Z <- stats::model.matrix(Zt, dat); .ud_rank_check(Z, "zero design")
     n  <- length(y); is0 <- y == 0; ms <- as.integer(max.support)
     pb <- ncol(X); pg <- ncol(Z)
-    pf <- tryCatch(gec(formula, dat, se = "none", max.support = max.support,
-                       offset = if (is.null(offset)) NULL else offset, weights = weights),
+    pf <- tryCatch(.ud_quiet_guard(gec(formula, dat, se = "none", max.support = max.support,
+                                       offset = if (is.null(offset)) NULL else offset, weights = weights)),
                    error = function(e) NULL)
     b0 <- if (!is.null(pf)) as.numeric(pf$coefficients)
           else { v <- stats::glm.fit(X, y, offset = off, family = stats::poisson())$coefficients

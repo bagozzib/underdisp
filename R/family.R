@@ -44,6 +44,7 @@
 #' @export
 compare_dispersion <- function(formula, data, max.support = 500, hurdle = FALSE, zi = FALSE) {
   .ud_no_formula_offset(formula)
+  .ud_check_whole(max.support, "max.support")
   y <- stats::model.response(stats::model.frame(formula, data))
   n <- length(y); kmax <- max(y); obs_zero <- mean(y == 0)
   aic <- function(ll, df) -2 * ll + 2 * df
@@ -112,7 +113,7 @@ compare_dispersion <- function(formula, data, max.support = 500, hurdle = FALSE,
 
   ## optional hurdle-CPB (only meaningful with zeros)
   if (isTRUE(hurdle) && obs_zero > 0) {
-    hc <- tryCatch(hurdle_cpb(formula, data = data, se = "none"), error = function(e) NULL)
+    hc <- tryCatch(.ud_quiet_guard(hurdle_cpb(formula, data = data, se = "none")), error = function(e) NULL)
     if (!is.null(hc)) {
       dfh <- length(stats::coef(hc$participation)) + hc$intensity$df
       llh <- as.numeric(stats::logLik(hc$participation)) + hc$intensity$loglik

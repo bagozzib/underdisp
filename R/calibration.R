@@ -264,7 +264,8 @@
 #' the calibration of competing count models.
 #'
 #' By default the scores are computed **in sample** (against the data the model
-#' was fit to). Supply `newdata` to score a fitted model on **held-out**
+#' was fit to, as means weighted by its frequency weights). Supply `newdata` to
+#' score a fitted model on **held-out**
 #' observations, or use [cv_score()] for a cross-validated score; an in-sample
 #' log score equals `-logLik/n` and does not penalize model complexity, so for
 #' comparing models of different size the held-out or cross-validated score is
@@ -282,6 +283,9 @@
 #'   contains larger values. Predicted probabilities are floored at 1e-12 in
 #'   the log score, so an observation outside a hard-ceiling model's support
 #'   contributes 27.6 to it.
+#' @param weights Frequency weights for the rows of `newdata`: a column name of
+#'   `newdata` or a numeric vector with one value per row. The held-out scores
+#'   are then weighted means, as the in-sample scores of a weighted fit are.
 #' @return A named numeric vector `c(logscore, rps)`.
 #' @seealso [cv_score()]
 #' @examples
@@ -290,7 +294,9 @@
 #' fit <- cpb(y ~ 1, data = data.frame(y = y), truncated = FALSE, se = "none")
 #' score(fit)
 #' @export
-score <- function(fit, newdata = NULL, kmax = NULL) {
+score <- function(fit, newdata = NULL, kmax = NULL, weights = NULL) {
+  if (!is.null(weights) && is.null(newdata))
+    stop("'weights' weights the rows of 'newdata'; in sample, the fit's own frequency weights apply.")
   if (is.null(kmax)) kmax <- max(.obs_counts(fit))
   pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax)
   if (max(pu$y) > kmax) {                       # held-out counts above the in-sample maximum
@@ -298,8 +304,12 @@ score <- function(fit, newdata = NULL, kmax = NULL) {
     pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax)
   }
   y <- pu$y; P <- pu$P
-  ## in-sample scores are frequency-weighted means, as the likelihood is
-  w <- if (is.null(newdata) && !is.null(fit$weights) && length(fit$weights) == length(y)) as.numeric(fit$weights) else rep(1, length(y))
+  ## frequency-weighted means: in sample by the fit's own weights, as the
+  ## likelihood is; held out by the weights given for the rows of newdata
+  w <- if (is.null(newdata)) .ud_fit_w(fit, length(y)) else .ud_weights(weights, newdata, seq_len(nrow(newdata)))
+  if (!is.null(w) && length(w) != length(y))
+    stop("'weights' must have one value per scored row of 'newdata' (", length(y), ").")
+  if (is.null(w)) w <- rep(1, length(y))
   yk <- pmin(y, kmax)
   py <- P[cbind(seq_along(y), yk + 1L)]
   ls <- -sum(w * log(pmax(py, 1e-12))) / sum(w)
@@ -332,6 +342,11 @@ score <- function(fit, newdata = NULL, kmax = NULL) {
 #'   fold assignment (so two models can be scored on identical folds). If `NULL`,
 #'   folds are drawn at random.
 #' @param cores Worker processes for the fold refits (default 1); see [cpb()].
+#' @param weights Optional frequency weights for the held-out scores: a column
+#'   name of `data` or a numeric vector with one value per row. The mean scores
+#'   are then weighted means, so a row of weight w counts as w held-out
+#'   observations (the folds assign whole rows). The fold fits see the weights
+#'   only through `fitfun`, so pass them there as well.
 #' @return An object of class `"cv_score"`: a list with the mean held-out
 #'   `logscore` and `rps`, the per-observation vectors `logscore_i`/`rps_i`, and
 #'   the `folds` used.
@@ -344,8 +359,9 @@ score <- function(fit, newdata = NULL, kmax = NULL) {
 #' cv$logscore
 #' }
 #' @export
-cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L) {
+cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L, weights = NULL) {
   n <- nrow(data)
+  wt <- .ud_weights(weights, data, seq_len(n))
   if (is.null(folds)) folds <- sample(rep(seq_len(k), length.out = n))
   if (length(folds) != n) stop("'folds' must have length nrow(data).")
   if (is.null(kmax)) {
@@ -368,7 +384,8 @@ cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L)
     ls_i[r$idx] <- r$ls; rps_i[r$idx] <- r$rps
   }
   ok <- is.finite(ls_i)
-  structure(list(logscore = mean(ls_i[ok]), rps = mean(rps_i[ok]),
+  avg <- function(v) if (is.null(wt)) mean(v[ok]) else sum(wt[ok] * v[ok]) / sum(wt[ok])
+  structure(list(logscore = avg(ls_i), rps = avg(rps_i),
                  logscore_i = ls_i, rps_i = rps_i, folds = folds, k = k, n_scored = sum(ok)),
             class = "cv_score")
 }
@@ -384,9 +401,11 @@ print.cv_score <- function(x, ...) {
 #' Draws a Tukey hanging rootogram: bars for the observed frequencies hang from
 #' the curve of expected frequencies, both on the square-root scale. Bars that
 #' hang below the zero line mark counts the model under-predicts; bars that stop
-#' short mark counts it over-predicts.
+#' short mark counts it over-predicts. A fit with frequency weights counts each
+#' row as many times as its weight in both the observed and the expected
+#' frequencies.
 #'
-#' @param fit A `"cpb"` or `"hurdle_cpb"` object.
+#' @param fit A fitted `underdisp` count model (any class [score()] takes).
 #' @param kmax Highest count to display; defaults to the maximum observed count.
 #' @param main,xlab,ylab Plot labels.
 #' @param ... Passed to [graphics::plot()].
@@ -403,9 +422,14 @@ rootogram <- function(fit, kmax = NULL, main = "Rootogram", xlab = "Count",
   y0 <- .obs_counts(fit)
   if (is.null(kmax)) kmax <- max(y0)
   pu <- .pmf_and_y(fit, kmax); y <- pu$y; P <- pu$P
-  ks  <- 0:kmax
-  obs <- as.numeric(tabulate(factor(pmin(y, kmax), levels = ks)))
-  expf <- colSums(P)
+  ks  <- 0:kmax; wt <- .ud_fit_w(fit, length(y))
+  if (is.null(wt)) {
+    obs  <- as.numeric(tabulate(factor(pmin(y, kmax), levels = ks), nbins = length(ks)))
+    expf <- colSums(P)
+  } else {                                      # frequency weights: w copies of a row
+    obs  <- vapply(ks, function(k) sum(wt[pmin(y, kmax) == k]), numeric(1))
+    expf <- colSums(P * wt)
+  }
   ro <- sqrt(obs); re <- sqrt(expf)
   graphics::plot(ks, re, type = "n", ylim = range(0, re, re - ro),
                  xlab = xlab, ylab = ylab, main = main, ...)
@@ -424,7 +448,8 @@ rootogram <- function(fit, kmax = NULL, main = "Rootogram", xlab = "Count",
 #' under-dispersion in the predictive distribution and a hump indicates
 #' over-dispersion.
 #'
-#' @param fit A `"cpb"` or `"hurdle_cpb"` object.
+#' @param fit A fitted `underdisp` count model (any class [score()] takes); a
+#'   fit with frequency weights counts each row as many times as its weight.
 #' @param bins Number of histogram bins.
 #' @param main,xlab,ylab Plot labels.
 #' @param ... Passed to [graphics::barplot()].
@@ -443,10 +468,15 @@ pit_hist <- function(fit, bins = 10, main = "PIT histogram", xlab = "PIT",
   cdf <- t(apply(P, 1, cumsum)); n <- length(y)
   yk <- pmin(y, kmax)
   Fy   <- cdf[cbind(seq_len(n), yk + 1L)]
-  Fym1 <- ifelse(yk == 0, 0, cdf[cbind(seq_len(n), yk)])
+  ## F(y - 1), zero at y = 0; an index-matrix row with a zero is dropped from the
+  ## result, so the lookup runs over the positive counts only
+  Fym1 <- numeric(n); pos <- yk > 0
+  Fym1[pos] <- cdf[cbind(which(pos), yk[pos])]
   denom <- pmax(Fy - Fym1, 1e-12)
   u <- seq(0, 1, length.out = bins + 1)
-  Fbar <- vapply(u, function(uu) mean(pmin(pmax((uu - Fym1) / denom, 0), 1)), numeric(1))
+  wt <- .ud_fit_w(fit, n)
+  Fbar <- vapply(u, function(uu) { v <- pmin(pmax((uu - Fym1) / denom, 0), 1)
+                                   if (is.null(wt)) mean(v) else sum(wt * v) / sum(wt) }, numeric(1))
   h <- diff(Fbar) * bins
   mids <- (u[-1] + u[-(bins + 1)]) / 2
   graphics::barplot(h, names.arg = round(mids, 2), space = 0, main = main,

@@ -242,7 +242,6 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
   .ud_no_formula_offset(formula)
   data <- .ud_drop_na_fe(data, fe)
   offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
-  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se_missing <- missing(se)
   fam <- .count_fam(family); family <- fam$tag; se <- match.arg(se)
   ## uniform cluster semantics across the family: supplying `cluster` implies

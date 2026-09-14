@@ -32,3 +32,13 @@ test_that("the NB bootstrap respects the comparator gates", {
                                   ztp_threshold = "bootstrap", ztp_boot_B = 19, comp_max_par = 1))
   expect_identical(s$p_nb_method, "asymptotic")
 })
+
+test_that("an NB fit at the Poisson boundary reports LR = 0 and no overdispersion reading", {
+  set.seed(23); x <- rnorm(200)
+  d <- data.frame(y = rcpb(200, exp(1.2 + 0.3 * x), 0.4, truncated = FALSE), x = x)
+  s <- suppressWarnings(ud_screen(y ~ x, data = d, run_cpb = FALSE, run_gp = FALSE, run_comp = FALSE))
+  expect_identical(s$lr_nb, 0)
+  out <- capture.output(print(s))
+  expect_true(any(grepl("NB vs Poisson LR = 0, at the Poisson boundary", out, fixed = TRUE)))
+  expect_false(any(grepl("sig => overdispersion", out, fixed = TRUE)))
+})

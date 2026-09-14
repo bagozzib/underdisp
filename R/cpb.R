@@ -192,6 +192,11 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
   .ud_no_formula_offset(formula)
   se <- match.arg(se)
   cl <- match.call()
+  .ud_check_whole(max.support, "max.support", null_ok = TRUE)
+  if (!is.numeric(alpha.start) || !length(alpha.start) || any(!is.finite(alpha.start)) ||
+      any(alpha.start <= 0 | alpha.start >= 1))
+    stop("'alpha.start' must be numeric, with every value strictly between 0 and 1.", call. = FALSE)
+  if (se == "bootstrap") .ud_check_whole(B, "B", lower = 2)
   mf <- model.frame(formula, data, na.action = na.omit, drop.unused.levels = TRUE)
   Y  <- model.response(mf); X <- model.matrix(formula, mf)
   n  <- length(Y); p <- ncol(X); rows <- .ud_kept_rows(mf, data)

@@ -111,7 +111,6 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
   .ud_no_formula_offset(formula, participation)
   data <- .ud_drop_na_fe(data, list(fe, part_fe))
   offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
-  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); link <- match.arg(link)
   ## reduce to complete cases on all model variables so the two margins stay aligned
   mv <- unique(c(all.vars(formula), all.vars(if (is.null(participation)) formula[-2L] else participation), fe, part_fe))

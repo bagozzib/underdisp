@@ -88,8 +88,9 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   .ud_no_formula_offset(formula, zero)
   data <- .ud_drop_na_fe(data, list(fe, zero_fe))
   offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
-  offset <- .ud_align_vec(offset, data); weights <- .ud_align_vec(weights, data); cluster <- .ud_align_vec(cluster, data)
   se <- match.arg(se); method <- match.arg(method)
+  .ud_check_whole(max.support, "max.support")
+  if (se == "bootstrap") .ud_check_whole(B, "B", lower = 2)
   if (!is.null(weights)) {
     if (identical(method, "em")) stop("'weights' is supported for method = \"ml\" only.")
     if (!(is.character(weights) && length(weights) == 1L)) {
@@ -212,8 +213,8 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
     uf   <- factor(data[[fe]]); nu <- nlevels(uf)
     ustart <- as.integer(c(0, cumsum(tabulate(as.integer(uf), nu))))
     pcov <- ncol(Xcov); pg <- ncol(Z); ms <- as.integer(max.support); iit <- 20L
-    cf <- tryCatch(cpb_fe(formula, data = data[y > 0, , drop = FALSE], fe = fe, truncated = TRUE,
-                          max.support = max.support, weights = weights), error = function(e) NULL)
+    cf <- tryCatch(.ud_quiet_guard(cpb_fe(formula, data = data[y > 0, , drop = FALSE], fe = fe, truncated = TRUE,
+                                          max.support = max.support, weights = weights)), error = function(e) NULL)
     b0 <- if (!is.null(cf)) cf$coefficients[colnames(Xcov)] else stats::setNames(rep(0, pcov), colnames(Xcov))
     b0[!is.finite(b0)] <- 0
     a0 <- if (!is.null(cf)) cf$alpha else 0.5
@@ -232,8 +233,9 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
         g <- suppressWarnings(stats::glm.fit(Z, w, family = stats::quasibinomial()))$coefficients
         g[!is.finite(g)] <- 0
         s <- is0 & (w > 0.5); if (it > 1L && all(s == s_old)) break; s_old <- s
-        cf2 <- tryCatch(cpb_fe(formula, data = data[!s, , drop = FALSE], fe = fe, truncated = FALSE,
-                               max.support = max.support, maxit = 800L, inner_it = 20L), error = function(e) NULL)
+        cf2 <- tryCatch(.ud_quiet_guard(cpb_fe(formula, data = data[!s, , drop = FALSE], fe = fe, truncated = FALSE,
+                                               max.support = max.support, maxit = 800L, inner_it = 20L)),
+                        error = function(e) NULL)
         if (!is.null(cf2)) { b <- cf2$coefficients[colnames(Xcov)]; b[!is.finite(b)] <- 0; a <- cf2$alpha; fe_hat <- cf2$fe }
         lam <- lam_fun(); pit <- as.numeric(stats::plogis(Z %*% g))
         py <- vapply(seq_along(y), function(i) .cpb_pmf1(lam[i], a, kmax, FALSE)[y[i] + 1L], numeric(1))
@@ -331,9 +333,9 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   ## the optimizer works on covariates scaled to unit (weighted) standard
   ## deviation in both equations and maps the coefficients back at the end
   sx <- .ud_colscale(X, w); sz <- .ud_colscale(Z, w); Xs <- sweep(X, 2, sx, "/"); Zs <- sweep(Z, 2, sz, "/")
-  pf <- tryCatch(cpb(formula, data[y > 0, , drop = FALSE], truncated = TRUE, se = "none",
-                     max.support = max.support,
-                     offset = if (is.null(offset)) NULL else offset, weights = weights),
+  pf <- tryCatch(.ud_quiet_guard(cpb(formula, data[y > 0, , drop = FALSE], truncated = TRUE, se = "none",
+                                     max.support = max.support,
+                                     offset = if (is.null(offset)) NULL else offset, weights = weights)),
                  error = function(e) NULL)
   b0 <- if (!is.null(pf)) as.numeric(pf$coefficients)
         else { v <- stats::glm.fit(X, y, offset = off, family = stats::poisson())$coefficients

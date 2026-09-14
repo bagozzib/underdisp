@@ -30,6 +30,33 @@
 ## weight vector for the likelihood: ones when no weights were supplied
 .ud_w1 <- function(w, n) if (is.null(w)) rep(1, n) else w
 
+## the frequency weights a calibration tool applies to a fit's rows: NULL for an
+## unweighted fit, so the unweighted computations run exactly as before
+.ud_fit_w <- function(fit, n) {
+  w <- fit$weights
+  if (!is.null(w) && length(w) == n) as.numeric(w) else NULL
+}
+
+## A count-valued argument (max.support, B, inner_it) is one whole number from
+## `lower` to the largest integer: as.integer() turns a larger value into NA,
+## which the C++ cannot take, and a negative or fractional value would reach the
+## optimizer as a meaningless support. Refused by name before any fitting.
+.ud_check_whole <- function(x, name, lower = 1, null_ok = FALSE) {
+  if (null_ok && is.null(x)) return(invisible(NULL))
+  if (!is.numeric(x) || length(x) != 1L || !is.finite(x) || x != floor(x) || x < lower || x > .Machine$integer.max)
+    stop("'", name, "' must be ", if (null_ok) "NULL or ", "a whole number from ", lower, " to ",
+         .Machine$integer.max, ".", call. = FALSE)
+  invisible(NULL)
+}
+
+## The support guard's warning ("... reaches max.support ...") muffled and every
+## other warning passed on, for a fit that is a step inside another computation:
+## a start value, a bootstrap or jackknife refit, the nest inside zi_test(). The
+## fit the user asked for reports the guard itself.
+.ud_quiet_guard <- function(expr)
+  withCallingHandlers(expr, warning = function(w)
+    if (grepl("reaches max.support", conditionMessage(w), fixed = TRUE)) invokeRestart("muffleWarning"))
+
 ## Parallel replicate driver for the bootstraps and the parametric-bootstrap
 ## screen threshold. `cores = 1` runs lapply(); `cores > 1` runs a PSOCK cluster
 ## (portable across Windows, macOS, and Linux) that loads this package from the

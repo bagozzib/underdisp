@@ -93,7 +93,7 @@ irr.zi_cpb <- function(object, level = 0.95, ...)
 .boot_diff <- function(refit, decomp, data, variable, from, to, B, level, stage = "both", cores = 1L) {
   n <- nrow(data); a <- (1 - level) / 2
   D <- do.call(cbind, .ud_lapply(seq_len(B), function(b) {
-    f2 <- tryCatch(refit(data[sample(n, replace = TRUE), , drop = FALSE]), error = function(e) NULL)
+    f2 <- tryCatch(.ud_quiet_guard(refit(data[sample(n, replace = TRUE), , drop = FALSE])), error = function(e) NULL)
     if (is.null(f2)) rep(NA_real_, 3) else decomp(f2, variable, from, to, stage)$diff
   }, cores))
   list(lower = apply(D, 1, stats::quantile, a, na.rm = TRUE),
@@ -199,7 +199,9 @@ zi_test <- function(object, object2 = NULL, data = NULL, ...) {
     dd <- if (!is.null(data)) data else object2
     if (is.null(dd) || !is.data.frame(dd))
       stop("zi_test(formula, data): supply the data frame as the second argument or via 'data ='.")
-    cpb_fit <- cpb(object, data = dd, truncated = FALSE, se = "none", ...)
+    ## the nest's support-guard warning is not the point of this test: the
+    ## untruncated CPB of zero-inflated counts leans toward its Poisson limit
+    cpb_fit <- .ud_quiet_guard(cpb(object, data = dd, truncated = FALSE, se = "none", ...))
     zi_fit  <- zi_cpb(object, data = dd, zero = ~ 1, ...)
   } else {
     if (is.null(object2))

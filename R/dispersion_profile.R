@@ -61,7 +61,11 @@
 #' binomial's ratio rises linearly. The profile therefore
 #' shows which mechanism the data follow, where a family's variance function
 #' fails, and whether the observed underdispersion is confined to a range of
-#' means. Zero-truncated fits are profiled on their conditional moments.
+#' means. Zero-truncated fits are profiled on their conditional moments. With
+#' frequency weights (those of the first model) the bins hold equal weight
+#' rather than equal numbers of rows, each row kept whole, every bin statistic
+#' is a weighted mean, and `n` is the bin's weight total, so a weighted fit is
+#' profiled as the data it stands for.
 #'
 #' @param object A fitted single-equation model (`cpb`, `cpb_fe`, `gec`,
 #'   `gec_fe`, or `count_reg`); its fitted means define the bins and the
@@ -98,19 +102,23 @@ dispersion_profile <- function(object, ..., bins = 10, plot = TRUE, ylim = NULL,
   if (any(vapply(fits[-1L], function(f) length(.obs_counts(f)) != length(y), logical(1))))
     stop("All models must be fit on the same observations.")
   mu <- m1$mean
+  wt <- .ud_fit_w(fits[[1L]], length(y))           # frequency weights of the first model
   ord <- order(mu)
-  bin <- integer(length(mu)); bin[ord] <- ceiling(seq_along(mu) * bins / length(mu))
+  bin <- integer(length(mu))
+  bin[ord] <- if (is.null(wt)) ceiling(seq_along(mu) * bins / length(mu))
+              else { cw <- cumsum(wt[ord]); ceiling(cw * bins / cw[length(cw)]) }   # equal weight, rows whole
   bin <- pmin(pmax(bin, 1L), bins)
+  fb <- factor(bin, levels = seq_len(bins))
+  bmean <- function(v) if (is.null(wt)) as.numeric(tapply(v, fb, mean))
+                       else as.numeric(tapply(wt * v, fb, sum) / tapply(wt, fb, sum))
   emp <- (y - mu)^2 / pmax(mu, 1e-12)
-  out <- data.frame(bin = seq_len(bins),
-                    n = as.integer(tabulate(bin, bins)),
-                    mean_fitted = as.numeric(tapply(mu, factor(bin, levels = seq_len(bins)), mean)),
-                    mean_y = as.numeric(tapply(y, factor(bin, levels = seq_len(bins)), mean)),
-                    ratio_empirical = as.numeric(tapply(emp, factor(bin, levels = seq_len(bins)), mean)))
+  nb <- if (is.null(wt)) as.integer(tabulate(bin, bins))
+        else { s <- as.numeric(tapply(wt, fb, sum)); s[is.na(s)] <- 0; s }
+  out <- data.frame(bin = seq_len(bins), n = nb, mean_fitted = bmean(mu), mean_y = bmean(y),
+                    ratio_empirical = bmean(emp))
   for (j in seq_along(fits)) {
     mj <- .disp_condition(.disp_moments(fits[[j]]))
-    out[[paste0("ratio_", nm[j])]] <- as.numeric(tapply(mj$var / pmax(mj$mean, 1e-12),
-                                                        factor(bin, levels = seq_len(bins)), mean))
+    out[[paste0("ratio_", nm[j])]] <- bmean(mj$var / pmax(mj$mean, 1e-12))
   }
   out <- out[out$n > 0, , drop = FALSE]
   class(out) <- c("dispersion_profile", "data.frame")
