@@ -38,12 +38,12 @@ from the stored draws.
 
 ``` r
 # \donttest{
-set.seed(8); x <- rnorm(300)
-N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)
-fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 100)
+set.seed(8); x <- rnorm(200)
+N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(200, N, 0.5)
+fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 40)
 irr(fit)
 #>         term equation ratio estimate lower upper             method
-#>  (Intercept)    count   IRR    4.484 4.266 4.660 bootstrap (stored)
-#>            x    count   IRR    1.539 1.476 1.612 bootstrap (stored)
+#>  (Intercept)    count   IRR    4.473 4.320 4.661 bootstrap (stored)
+#>            x    count   IRR    1.502 1.434 1.549 bootstrap (stored)
 # }
 ```

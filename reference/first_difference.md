@@ -68,11 +68,11 @@ interval on the difference (`method = "bootstrap (stored)"`). Every
 
 ``` r
 # \donttest{
-set.seed(1); x <- rnorm(400)
-N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1); y <- rbinom(400, N, 0.5)
-fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 200)
+set.seed(1); x <- rnorm(250)
+N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1); y <- rbinom(250, N, 0.5)
+fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 60)
 first_difference(fit, "x", from = -1, to = 1, quantity = "mean")
 #>  component  from    to  diff lower upper             method
-#>       mean 3.027 7.964 4.937 4.567 5.205 bootstrap (stored)
+#>       mean 3.081 8.388 5.308 5.038 5.568 bootstrap (stored)
 # }
 ```

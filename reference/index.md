@@ -80,6 +80,8 @@ One formula interface, one class per model, one set of methods.
   : Confidence intervals for every model class
 - [`alpha_confint()`](https://bagozzib.github.io/underdisp/reference/alpha_confint.md)
   : Profile-likelihood interval for the dispersion parameter alpha
+- [`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md)
+  : Calibrate the interval for the CPB dispersion parameter
 - [`vcov(`*`<cpb_fe>`*`)`](https://bagozzib.github.io/underdisp/reference/vcov.cpb_fe.md)
   : Bootstrap covariance for a fixed-effects CPB fit
 - [`fitted(`*`<cpb_fe>`*`)`](https://bagozzib.github.io/underdisp/reference/fitted.underdisp.md)

@@ -38,13 +38,13 @@ ordered by AIC.
 
 ``` r
 # \donttest{
-set.seed(1); n <- 800; x <- rnorm(n); z <- rnorm(n)
+set.seed(1); n <- 400; x <- rnorm(n); z <- rnorm(n)
 y <- rhurdle_cpb(n, exp(1.2 + 0.5 * x), 0.5, plogis(-0.2 + 0.8 * z))
 d <- data.frame(y = y, x = x, z = z)
 compare_models(hurdle = hurdle_cpb(y ~ x, data = d, participation = ~ z),
                zi = zi_cpb(y ~ x, data = d, zero = ~ z))
-#>        df    logLik      AIC      BIC logscore      rps
-#> hurdle  5 -1124.482 2258.964 2282.388 1.405603 1.008874
-#> zi      5 -1126.524 2263.049 2286.472 1.408156 1.009496
+#>        df    logLik      AIC      BIC logscore       rps
+#> hurdle  5 -547.3110 1104.622 1124.579 1.368277 0.9901023
+#> zi      5 -550.3732 1110.746 1130.704 1.375933 0.9951678
 # }
 ```

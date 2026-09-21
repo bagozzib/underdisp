@@ -1,11 +1,16 @@
 # Implied ceiling with a profile-likelihood interval
 
 Returns the observation- (or profile-) specific ceiling
-lambda/(1-alpha), with an interval propagating the profile-likelihood
-uncertainty in `alpha` at the fitted mean. (Coefficient uncertainty in
-lambda is not propagated here; use
+lambda/(1-alpha), with bounds that carry the limits of the interval for
+`alpha` (see
+[`alpha_confint()`](https://bagozzib.github.io/underdisp/reference/alpha_confint.md);
+calibrated when the fit went through
+[`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md))
+to the ceiling at the fitted rate. The rate is held at its estimate:
+coefficient uncertainty in lambda is not propagated, so the bounds are
+not a confidence interval for the ceiling; use
 [`first_difference()`](https://bagozzib.github.io/underdisp/reference/first_difference.md)
-with `quantity = "ceiling"` for a fully bootstrapped contrast.)
+with `quantity = "ceiling"` for a fully bootstrapped contrast.
 
 ## Usage
 

@@ -74,6 +74,16 @@ zero-truncated variant.</p>
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
     <p>An integer vector of counts.</p>
     </div>
+    <div class="section level2">
+    <h2 id="details">Details<a class="anchor" aria-label="anchor" href="#details"></a></h2>
+    <p>The support of the CPB is <code>0, ..., floor(lambda / (1 - alpha))</code>. A rate
+whose ceiling <code>lambda / (1 - alpha)</code> is below 1 has the support <code>{0}</code>, so its
+zero-truncated distribution does not exist. With <code>truncated = TRUE</code> such a
+draw is set to 1 and a warning reports how many there were: the stated
+parameters give that count probability zero, so data simulated this way are
+not data from the model (in a simulation study, keep every ceiling at 1 or
+above).</p>
+    </div>
 
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>

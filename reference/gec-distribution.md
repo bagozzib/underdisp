@@ -73,5 +73,5 @@ vector of count draws.
 dgec(0:5, lambda = 3, delta = 0.7)
 #> [1] 0.02824752 0.12106082 0.23347444 0.26682793 0.20012095 0.10291935
 var(rgec(2000, lambda = 3, delta = 0.7)) / mean(rgec(2000, lambda = 3, delta = 0.7))
-#> [1] 0.708527
+#> [1] 0.6865009
 ```

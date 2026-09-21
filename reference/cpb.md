@@ -144,7 +144,9 @@ can stop short of it). The numerical Hessian is unreliable on such a
 surface, so inference uses a cold-multistart bootstrap for the
 coefficients (validated to nominal coverage) and a profile-likelihood
 interval for \\\alpha\\ (see
-[`confint.cpb()`](https://bagozzib.github.io/underdisp/reference/confint.cpb.md)).
+[`alpha_confint()`](https://bagozzib.github.io/underdisp/reference/alpha_confint.md);
+first-order by default, calibrated by parametric bootstrap after
+[`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md)).
 
 Runtime: a fit with `se = "none"` takes a few seconds at 500 rows and
 about fifteen at 2,000 on one core, the nine starts, the profile trace,
@@ -184,7 +186,7 @@ summary(fit)
 #> (Intercept)  1.58998         NA      NA       NA
 #> x            0.50639         NA      NA       NA
 #> 
-#> alpha = 0.4862   (profile 95% CI: 0.457 to 0.591)
+#> alpha = 0.4862   (first-order profile 95% CI: 0.457 to 0.591)
 #> Implied ceiling lambda/(1-alpha): median 9.37   range 2.21 to 36.5 
 #> logLik = -559.53    AIC = 1125.06 
 #> LR vs ZT-Poisson (H0: alpha = 1): 51.09, p 4.4046e-13

@@ -1,10 +1,14 @@
 # Confidence intervals for a CPB fit
 
 Coefficient intervals use the cold-multistart bootstrap percentile
-method (validated to nominal coverage); the interval for `alpha` uses
-the profile-likelihood method, which is reliable except under strong
-underdispersion, where `alpha` sits at the feasibility boundary and the
-interval is one-sided.
+method (validated to nominal coverage). The interval for `alpha` is a
+profile-likelihood interval: first-order by default (it covers about
+0.88 to 0.95 in simulations from the CPB, with its misses on the upper
+side; see
+[`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md)
+for the reason), and calibrated by parametric bootstrap when the fit
+went through
+[`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md).
 
 ## Usage
 

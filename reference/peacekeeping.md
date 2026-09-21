@@ -70,20 +70,21 @@ table(peacekeeping$contributions == 0)
 #> FALSE  TRUE 
 #>  2602  1846 
 # \donttest{
-fit <- hurdle_cpb(contributions ~ lgdppc + milper, data = peacekeeping,
+some <- subset(peacekeeping, iso3 %in% unique(iso3)[1:40])   # forty states keep the example short
+fit <- hurdle_cpb(contributions ~ lgdppc + milper, data = some,
                   participation = ~ democracy + majorpower, fe = "iso3")
 fit
 #> Hurdle Continuous Parameter Binomial (intensity fixed effects on 'iso3')
-#> Call:  hurdle_cpb(formula = contributions ~ lgdppc + milper, data = peacekeeping,     participation = ~democracy + majorpower, fe = "iso3")
-#> Units: 4448 (2602 participate, 58%)
+#> Call:  hurdle_cpb(formula = contributions ~ lgdppc + milper, data = some,     participation = ~democracy + majorpower, fe = "iso3")
+#> Units: 1020 (588 participate, 58%)
 #> 
 #> Participation (logit link) -- positive coefficients raise P(Y > 0), i.e. participation:
 #> (Intercept)   democracy  majorpower 
-#>     -1.1595      2.9493      4.1431 
+#>     -1.8477      3.8935     17.9320 
 #> 
 #> Intensity (zero-truncated CPB) coefficients:
 #>  lgdppc  milper 
-#>  0.5799 -0.0005 
-#> Intensity alpha (shape): 0.7574 
+#>  0.2608 -0.0012 
+#> Intensity alpha (shape): 0.6675 
 # }
 ```

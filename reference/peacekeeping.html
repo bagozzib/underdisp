@@ -111,21 +111,22 @@ covariates only; prepared for illustration.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> FALSE  TRUE </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  2602  1846 </span>
 <span class="r-in"><span><span class="co"># \donttest{</span></span></span>
-<span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="hurdle_cpb.html">hurdle_cpb</a></span><span class="op">(</span><span class="va">contributions</span> <span class="op">~</span> <span class="va">lgdppc</span> <span class="op">+</span> <span class="va">milper</span>, data <span class="op">=</span> <span class="va">peacekeeping</span>,</span></span>
+<span class="r-in"><span><span class="va">some</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/subset.html" class="external-link">subset</a></span><span class="op">(</span><span class="va">peacekeeping</span>, <span class="va">iso3</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="fu"><a href="https://rdrr.io/r/base/unique.html" class="external-link">unique</a></span><span class="op">(</span><span class="va">iso3</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">40</span><span class="op">]</span><span class="op">)</span>   <span class="co"># forty states keep the example short</span></span></span>
+<span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="hurdle_cpb.html">hurdle_cpb</a></span><span class="op">(</span><span class="va">contributions</span> <span class="op">~</span> <span class="va">lgdppc</span> <span class="op">+</span> <span class="va">milper</span>, data <span class="op">=</span> <span class="va">some</span>,</span></span>
 <span class="r-in"><span>                  participation <span class="op">=</span> <span class="op">~</span> <span class="va">democracy</span> <span class="op">+</span> <span class="va">majorpower</span>, fe <span class="op">=</span> <span class="st">"iso3"</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">fit</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Hurdle Continuous Parameter Binomial (intensity fixed effects on 'iso3')</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Call:  hurdle_cpb(formula = contributions ~ lgdppc + milper, data = peacekeeping,     participation = ~democracy + majorpower, fe = "iso3")</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Units: 4448 (2602 participate, 58%)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Call:  hurdle_cpb(formula = contributions ~ lgdppc + milper, data = some,     participation = ~democracy + majorpower, fe = "iso3")</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Units: 1020 (588 participate, 58%)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Participation (logit link) -- positive coefficients raise P(Y &gt; 0), i.e. participation:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)   democracy  majorpower </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>     -1.1595      2.9493      4.1431 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>     -1.8477      3.8935     17.9320 </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Intensity (zero-truncated CPB) coefficients:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  lgdppc  milper </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  0.5799 -0.0005 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Intensity alpha (shape): 0.7574 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  0.2608 -0.0012 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Intensity alpha (shape): 0.6675 </span>
 <span class="r-in"><span><span class="co"># }</span></span></span>
 </code></pre></div>
     </div>

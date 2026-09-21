@@ -5,8 +5,9 @@ whole family, one interval rule per inference type: bootstrap percentile
 intervals for
 [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md)
 (coefficients; the dispersion parameter gets its profile-likelihood
-interval) and
-[`gec()`](https://bagozzib.github.io/underdisp/reference/gec.md)
+interval, first-order or calibrated by
+[`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md))
+and [`gec()`](https://bagozzib.github.io/underdisp/reference/gec.md)
 (coefficients and `delta`); normal-approximation intervals from the
 bootstrap standard errors for the fixed-effects fits
 ([`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md),

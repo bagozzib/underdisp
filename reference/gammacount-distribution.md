@@ -74,5 +74,5 @@ models. *Journal of Business & Economic Statistics*, 13(4), 467-474.
 dgammacount(0:5, mu = 3, alpha = 2)
 #> [1] 0.01735127 0.13385262 0.29447576 0.29830012 0.17209622 0.06383205
 var(rgammacount(2000, mu = 3, alpha = 2)) / 3
-#> [1] 0.5282695
+#> [1] 0.5035768
 ```

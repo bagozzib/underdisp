@@ -78,7 +78,7 @@ summary(fit)
 #> (Intercept)  1.58279         NA      NA       NA
 #> x            0.49215         NA      NA       NA
 #> 
-#> alpha = 0.5256   (profile 95% CI: 0.487 to 0.613)
+#> alpha = 0.5256   (first-order profile 95% CI: 0.487 to 0.613)
 #> Implied ceiling lambda/(1-alpha): median 10.22   range 2.48 to 37.8 
 #> logLik = -745.05    AIC = 1496.1 
 #> LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15
@@ -156,37 +156,51 @@ Because the CPB’s support depends on its parameters, Hessian-based
 standard errors are unreliable; coefficient inference uses a
 cold-multistart pairs bootstrap (validated to nominal coverage in the
 companion paper), and the dispersion parameter carries a
-profile-likelihood interval. `cores =` runs the replicates on a socket
+profile-likelihood interval. That interval is first-order by default:
+the estimate of `alpha` is biased toward zero (the log-ceiling
+coefficients behave like endpoint parameters), so it covers about 0.88
+to 0.95 in simulations, with its misses on the upper side.
+[`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md)
+is the opt-in remedy: it stores the parametric-bootstrap distribution of
+the signed root of the profile likelihood ratio in the fit
+(`fit <- calibrate_alpha(fit, B = 199, cores = 4, seed = 1)`, about a
+third of a fit per replicate), after which
+[`alpha_confint()`](https://bagozzib.github.io/underdisp/reference/alpha_confint.md),
+[`confint()`](https://rdrr.io/r/stats/confint.html),
+[`implied_ceiling()`](https://bagozzib.github.io/underdisp/reference/implied_ceiling.md)
+and [`summary()`](https://rdrr.io/r/base/summary.html) report the
+calibrated interval. Both intervals are model-based and assume
+independent observations. `cores =` runs the replicates on a socket
 cluster seeded from the session.
 
 ``` r
 
-fit_b <- cpb(y ~ x, data = d[d$y > 0, ], se = "bootstrap", B = 99)
+fit_b <- cpb(y ~ x, data = d[d$y > 0, ], se = "bootstrap", B = 49)   # a small B keeps the vignette quick
 summary(fit_b)
 #> 
 #> Continuous Parameter Binomial regression (zero-truncated)
 #> N = 393    inference: bootstrap 
 #> 
 #>             Estimate Std. Error z value  Pr(>|z|)    
-#> (Intercept) 1.582786   0.017445  90.731 < 2.2e-16 ***
-#> x           0.492152   0.018314  26.872 < 2.2e-16 ***
+#> (Intercept) 1.582786   0.017365  91.150 < 2.2e-16 ***
+#> x           0.492152   0.017873  27.537 < 2.2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #> 
-#> alpha = 0.5256   (profile 95% CI: 0.487 to 0.613)
+#> alpha = 0.5256   (first-order profile 95% CI: 0.487 to 0.613)
 #> Implied ceiling lambda/(1-alpha): median 10.22   range 2.48 to 37.8 
 #> logLik = -745.05    AIC = 1496.1 
 #> LR vs ZT-Poisson (H0: alpha = 1): 58.66, p 9.3805e-15
 #> Note: the p-value is asymptotic, which over-rejects in finite samples at this boundary; dispersion_test() gives the parametric-bootstrap p-value.
-#> (99 bootstrap resamples converged)
+#> (49 bootstrap resamples converged)
 irr(fit_b)             # rate ratios with percentile intervals
 #>         term equation ratio estimate lower upper             method
-#>  (Intercept)    count   IRR    4.869 4.722 5.045 bootstrap (stored)
-#>            x    count   IRR    1.636 1.578 1.686 bootstrap (stored)
-confint(fit_b)         # coefficients (percentile) and alpha (profile likelihood)
+#>  (Intercept)    count   IRR    4.869 4.732 5.056 bootstrap (stored)
+#>            x    count   IRR    1.636 1.581 1.689 bootstrap (stored)
+confint(fit_b)         # coefficients (percentile) and alpha (first-order profile likelihood)
 #>                  2.5%     97.5%
-#> (Intercept) 1.5521549 1.6183956
-#> x           0.4561561 0.5224254
+#> (Intercept) 1.5543877 1.6206530
+#> x           0.4579820 0.5243323
 #> alpha       0.4870825 0.6129318
 ```
 
@@ -213,10 +227,10 @@ gec(y ~ x, data = data.frame(y = rpois(n, exp(1 + 0.4 * x)), x = x),
 #> Generalized event count (Katz family) regression
 #> Call:  gec(formula = y ~ x, data = data.frame(y = rpois(n, exp(1 + 0.4 *     x)), x = x), se = "none")
 #> (Intercept)           x 
-#>      0.9649      0.3493 
+#>      0.9971      0.4110 
 #> 
-#> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.954  [equidispersion not rejected (LR p = 0.52)]
-#> logLik = -740.83,  n = 400
+#> dispersion delta (Katz; Var/Mean on an unbounded support) = 0.946  [equidispersion not rejected (LR p = 0.42)]
+#> logLik = -739.98,  n = 400
 ```
 
 The GEC carries the same zero-truncated, hurdle
@@ -237,28 +251,28 @@ the likelihood, so it scales to thousands of units.
 
 ``` r
 
-panel <- do.call(rbind, lapply(1:50, function(i) {
+panel <- do.call(rbind, lapply(1:30, function(i) {
   xx <- rnorm(12); NN <- pmax(round(exp(rnorm(1, 0, 0.4) + 0.4 * xx) / 0.5), 1)
   data.frame(unit = i, x = xx, y = rbinom(12, NN, 0.5))
 }))
 fe_fit <- cpb_fe(y ~ x, data = panel, fe = "unit")
 fe_fit
-#> CPB regression with 50 unit fixed effects (concentrated likelihood)
+#> CPB regression with 30 unit fixed effects (concentrated likelihood)
 #> Coefficients:
-#>      x 
-#> 0.2979 
+#>     x 
+#> 0.296 
 #> 
-#> alpha (shape parameter): 0.4735   median implied bound: 2.25 
+#> alpha (shape parameter): 0.4596   median implied bound: 2.3 
 #> Note: alpha is subject to incidental-parameters bias for short panels; see ?cpb_fe.
 dispersion_test(fe_fit, B = 0)   # the statistic against a Poisson with the same unit effects
 #> 
 #> Likelihood-ratio test of equidispersion (CPB vs Poisson; boundary null; asymptotic 1/2 chi2_0 + 1/2 chi2_1 mixture)
 #> 
 #> data: y ~ x
-#> LR = 216.3068  (logLik: fitted family = -599.47, Poisson = -707.63),  p-value = NA
+#> LR = 151.9428  (logLik: fitted family = -356.55, Poisson = -432.52),  p-value = NA
 #> alternative hypothesis: underdispersion
 #> note: unit fixed effects bias the dispersion estimate toward underdispersion, so the asymptotic distribution does not apply; B > 0 gives the parametric-bootstrap p-value
-#> estimate: alpha = 0.4735  (Poisson value 1)
+#> estimate: alpha = 0.4596  (Poisson value 1)
 ```
 
 With unit fixed effects the asymptotic distribution of that statistic
@@ -308,24 +322,25 @@ places them next to the CPB on one footing.
 
 ``` r
 
+dw <- d[1:150, ]                         # part of the sample keeps the seven fits quick
 fits <- list(
-  CPB          = cpb(y ~ x, data = d, truncated = FALSE, se = "none"),
-  Poisson      = count_reg(y ~ x, data = d, family = "poisson"),
-  NB           = count_reg(y ~ x, data = d, family = "negbin"),
-  `COM-Poisson`= count_reg(y ~ x, data = d, family = "mpcmp"),
-  GenPoisson   = count_reg(y ~ x, data = d, family = "genpois"),
-  GammaCount   = count_reg(y ~ x, data = d, family = "gammacount"),
-  DoublePois   = count_reg(y ~ x, data = d, family = "doublepois")
+  CPB          = cpb(y ~ x, data = dw, truncated = FALSE, se = "none"),
+  Poisson      = count_reg(y ~ x, data = dw, family = "poisson"),
+  NB           = count_reg(y ~ x, data = dw, family = "negbin"),
+  `COM-Poisson`= count_reg(y ~ x, data = dw, family = "mpcmp"),
+  GenPoisson   = count_reg(y ~ x, data = dw, family = "genpois"),
+  GammaCount   = count_reg(y ~ x, data = dw, family = "gammacount"),
+  DoublePois   = count_reg(y ~ x, data = dw, family = "doublepois")
 )
 do.call(compare_models, fits)
-#>             df    logLik      AIC      BIC logscore       rps
-#> CPB          3 -769.2022 1544.404 1556.379 1.923006 0.9642686
-#> GenPoisson   3 -770.1544 1546.309 1558.283 1.925386 0.9643720
-#> GammaCount   3 -771.8363 1549.673 1561.647 1.929591 0.9632720
-#> COM-Poisson  3 -772.6416 1551.283 1563.258 1.931604 0.9646314
-#> DoublePois   3 -774.3085 1554.617 1566.591 1.935771 0.9651785
-#> Poisson      2 -798.9009 1601.802 1609.785 1.997252 0.9855061
-#> NB           3 -798.9008 1603.802 1615.776 1.997252 0.9855095
+#>             df    logLik      AIC      BIC logscore      rps
+#> CPB          3 -297.1212 600.2425 609.2744 1.980808 1.018955
+#> GenPoisson   3 -297.4525 600.9050 609.9369 1.983017 1.018599
+#> GammaCount   3 -299.0185 604.0369 613.0688 1.993456 1.018395
+#> COM-Poisson  3 -299.2068 604.4135 613.4454 1.994712 1.019137
+#> DoublePois   3 -299.9026 605.8053 614.8372 1.999351 1.019015
+#> Poisson      2 -305.3268 614.6535 620.6748 2.035512 1.029690
+#> NB           3 -305.3268 616.6535 625.6854 2.035512 1.029689
 ```
 
 On underdispersed data the negative binomial collapses onto the Poisson,
@@ -406,9 +421,9 @@ dh <- data.frame(y = yh, x = x, z = z)
 h <- hurdle_cpb(y ~ x, data = dh, participation = ~ z)
 zi <- zi_cpb(y ~ x, data = dh, zero = ~ z)
 compare_models(hurdle = h, mixture = zi)
-#>         df    logLik      AIC      BIC logscore      rps
-#> hurdle   5 -609.9920 1229.984 1249.941 1.524980 1.039174
-#> mixture  5 -610.1175 1230.235 1250.192 1.525294 1.040124
+#>         df    logLik      AIC      BIC logscore       rps
+#> mixture  5 -601.2459 1212.492 1232.449 1.503115 0.9731981
+#> hurdle   5 -602.5343 1215.069 1235.026 1.506336 0.9737676
 ```
 
 The hurdle’s
@@ -432,7 +447,7 @@ w <- sample(1:3, n, TRUE)
 c(weighted = count_reg(y ~ x, data = d, family = "gammacount", weights = w)$loglik,
   expanded = count_reg(y ~ x, data = d[rep(seq_len(n), w), ], family = "gammacount")$loglik)
 #>  weighted  expanded 
-#> -1517.227 -1517.227
+#> -1564.823 -1564.823
 ```
 
 ## Short panels: bias-corrected fixed effects
@@ -446,7 +461,7 @@ each unit’s temporal halves.
 
 ``` r
 
-short <- do.call(rbind, lapply(1:30, function(i) {
+short <- do.call(rbind, lapply(1:16, function(i) {
   xx <- rnorm(8); NN <- pmax(round(exp(1.0 + rnorm(1, 0, 0.4) + 0.3 * xx) / 0.5), 1)
   data.frame(unit = i, x = xx, y = rbinom(8, NN, 0.5))
 }))
@@ -454,7 +469,7 @@ ml <- cpb_fe(y ~ x, data = short, fe = "unit")
 jk <- cpb_fe(y ~ x, data = short, fe = "unit", bias_correct = "jackknife")
 c(ml = ml$alpha, jackknife = jk$alpha)   # truth is 0.5; ML is biased downward
 #>        ml jackknife 
-#> 0.3874510 0.4800524
+#> 0.4142559 0.5079890
 ```
 
 The correction is only valid when the two half-panels estimate the same

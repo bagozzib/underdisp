@@ -191,19 +191,19 @@ which supports two-way fixed effects natively.
 ``` r
 # \donttest{
 set.seed(1)
-d <- do.call(rbind, lapply(1:60, function(i) {
-  x <- rnorm(20); lam <- exp(rnorm(1, 0, 0.5) + 0.5 * x)
+d <- do.call(rbind, lapply(1:25, function(i) {
+  x <- rnorm(12); lam <- exp(rnorm(1, 0, 0.5) + 0.5 * x)
   N <- pmax(round(lam / 0.5), 1)
-  data.frame(unit = i, x = x, y = rbinom(20, N, 0.5))
+  data.frame(unit = i, x = x, y = rbinom(12, N, 0.5))
 }))
 fit <- cpb_fe(y ~ x, data = d, fe = "unit")
 fit
-#> CPB regression with 60 unit fixed effects (concentrated likelihood)
+#> CPB regression with 25 unit fixed effects (concentrated likelihood)
 #> Coefficients:
 #>      x 
-#> 0.3635 
+#> 0.3069 
 #> 
-#> alpha (shape parameter): 0.5447   median implied bound: 2.35 
+#> alpha (shape parameter): 0.4767   median implied bound: 2.56 
 #> Note: alpha is subject to incidental-parameters bias for short panels; see ?cpb_fe.
 # }
 ```
