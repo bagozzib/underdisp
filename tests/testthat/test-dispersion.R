@@ -39,6 +39,7 @@ test_that("boundary nulls bootstrap by default; B = 0 gives the one-sided Self-L
 })
 
 test_that("the calibration rule keeps the asymptotic distribution only for small first-order shifts", {
+  skip_on_cran()                                  # heavy: runs in CI and locally, not on CRAN's clock
   s1 <- underdisp:::.disp_first_order_size
   expect_equal(s1(2, 400, "under"), pnorm(qnorm(0.95) - 2 / sqrt(800), lower.tail = FALSE))
   expect_lt(s1(2, 400, "under"), 0.06)                  # one covariate on 400 rows: asymptotic
@@ -60,6 +61,7 @@ test_that("the calibration rule keeps the asymptotic distribution only for small
 })
 
 test_that("the bootstrap refits reproduce each fit on its own response", {
+  skip_on_cran()                                  # heavy: runs in CI and locally, not on CRAN's clock
   f <- cpb(y ~ x, d_gc, truncated = FALSE, se = "none")
   expect_equal(underdisp:::.disp_alt_fit(f, f$Y)[["loglik"]], f$loglik, tolerance = 1e-6)
   g <- gec(y ~ x, d_gc, se = "none")
@@ -109,6 +111,7 @@ test_that("the auxiliary regression test reproduces the by-hand Cameron-Trivedi 
 })
 
 test_that("the dispersion profile recovers a constant ratio for CPB data", {
+  skip_on_cran()                                  # heavy: runs in CI and locally, not on CRAN's clock
   set.seed(9); m <- 800; xx <- rnorm(m)
   d <- data.frame(y = rcpb(m, exp(1.5 + 0.5 * xx), 0.5), x = xx)
   f <- cpb(y ~ x, d, truncated = FALSE, se = "none")

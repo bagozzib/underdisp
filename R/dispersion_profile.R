@@ -80,7 +80,7 @@
 #'   `bin`, `n`, `mean_fitted`, `mean_y`, `ratio_empirical`, and one
 #'   `ratio_<model>` column per fitted model.
 #' @examples
-#' set.seed(4); n <- 600; x <- rnorm(n)
+#' set.seed(4); n <- 400; x <- rnorm(n)
 #' d <- data.frame(y = rgammacount(n, exp(0.8 + 0.6 * x), alpha = 2.5), x = x)
 #' m_gc <- count_reg(y ~ x, d, family = "gammacount")
 #' m_nb <- count_reg(y ~ x, d, family = "negbin")

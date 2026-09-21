@@ -33,7 +33,8 @@
 #' data(peacekeeping)
 #' table(peacekeeping$contributions == 0)
 #' \donttest{
-#' fit <- hurdle_cpb(contributions ~ lgdppc + milper, data = peacekeeping,
+#' some <- subset(peacekeeping, iso3 %in% unique(iso3)[1:40])   # forty states keep the example short
+#' fit <- hurdle_cpb(contributions ~ lgdppc + milper, data = some,
 #'                   participation = ~ democracy + majorpower, fe = "iso3")
 #' fit
 #' }

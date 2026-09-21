@@ -109,7 +109,8 @@ in the fixed-effects estimator \code{\link[=cpb_fe]{cpb_fe()}}, which solves eac
 Hessian is unreliable on
 such a surface, so inference uses a cold-multistart bootstrap for the
 coefficients (validated to nominal coverage) and a profile-likelihood interval
-for \eqn{\alpha} (see \code{\link[=confint.cpb]{confint.cpb()}}).
+for \eqn{\alpha} (see \code{\link[=alpha_confint]{alpha_confint()}}; first-order by default, calibrated
+by parametric bootstrap after \code{\link[=calibrate_alpha]{calibrate_alpha()}}).
 
 Runtime: a fit with \code{se = "none"} takes a few seconds at 500 rows and about
 fifteen at 2,000 on one core, the nine starts, the profile trace, and the

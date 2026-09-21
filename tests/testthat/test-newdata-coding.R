@@ -12,6 +12,7 @@ d$y0 <- ifelse(runif(n) < plogis(-1 + 0.5 * z), 0L, d$y)
 sub <- d[1:80, ]
 
 test_that("single-equation fits keep the coding on newdata", {
+  skip_on_cran()                                  # heavy: runs in CI and locally, not on CRAN's clock
   for (f in list(cpb(y ~ x + g, d, truncated = FALSE, se = "none"),
                  count_reg(y ~ x + g, d, family = "poisson"),
                  gec(y ~ x + g, d, se = "none"))) {
@@ -22,6 +23,7 @@ test_that("single-equation fits keep the coding on newdata", {
 })
 
 test_that("two-part fits keep the coding on newdata in both equations", {
+  skip_on_cran()                                  # heavy: runs in CI and locally, not on CRAN's clock
   z1 <- zi_cpb(y0 ~ x, d, zero = ~ g, se = "none")
   expect_equal(unname(predict(z1, newdata = d)), unname(fitted(z1)), tolerance = 1e-10)
   z2 <- zi_count(y0 ~ x + g, d, family = "poisson", zero = ~ g)

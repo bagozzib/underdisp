@@ -29,9 +29,9 @@ Incidence rate ratios for a CPB fit
 }
 \examples{
 \donttest{
-set.seed(8); x <- rnorm(300)
-N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)
-fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 100)
+set.seed(8); x <- rnorm(200)
+N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(200, N, 0.5)
+fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 40)
 irr(fit)
 }
 }

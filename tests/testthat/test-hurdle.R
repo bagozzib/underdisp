@@ -40,7 +40,10 @@ test_that("the zero-truncated CPB at a ceiling below 1 is the point mass at 1 ev
   expect_equal(underdisp:::.cpb_ztmean(0.3, 0.5), 1)
   expect_equal(underdisp:::.cpb_mean1(0.3, 0.5, truncated = TRUE), 1)
   expect_equal(unname(underdisp:::.cpb_moments(0.3, 0.5, truncated = TRUE)$var), 0)
-  set.seed(1); expect_true(all(rcpb(20, 0.3, 0.5, truncated = TRUE) == 1))
+  ## the simulator follows the same rule and says so: the stated parameters give such a count probability zero
+  set.seed(1); expect_warning(yy <- rcpb(20, 0.3, 0.5, truncated = TRUE), "ceiling")
+  expect_true(all(yy == 1))
+  expect_silent(rcpb(20, 3, 0.5, truncated = TRUE))
   ## at a ceiling of exactly 1 the same distribution holds
   expect_equal(underdisp:::.cpb_pmf1(0.5, 0.5, 3, truncated = TRUE), c(0, 1, 0, 0))
 })

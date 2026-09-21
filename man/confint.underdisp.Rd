@@ -46,7 +46,8 @@ A two-column matrix of lower and upper bounds.
 \description{
 \code{confint()} methods for the whole family, one interval rule per inference
 type: bootstrap percentile intervals for \code{\link[=cpb]{cpb()}} (coefficients; the
-dispersion parameter gets its profile-likelihood interval) and \code{\link[=gec]{gec()}}
+dispersion parameter gets its profile-likelihood interval, first-order or
+calibrated by \code{\link[=calibrate_alpha]{calibrate_alpha()}}) and \code{\link[=gec]{gec()}}
 (coefficients and \code{delta}); normal-approximation intervals from the
 bootstrap standard errors for the fixed-effects fits (\code{\link[=cpb_fe]{cpb_fe()}},
 \code{\link[=gec_fe]{gec_fe()}}) and the zero-inflated mixtures (\code{\link[=zi_cpb]{zi_cpb()}}, \code{\link[=zi_gec]{zi_gec()}}); Wald

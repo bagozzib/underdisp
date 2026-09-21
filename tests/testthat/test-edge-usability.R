@@ -6,6 +6,7 @@ d <- data.frame(y = rcpb(n, exp(1 + 0.4 * x), 0.5), x = x, g = g)
 du <- d; du$g <- factor(du$g, levels = c(levels(d$g), "zz"))
 
 test_that("unused factor levels are dropped, as lm() and glm() drop them", {
+  skip_on_cran()                                  # heavy: runs in CI and locally, not on CRAN's clock
   a <- cpb(y ~ x + g, du, truncated = FALSE, se = "none")
   b <- cpb(y ~ x + g, d, truncated = FALSE, se = "none")
   expect_equal(a$loglik, b$loglik)
@@ -21,6 +22,7 @@ test_that("an all-zero response fits with a warning that the dispersion is not i
 })
 
 test_that("newdata rows with a missing covariate predict NA", {
+  skip_on_cran()                                  # heavy: runs in CI and locally, not on CRAN's clock
   nd <- data.frame(x = c(0, NA, 1), g = factor(c("a", "b", "c"), levels = levels(d$g)))
   fits <- list(cpb(y ~ x + g, d, truncated = FALSE, se = "none"),
                count_reg(y ~ x + g, d, family = "compois", se = "none"),

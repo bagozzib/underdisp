@@ -70,6 +70,7 @@ reference:
       - confint.cpb
       - confint.underdisp
       - alpha_confint
+      - calibrate_alpha
       - vcov.cpb_fe
       - fitted.underdisp
   - title: Predictions

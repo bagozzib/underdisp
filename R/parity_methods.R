@@ -129,7 +129,8 @@ vcov.zi_gec <- function(object, ...) {
 #'
 #' `confint()` methods for the whole family, one interval rule per inference
 #' type: bootstrap percentile intervals for [cpb()] (coefficients; the
-#' dispersion parameter gets its profile-likelihood interval) and [gec()]
+#' dispersion parameter gets its profile-likelihood interval, first-order or
+#' calibrated by [calibrate_alpha()]) and [gec()]
 #' (coefficients and `delta`); normal-approximation intervals from the
 #' bootstrap standard errors for the fixed-effects fits ([cpb_fe()],
 #' [gec_fe()]) and the zero-inflated mixtures ([zi_cpb()], [zi_gec()]); Wald

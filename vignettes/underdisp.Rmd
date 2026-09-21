@@ -100,14 +100,23 @@ dispersion_test(count_reg(y ~ x, data = d, family = "poisson"),
 Because the CPB's support depends on its parameters, Hessian-based standard
 errors are unreliable; coefficient inference uses a cold-multistart pairs
 bootstrap (validated to nominal coverage in the companion paper), and the
-dispersion parameter carries a profile-likelihood interval. `cores =` runs the
-replicates on a socket cluster seeded from the session.
+dispersion parameter carries a profile-likelihood interval. That interval is
+first-order by default: the estimate of `alpha` is biased toward zero (the
+log-ceiling coefficients behave like endpoint parameters), so it covers about
+0.88 to 0.95 in simulations, with its misses on the upper side.
+`calibrate_alpha()` is the opt-in remedy: it stores the parametric-bootstrap
+distribution of the signed root of the profile likelihood ratio in the fit
+(`fit <- calibrate_alpha(fit, B = 199, cores = 4, seed = 1)`, about a third of
+a fit per replicate), after which `alpha_confint()`, `confint()`,
+`implied_ceiling()` and `summary()` report the calibrated interval. Both
+intervals are model-based and assume independent observations. `cores =` runs
+the replicates on a socket cluster seeded from the session.
 
 ```{r boot}
-fit_b <- cpb(y ~ x, data = d[d$y > 0, ], se = "bootstrap", B = 99)
+fit_b <- cpb(y ~ x, data = d[d$y > 0, ], se = "bootstrap", B = 49)   # a small B keeps the vignette quick
 summary(fit_b)
 irr(fit_b)             # rate ratios with percentile intervals
-confint(fit_b)         # coefficients (percentile) and alpha (profile likelihood)
+confint(fit_b)         # coefficients (percentile) and alpha (first-order profile likelihood)
 ```
 
 ## The free-dispersion GEC
@@ -133,7 +142,7 @@ hide. `cpb_fe()` absorbs a full set of unit fixed effects by concentrating them
 out of the likelihood, so it scales to thousands of units.
 
 ```{r fe}
-panel <- do.call(rbind, lapply(1:50, function(i) {
+panel <- do.call(rbind, lapply(1:30, function(i) {
   xx <- rnorm(12); NN <- pmax(round(exp(rnorm(1, 0, 0.4) + 0.4 * xx) / 0.5), 1)
   data.frame(unit = i, x = xx, y = rbinom(12, NN, 0.5))
 }))
@@ -176,14 +185,15 @@ standard errors, and every method in the package, so `compare_models()` places
 them next to the CPB on one footing.
 
 ```{r wider}
+dw <- d[1:150, ]                         # part of the sample keeps the seven fits quick
 fits <- list(
-  CPB          = cpb(y ~ x, data = d, truncated = FALSE, se = "none"),
-  Poisson      = count_reg(y ~ x, data = d, family = "poisson"),
-  NB           = count_reg(y ~ x, data = d, family = "negbin"),
-  `COM-Poisson`= count_reg(y ~ x, data = d, family = "mpcmp"),
-  GenPoisson   = count_reg(y ~ x, data = d, family = "genpois"),
-  GammaCount   = count_reg(y ~ x, data = d, family = "gammacount"),
-  DoublePois   = count_reg(y ~ x, data = d, family = "doublepois")
+  CPB          = cpb(y ~ x, data = dw, truncated = FALSE, se = "none"),
+  Poisson      = count_reg(y ~ x, data = dw, family = "poisson"),
+  NB           = count_reg(y ~ x, data = dw, family = "negbin"),
+  `COM-Poisson`= count_reg(y ~ x, data = dw, family = "mpcmp"),
+  GenPoisson   = count_reg(y ~ x, data = dw, family = "genpois"),
+  GammaCount   = count_reg(y ~ x, data = dw, family = "gammacount"),
+  DoublePois   = count_reg(y ~ x, data = dw, family = "doublepois")
 )
 do.call(compare_models, fits)
 ```
@@ -263,7 +273,7 @@ jackknife of Dhaene and Jochmans (2015), refitting on each unit's temporal
 halves.
 
 ```{r jackknife}
-short <- do.call(rbind, lapply(1:30, function(i) {
+short <- do.call(rbind, lapply(1:16, function(i) {
   xx <- rnorm(8); NN <- pmax(round(exp(1.0 + rnorm(1, 0, 0.4) + 0.3 * xx) / 0.5), 1)
   data.frame(unit = i, x = xx, y = rbinom(8, NN, 0.5))
 }))

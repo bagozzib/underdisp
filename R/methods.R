@@ -56,7 +56,8 @@ residuals.cpb <- function(object, type = c("response", "pearson"), ...) {
 #' @param object A `"cpb"` object.
 #' @param ... Unused.
 #' @return An object of class `"summary.cpb"` with the coefficient table, the
-#'   dispersion parameter and its profile-likelihood interval, the implied ceiling,
+#'   dispersion parameter and its profile-likelihood interval (first-order, or
+#'   calibrated when the fit went through [calibrate_alpha()]), the implied ceiling,
 #'   fit statistics, and the likelihood-ratio test against a (zero-truncated) Poisson.
 #' @method summary cpb
 #' @export
@@ -64,7 +65,7 @@ summary.cpb <- function(object, ...) {
   z <- object$coefficients / object$se.beta
   ctab <- cbind(Estimate = object$coefficients, `Std. Error` = object$se.beta,
                 `z value` = z, `Pr(>|z|)` = 2 * pnorm(-abs(z)))
-  aci <- .cpb_alpha_profile_ci(object)
+  aci <- .cpb_alpha_ci(object)
   ## the likelihood-ratio statistic against the (zero-truncated) Poisson limit and
   ## its asymptotic boundary-mixture p-value: a value the support guard pushed
   ## below zero is the boundary value 0, and the p-value is flagged as asymptotic
@@ -92,9 +93,11 @@ print.summary.cpb <- function(x, ...) {
   cat("N =", x$n, if (!is.null(x$nobs) && x$nobs != x$n) paste0(" (weight total ", format(x$nobs), ")"),
       "   inference:", x$se.type, "\n\n")
   printCoefmat(x$coefficients, P.values = TRUE, has.Pvalue = TRUE, na.print = "NA")
+  calibrated <- isTRUE(grepl("calibrated", attr(x$alpha.ci, "method"), fixed = TRUE))
   cat("\nalpha =", round(x$alpha, 4),
-      sprintf("  (profile %d%% CI: %.3f to %.3f%s)\n", 95L, x$alpha.ci["lower"],
-              x$alpha.ci["upper"], if (x$alpha.ci["boundary"] == 1) ", at feasibility boundary" else ""))
+      sprintf("  (%s profile %d%% CI: %.3f to %.3f%s)\n", if (calibrated) "calibrated" else "first-order", 95L,
+              x$alpha.ci["lower"], x$alpha.ci["upper"],
+              if (x$alpha.ci["boundary"] == 1) ", lower limit at the parameter bound" else ""))
   cat("Implied ceiling lambda/(1-alpha): median", round(stats::median(x$ceiling), 2),
       "  range", paste(round(range(x$ceiling), 2), collapse = " to "), "\n")
   cat("logLik =", round(x$loglik, 2), "   AIC =", round(x$aic, 2), "\n")
@@ -113,9 +116,11 @@ print.summary.cpb <- function(x, ...) {
 #' Confidence intervals for a CPB fit
 #'
 #' Coefficient intervals use the cold-multistart bootstrap percentile method
-#' (validated to nominal coverage); the interval for `alpha` uses the
-#' profile-likelihood method, which is reliable except under strong underdispersion,
-#' where `alpha` sits at the feasibility boundary and the interval is one-sided.
+#' (validated to nominal coverage). The interval for `alpha` is a
+#' profile-likelihood interval: first-order by default (it covers about 0.88 to
+#' 0.95 in simulations from the CPB, with its misses on the upper side; see
+#' [calibrate_alpha()] for the reason), and calibrated by parametric bootstrap
+#' when the fit went through [calibrate_alpha()].
 #'
 #' @param object A `"cpb"` object fit with `se = "bootstrap"`.
 #' @param parm Optional subset of parameters (coefficient names and/or `"alpha"`).
@@ -131,7 +136,7 @@ confint.cpb <- function(object, parm, level = 0.95, ...) {
   ok <- object$boot[complete.cases(object$boot), , drop = FALSE]
   cib <- t(apply(ok[, 1:object$p, drop = FALSE], 2, quantile, c(a, 1 - a)))
   rownames(cib) <- names(object$coefficients)
-  aci <- .cpb_alpha_profile_ci(object, level = level)
+  aci <- .cpb_alpha_ci(object, level = level)
   ci  <- rbind(cib, alpha = aci[c("lower", "upper")])
   colnames(ci) <- c(paste0(format(100 * a), "%"), paste0(format(100 * (1 - a)), "%"))
   if (!missing(parm)) ci <- ci[parm, , drop = FALSE]

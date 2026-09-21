@@ -82,10 +82,13 @@ predict.cpb <- function(object, newdata = NULL,
 
 #' Implied ceiling with a profile-likelihood interval
 #'
-#' Returns the observation- (or profile-) specific ceiling lambda/(1-alpha), with an
-#' interval propagating the profile-likelihood uncertainty in `alpha` at the fitted
-#' mean. (Coefficient uncertainty in lambda is not propagated here; use
-#' [first_difference()] with `quantity = "ceiling"` for a fully bootstrapped contrast.)
+#' Returns the observation- (or profile-) specific ceiling lambda/(1-alpha), with
+#' bounds that carry the limits of the interval for `alpha` (see [alpha_confint()];
+#' calibrated when the fit went through [calibrate_alpha()]) to the ceiling at the
+#' fitted rate. The rate is held at its estimate: coefficient uncertainty in lambda
+#' is not propagated, so the bounds are not a confidence interval for the ceiling;
+#' use [first_difference()] with `quantity = "ceiling"` for a fully bootstrapped
+#' contrast.
 #'
 #' @param object A `"cpb"` object.
 #' @param newdata Optional covariate profiles.
@@ -105,7 +108,7 @@ implied_ceiling <- function(object, ...) UseMethod("implied_ceiling")
 #' @export
 implied_ceiling.cpb <- function(object, newdata = NULL, level = 0.95, ...) {
   lam <- predict(object, newdata = newdata, type = "rate")
-  aci <- .cpb_alpha_profile_ci(object, level = level)
+  aci <- .cpb_alpha_ci(object, level = level)
   data.frame(lambda  = lam,
              ceiling = lam / (1 - object$alpha),
              lower   = lam / (1 - aci["lower"]),
@@ -126,11 +129,21 @@ implied_ceiling.cpb_fe <- function(object, newdata = NULL, level = 0.95, ...) {
 
 #' Profile-likelihood interval for the dispersion parameter alpha
 #'
+#' The interval inverts the likelihood-ratio test of `alpha`, re-maximizing the
+#' coefficients at each value. By default the cut is the chi-square one (a
+#' first-order interval); it covers about 0.88 to 0.95 in simulations from the
+#' CPB, with nearly all misses on the upper side, because the estimate of
+#' `alpha` is biased toward zero ([calibrate_alpha()] explains the mechanism).
+#' A fit that went through [calibrate_alpha()] gets the interval calibrated by
+#' parametric bootstrap instead. Either interval is model-based: it assumes the
+#' CPB and independent observations.
+#'
 #' @param object A `"cpb"` object.
 #' @param level Confidence level (default 0.95).
 #' @return A length-2 numeric vector (`lower`, `upper`) with attributes `alpha` (the
-#'   point estimate) and `boundary` (`TRUE` if the lower bound is at the feasibility
-#'   boundary, i.e. strong underdispersion, where the interval is one-sided).
+#'   point estimate), `method` (first-order or calibrated) and `boundary` (`TRUE`
+#'   when the profile has not fallen to the cut by `alpha = 0.005`, so that the
+#'   lower limit is the parameter bound).
 #' @examples
 #' set.seed(7); x <- rnorm(300)
 #' N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)
@@ -138,9 +151,9 @@ implied_ceiling.cpb_fe <- function(object, newdata = NULL, level = 0.95, ...) {
 #' alpha_confint(fit)
 #' @export
 alpha_confint <- function(object, level = 0.95) {
-  aci <- .cpb_alpha_profile_ci(object, level = level)
-  structure(aci[c("lower", "upper")], alpha = object$alpha,
-            boundary = aci["boundary"] == 1)
+  aci <- .cpb_alpha_ci(object, level = level)
+  structure(aci[c("lower", "upper")], alpha = object$alpha, method = attr(aci, "method"),
+            boundary = aci[["boundary"]] == 1)
 }
 
 #' Incidence rate ratios for a CPB fit
@@ -156,9 +169,9 @@ alpha_confint <- function(object, level = 0.95) {
 #' @param ... Further arguments passed to methods.
 #' @examples
 #' \donttest{
-#' set.seed(8); x <- rnorm(300)
-#' N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)
-#' fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 100)
+#' set.seed(8); x <- rnorm(200)
+#' N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(200, N, 0.5)
+#' fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 40)
 #' irr(fit)
 #' }
 #' @export
@@ -202,9 +215,9 @@ irr.cpb <- function(object, level = 0.95, ...) {
 #' @param ... Further arguments passed to methods; unknown arguments error.
 #' @examples
 #' \donttest{
-#' set.seed(1); x <- rnorm(400)
-#' N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1); y <- rbinom(400, N, 0.5)
-#' fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 200)
+#' set.seed(1); x <- rnorm(250)
+#' N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1); y <- rbinom(250, N, 0.5)
+#' fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 60)
 #' first_difference(fit, "x", from = -1, to = 1, quantity = "mean")
 #' }
 #' @export

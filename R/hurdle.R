@@ -11,6 +11,13 @@
 #' @param lambda Mean parameter; a scalar or a length-`n` vector.
 #' @param alpha Shape/dispersion parameter in (0, 1).
 #' @param truncated If `TRUE`, draw from the zero-truncated CPB.
+#' @details The support of the CPB is `0, ..., floor(lambda / (1 - alpha))`. A rate
+#' whose ceiling `lambda / (1 - alpha)` is below 1 has the support `{0}`, so its
+#' zero-truncated distribution does not exist. With `truncated = TRUE` such a
+#' draw is set to 1 and a warning reports how many there were: the stated
+#' parameters give that count probability zero, so data simulated this way are
+#' not data from the model (in a simulation study, keep every ceiling at 1 or
+#' above).
 #' @return An integer vector of counts.
 #' @examples
 #' set.seed(1)
@@ -20,16 +27,19 @@ rcpb <- function(n, lambda, alpha, truncated = FALSE) {
   if (length(alpha) != 1L || alpha <= 0 || alpha >= 1) stop("`alpha` must be a single value in (0, 1).")
   if (n == 0) return(integer(0))
   lambda <- rep_len(lambda, n)
-  out <- integer(n)
+  out <- integer(n); nbelow <- 0L
   for (i in seq_len(n)) {
     pr <- .cpb_pmf_core(lambda[i], alpha)
     K  <- length(pr) - 1L
     if (truncated) {
-      if (K < 1) { out[i] <- 1L; next }
+      if (K < 1) { out[i] <- 1L; nbelow <- nbelow + 1L; next }
       pr[1] <- 0; pr <- pr / sum(pr)
     }
     out[i] <- as.integer(sample(0:K, 1L, prob = pr))
   }
+  if (nbelow > 0L)
+    warning(nbelow, " of ", n, " rates have a ceiling lambda / (1 - alpha) below 1, where the zero-truncated CPB does not ",
+            "exist; those draws are set to 1, a count the stated parameters give probability zero.", call. = FALSE)
   out
 }
 

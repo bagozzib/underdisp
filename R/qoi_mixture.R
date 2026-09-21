@@ -19,7 +19,7 @@ implied_ceiling.hurdle_cpb <- function(object, newdata = NULL, level = 0.95, ...
   lam <- if (is.null(newdata)) object$lambda_full else predict(int, newdata = newdata, type = "rate")
   out <- data.frame(lambda = lam, ceiling = lam / (1 - int$alpha), row.names = NULL)
   if (inherits(int, "cpb")) {                         # a profile interval exists for the pooled intensity
-    aci <- .cpb_alpha_profile_ci(int, level = level)
+    aci <- .cpb_alpha_ci(int, level = level)
     out$lower <- lam / (1 - aci["lower"]); out$upper <- lam / (1 - aci["upper"])
   }
   out

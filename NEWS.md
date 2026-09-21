@@ -41,12 +41,34 @@
   bins of the fitted mean against the ratio each fitted family implies, with a
   `plot()` method, so the mechanism behind an underdispersed outcome (a hard
   ceiling, regular event timing, a soft tail) can be read off the data.
+* `calibrate_alpha()`: an opt-in calibration of the interval for the CPB
+  dispersion parameter. The support of the CPB moves with the parameters
+  through the log-ceiling coefficients, which behave like endpoint parameters,
+  and the estimate of `alpha` inherits a bias toward zero from them; the
+  first-order (chi-square) profile interval therefore covers about 0.88 to
+  0.95 in simulations from the CPB, with its misses on the upper side.
+  `calibrate_alpha(fit, B, cores, seed)` stores the parametric-bootstrap
+  distribution of the signed root of the profile likelihood ratio in the fit,
+  and `alpha_confint()`, `confint()`, `implied_ceiling()` and `summary()` then
+  report the interval cut at its quantiles (0.94 to 0.96 in the same
+  simulations, misses balanced). The responses are drawn once on the calling
+  process and the refits use no random numbers, so the result does not depend
+  on `cores`. It is refused, with the reason, for a fit at the `max.support`
+  guard, weights that are not whole numbers, and a fit saved by 0.1.0. With few
+  distinct covariate patterns the first-order interval already covers at its
+  level and the calibration is not needed. Without it the accessors report the
+  first-order interval, and `attr(, "method")` and `summary()` say which one is
+  shown.
 
 ## Weights, parallel bootstraps, and column scaling
 
 * `weights =` (frequency weights) on every estimator; a weight of w is
   equivalent to w copies of the row in the likelihood, the information, the
   score products, and the bootstrap, and `nobs()` returns the weight total.
+  In the parametric bootstraps (`dispersion_test()`, `calibrate_alpha()`) a row
+  of weight w contributes w independent simulated responses; weights that are
+  not whole numbers have no such replicate data, so `dispersion_test()` then
+  reports the asymptotic p-value with a note.
 * `cores =` on every bootstrap, the parametric-bootstrap screen threshold,
   `cv_score()`, and the refit first differences: replicates run on a socket
   cluster seeded from the calling session.
@@ -173,7 +195,13 @@
   `alpha` is maximized with the fit's own multistart (BFGS, Nelder-Mead
   polish, perturbed restarts), so the lower limit is the re-maximized
   profile's crossing point; the interval is one-sided only when the profile
-  has not dropped to the cut by `alpha = 0.005`.
+  has not dropped to the cut by `alpha = 0.005`. Each limit is the outermost
+  crossing of its cut (the profile is a saw-tooth, so the set above a cut need
+  not be connected), and a cut deeper than the stored trace, as at a level
+  above 0.995, re-runs the trace instead of returning the parameter bounds.
+* `rcpb(truncated = TRUE)` warns when a rate's ceiling `lambda / (1 - alpha)` is
+  below 1: the zero-truncated CPB does not exist there, and the draw of 1 it
+  returns has probability zero under the stated parameters.
 * `max.support` defaults to `max(500, 10 * max(y))`; a fit whose largest
   implied ceiling reaches the guard warns and records `$support_binding`; a
   fit whose every start is infeasible errors instead of returning the starting

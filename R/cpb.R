@@ -118,7 +118,8 @@
 #' Hessian is unreliable on
 #' such a surface, so inference uses a cold-multistart bootstrap for the
 #' coefficients (validated to nominal coverage) and a profile-likelihood interval
-#' for \eqn{\alpha} (see [confint.cpb()]).
+#' for \eqn{\alpha} (see [alpha_confint()]; first-order by default, calibrated
+#' by parametric bootstrap after [calibrate_alpha()]).
 #'
 #' Runtime: a fit with `se = "none"` takes a few seconds at 500 rows and about
 #' fifteen at 2,000 on one core, the nine starts, the profile trace, and the
@@ -310,17 +311,25 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
 }
 
 ## Profile-likelihood interval for alpha: invert the LR test by fixing alpha and
-## re-optimizing beta (on the column-scaled design). Well calibrated except at
-## strong underdispersion, where alpha sits at the feasibility boundary and the
-## interval becomes one-sided (see paper).
+## re-optimizing beta (on the column-scaled design). The interval is first-order
+## and model-based. The support floor(lambda_i/(1-alpha)) moves with the
+## parameters, so the log-ceiling coefficients (the intercept less log(1-alpha),
+## and the slopes) are endpoint-type parameters: the likelihood gains whenever an
+## unobserved top support point is shed, the maximum stops at the first count on
+## its ceiling, and alpha-hat inherits a bias toward zero from them (given the
+## ceilings, alpha is a regular exponential-family parameter). With the
+## chi-square cut the interval covers about 0.88 to 0.95 in simulations from the
+## CPB, its misses on the upper side.
 ## The profile is traced by continuation: each alpha starts from the solution
 ## at the previous alpha, and the start is first repaired to feasibility (a
 ## smaller alpha shrinks every ceiling lambda_i/(1-alpha), so the previous
 ## coefficients can leave observations above their ceiling; raising the
 ## intercept restores feasibility) and then re-maximized over beta with
-## restarts. The lower limit is bracketed on a descending grid and located by
-## uniroot inside the bracket. The interval is one-sided (`boundary`) only when
-## the profile has not dropped to the cut by alpha = 0.005.
+## restarts. Each limit is the OUTERMOST crossing of its cut on the trace (the
+## profile is a saw-tooth, so the set above a cut need not be connected),
+## located by uniroot between the last trace point above the cut and the next
+## one out. The interval is one-sided (`boundary`) only when the profile has not
+## dropped to the cut by alpha = 0.005.
 ## The profile machinery of the pooled fit. `.cpb_prof_at()` maximizes the
 ## slopes at a fixed alpha with the fit's own effort (BFGS, Nelder-Mead polish,
 ## feasibility-repaired perturbation restarts, since a single simplex can stop
@@ -435,30 +444,47 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
   o <- order(alpha)
   list(alpha = alpha[o], ll = ll[o], b = b[o])
 }
-.cpb_alpha_profile_ci <- function(object, level = 0.95) {
+.cpb_alpha_profile_ci <- function(object, level = 0.95, drops = NULL) {
   X <- object$X; Y <- object$Y; ms <- object$max.support; tr <- object$truncated
   off <- if (!is.null(object$offset)) object$offset else rep_len(0, length(Y))
   w <- object$weights
   s <- .ud_colscale(X, .ud_w1(w, length(Y))); Xs <- sweep(X, 2, s, "/")
   icol <- match("(Intercept)", colnames(X)); pos <- Y > 0
-  llmax <- object$loglik; cut <- llmax - qchisq(level, 1) / 2
+  llmax <- object$loglik
+  ## `drops`: how far below the maximum each limit sits, c(lower, upper) in
+  ## log-likelihood units; the chi-square cut by default, side-specific values
+  ## when the signed root has been calibrated
+  if (is.null(drops)) drops <- rep(qchisq(level, 1) / 2, 2L)
+  drops <- pmax(as.numeric(drops), 0); cut <- llmax - drops
+  step <- max(0.01, object$alpha / 20)
+  ## a side of the trace is usable when it falls below its cut or ends at the
+  ## parameter bound; the stored trace stops 4 units below the maximum, so a
+  ## deeper cut re-runs it (the fit is not touched)
+  reaches <- function(pr) {
+    if (is.null(pr)) return(FALSE)
+    lo <- pr$alpha < object$alpha - 1e-12; hi <- pr$alpha > object$alpha + 1e-12
+    (any(pr$ll[lo] < cut[1L]) || (any(lo) && min(pr$alpha[lo]) - step < 0.005)) &&
+      (any(pr$ll[hi] < cut[2L]) || (any(hi) && max(pr$alpha[hi]) + step > 0.995))
+  }
   pr <- object$profile
-  if (is.null(pr) || max(pr$ll) > llmax + 1e-8) {           # an older object, or one whose trace is stale
+  if (is.null(pr) || max(pr$ll) > llmax + 1e-8 || !reaches(pr)) {        # an older object, a stale trace, or a cut below it
     fit <- list(par = c(object$coefficients, qlogis(object$alpha)), value = -llmax)
-    pr <- .cpb_profile_trace(X, Y, off, ms, tr, w, fit, drop = qchisq(level, 1) / 2 + 2)
+    pr <- .cpb_profile_trace(X, Y, off, ms, tr, w, fit, drop = max(drops, qchisq(level, 1) / 2) + 2)
   }
   prof <- function(a, b0) .cpb_prof_at(a, b0, Xs, Y, off, ms, tr, w, s, icol, pos)$ll
   k <- which(abs(pr$alpha - object$alpha) < 1e-12)[1L]; if (is.na(k)) k <- which.max(pr$ll)
-  cross <- function(idx) {                                   # first trace point below the cut on one side
-    below <- idx[pr$ll[idx] < cut]
-    if (!length(below)) return(NA_real_)
-    j <- below[1L]; m <- match(j, idx); i <- if (m > 1L) idx[m - 1L] else k
+  cross <- function(idx, cut) {                              # idx runs outward from alpha-hat
+    if (!length(idx)) return(NA_real_)
+    if (cut >= llmax - 1e-10) return(object$alpha)           # a zero drop: the limit is the estimate itself
+    above <- which(pr$ll[idx] >= cut)
+    m <- if (length(above)) max(above) else 0L               # the outermost trace point still above the cut
+    if (m == length(idx)) return(NA_real_)                   # the trace ends above the cut, at a parameter bound
+    i <- if (m == 0L) k else idx[m]; j <- idx[m + 1L]
     f <- function(aa) prof(aa, pr$b[[i]] * s) - cut
     tryCatch(uniroot(f, sort(c(pr$alpha[i], pr$alpha[j])), tol = 1e-4)$root, error = function(e) pr$alpha[j])
   }
-  lo <- if (k > 1L) cross(rev(seq_len(k - 1L))) else NA_real_
-  hi <- if (k < length(pr$ll)) cross(seq(k + 1L, length(pr$ll))) else NA_real_
-  ## the trace ends only where the profile has dropped below the cut or at a bound
+  lo <- cross(if (k > 1L) rev(seq_len(k - 1L)) else integer(0), cut[1L])
+  hi <- cross(if (k < length(pr$ll)) seq(k + 1L, length(pr$ll)) else integer(0), cut[2L])
   c(lower = if (is.na(lo)) 0.005 else unname(lo),
     upper = if (is.na(hi)) 0.999 else unname(hi),
     boundary = as.numeric(is.na(lo)))

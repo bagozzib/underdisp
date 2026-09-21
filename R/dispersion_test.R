@@ -273,6 +273,25 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
   list(loglik = -o$value, rate = conc(o$par)$lam)
 }
 
+## Frequency weights in the parametric bootstrap. A weight of w stands for w
+## independent observations, so a replicate carries w independent draws for that
+## row: the rows are expanded and the refits run unweighted. (One draw per row,
+## with the weight passed to the refit, would make the w copies identical and
+## inflate the replicate statistics by about sum(w^2)/sum(w).) Returns NULL when
+## the weights are not whole numbers, where no such expansion exists.
+.disp_expand <- function(object) {
+  w <- object$weights
+  if (is.null(w)) return(list(object = object, index = seq_along(object$Y)))
+  if (any(abs(w - round(w)) > 1e-8)) return(NULL)
+  idx <- rep(seq_along(w), times = as.integer(round(w)))
+  ob <- object
+  ob$offset <- .disp_offset(object)[idx]
+  ob$X <- object$X[idx, , drop = FALSE]; ob$Y <- object$Y[idx]
+  if (!is.null(object$unit)) ob$unit <- object$unit[idx]
+  ob["weights"] <- list(NULL)
+  list(object = ob, index = idx)
+}
+
 ## Poisson (zero-truncated Poisson) draws at the given rates
 .disp_simulate <- function(rate, truncated) {
   if (!truncated) return(stats::rpois(length(rate), rate))
@@ -351,13 +370,19 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
   nboot <- if (neg$shortfall) 0L else if (is.null(B)) (if (asym_ok) 0L else 199L) else as.integer(B)
   stat <- if (neg$shortfall) NA_real_ else .disp_signed(LR, fam$est, fam, alternative)
   p <- NA_real_; boot <- NULL; B_ok <- NA_integer_
+  ex <- .disp_expand(object)
+  remedy <- "the default (B = NULL) calibrates it by parametric bootstrap"
+  if (is.null(ex)) {                       # weights that are not whole numbers: there is no replicate data to simulate
+    if (nboot > 0L) note <- c(note, "the weights are not whole numbers, so the parametric bootstrap is skipped")
+    nboot <- 0L; remedy <- "the parametric bootstrap that calibrates it needs whole-number weights"
+  }
   if (nboot > 0L) {
-    rate <- null0$rate; trunc <- isTRUE(object$truncated)
+    rate <- null0$rate[ex$index]; trunc <- isTRUE(object$truncated); obj <- ex$object
     one <- function(b) {
       ys <- .disp_simulate(rate, trunc)
       tryCatch(suppressWarnings({
-        n0 <- .disp_null_fit(object, ys)
-        a1 <- .disp_alt_fit(object, ys)
+        n0 <- .disp_null_fit(obj, ys)
+        a1 <- .disp_alt_fit(obj, ys)
         if (!is.finite(n0$loglik) || !is.finite(a1[["loglik"]]) || a1[["loglik"]] < -1e9) NA_real_
         else .disp_signed(max(2 * (a1[["loglik"]] - n0$loglik), 0), a1[["est"]], fam, alternative)
       }), error = function(e) NA_real_)
@@ -373,7 +398,8 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
     }
   } else if (!neg$shortfall && des$fe) {
     note <- c(note, paste0("unit fixed effects bias the dispersion estimate toward underdispersion, so the asymptotic ",
-                           "distribution does not apply; B > 0 gives the parametric-bootstrap p-value"))
+                           "distribution does not apply; ",
+                           if (is.null(ex)) remedy else "B > 0 gives the parametric-bootstrap p-value"))
   } else if (!neg$shortfall) {
     p <- if (fam$boundary) 0.5 * stats::pchisq(LR, 1, lower.tail = FALSE)
          else switch(alternative,
@@ -383,10 +409,10 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
     if (!asym_ok)
       note <- c(note, if (fam$boundary)
         paste0("the p-value is asymptotic; at a boundary null the statistic is skewed toward rejection in finite ",
-               "samples, and the default (B = NULL) calibrates it by parametric bootstrap")
+               "samples, and ", remedy)
         else sprintf(paste0("the p-value is asymptotic; with %d mean parameters on %s observations its first-order ",
-                            "size at the 5%% level is %.3f, and the default (B = NULL) calibrates it by parametric bootstrap"),
-                     as.integer(des$p), format(des$n), size1))
+                            "size at the 5%% level is %.3f, and %s"),
+                     as.integer(des$p), format(des$n), size1, remedy))
   }
   structure(list(statistic = c(LR = LR), parameter = c(df = 1), p.value = p, note = note,
                  estimate = stats::setNames(fam$est, fam$par), null.value = stats::setNames(fam$null, fam$par),

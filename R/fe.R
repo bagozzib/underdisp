@@ -107,10 +107,10 @@
 #' @examples
 #' \donttest{
 #' set.seed(1)
-#' d <- do.call(rbind, lapply(1:60, function(i) {
-#'   x <- rnorm(20); lam <- exp(rnorm(1, 0, 0.5) + 0.5 * x)
+#' d <- do.call(rbind, lapply(1:25, function(i) {
+#'   x <- rnorm(12); lam <- exp(rnorm(1, 0, 0.5) + 0.5 * x)
 #'   N <- pmax(round(lam / 0.5), 1)
-#'   data.frame(unit = i, x = x, y = rbinom(20, N, 0.5))
+#'   data.frame(unit = i, x = x, y = rbinom(12, N, 0.5))
 #' }))
 #' fit <- cpb_fe(y ~ x, data = d, fe = "unit")
 #' fit
