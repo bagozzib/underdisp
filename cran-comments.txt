@@ -1,45 +1,48 @@
-underdisp 0.1.1
+## underdisp 0.1.2
 
-This is a maintenance and feature release of underdisp (first published on CRAN
-2026-08-20). It adds four count families, two dispersion diagnostics, frequency
-weights, parallel bootstraps, and an opt-in calibration of the interval for the
-CPB dispersion parameter, and it fixes the issues found in two external review
-rounds (see NEWS.md).
+This release exists to correct the undefined behaviour reported for 0.1.1 on
+https://www.stats.ox.ac.uk/pub/bdr/M1-SAN/underdisp (mail of 2026-09-28, to be
+corrected before 2026-10-19).
 
-Test environments
+## The issue and the fix
 
-- local Windows 11, R 4.6.1 (R CMD check --as-cran): see the results below.
-- GitHub Actions (r-lib/actions): ubuntu-latest (R release, devel, oldrel-1),
+The sanitizer reported "outside the range of representable values of type 'int'"
+at `cpb_pmf.h:30`, `cpb_fe.cpp:106` (twice) and `cpb_fe.cpp:164`. The value being
+converted is a fitted ceiling, `lambda / (1 - alpha)` for the CPB and
+`mu / (1 - delta)` for the GEC. Both diverge as the dispersion parameter
+approaches its equidispersed limit, and the limit is reachable exactly, because
+the parameter is carried on the logit scale and `plogis()` returns 1 once its
+argument passes about 40. The ceiling was then `+Inf` and the conversion
+undefined.
+
+Every caller already rejected a ceiling above `max.support`, so the fix caps the
+value at `max.support + 1` before converting, through one rule in the new
+`src/support_cap.h`. I audited every `double` to `int` conversion in `src/` and
+routed all six of this kind through it, including two the sanitizer's runs did
+not reach (`cpb_fe.cpp:67` and `gec_fe.cpp:104`), so the same defect cannot
+resurface from a path your tests happen to exercise later. `tests/testthat/
+test-support-cap.R` pins the behaviour at and beyond the limit.
+
+## Test environments
+
+* local Windows 11, R 4.6.1 (`R CMD check --as-cran`).
+* GitHub Actions (r-lib/actions): ubuntu-latest (R release, devel, oldrel-1),
   macOS-latest (release), windows-latest (release), with NOT_CRAN = true so the
   full test suite runs.
-- win-builder R-devel and R-release.
+* win-builder R-devel and R-release.
 
-R CMD check results
+## R CMD check results
 
-Local (Windows 11, R 4.6.1, R CMD check --as-cran): 0 errors | 0 warnings |
-1 note. The note is "Skipping checking math rendering: package 'V8' unavailable",
-a property of the local check environment.
+0 errors | 0 warnings | 1 note. The note is the usual incoming-feasibility one,
+naming the maintainer and flagging Katz, equidispersion and rootograms in the
+Description; these are standard statistical terms.
 
-Overall check time is under eight minutes on that machine. The 0.1.0 submission
-was auto-rejected in 2026-08 for exceeding the ten-minute budget, so for this
-release the heavy test blocks, examples and vignette chunks were measured
-individually and reduced: the CRAN-visible test run is about one minute, the
-examples about forty seconds (including --run-donttest), and the vignette
-rebuild about two minutes.
+Check time is unchanged and well inside the ten-minute budget (the 0.1.1 incoming
+check ran 363 seconds).
 
-The CRAN-mode test run passes with 0 failures and 0 errors; the full validation
-batteries run with NOT_CRAN = true in the package's continuous integration, which
-is green on all five platforms above.
+## Notes for the reviewer
 
-Notes for the reviewer
-
-- The package compiles a small amount of C++ (Rcpp) for the likelihoods; no
-  system requirements beyond a C++11 compiler.
-- Long-running test batteries are gated behind testthat::skip_on_cran() so the
-  check stays inside the ten-minute budget; they run in the package's continuous
-  integration.
-- Tests and examples that compare against glmmTMB, gamlss.dist, rmutil,
-  COMPoissonReg, and the Ecdat/wooldridge data sets are guarded by
-  requireNamespace() and skip when those Suggests are unavailable.
-- Words flagged as possibly misspelled in the Description (Katz, equidispersion,
-  rootograms) are standard statistical terms.
+* No user-visible interface changed, and no fitted value changed: I compared the
+  0.1.1 and 0.1.2 builds on an identical battery of fits and every cross-sectional
+  and fixed-effects CPB result, and the calibrated interval, agree bit for bit.
+* Long-running test batteries remain gated behind `testthat::skip_on_cran()`.

@@ -1,7 +1,7 @@
 Package: underdisp
 Type: Package
 Title: Diagnostics and Models for Underdispersed Count Data
-Version: 0.1.1
+Version: 0.1.2
 Authors@R: person("Benjamin E.", "Bagozzi", email = "bagozzib@udel.edu",
     role = c("aut", "cre"), comment = c(ORCID = "0000-0002-6233-6453"))
 Description: Tools for detecting and modeling underdispersion in count data

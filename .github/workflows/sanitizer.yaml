@@ -1,0 +1,61 @@
+# Undefined-behaviour and address sanitizers, in the r-hub containers.
+#
+# CRAN's own macOS-arm64 sanitizer build (M1-SAN) reported undefined behaviour in 0.1.1 that none of the
+# ordinary check platforms sees, because a sanitizer finding does not change the check status: the errors
+# appear only as "runtime error:" lines inside the .Rout files, and 00check.log still reads "Status: OK".
+# This workflow therefore does not trust the check's exit code. It greps the check directory for sanitizer
+# output and fails the job if any is present.
+name: sanitizer
+
+on:
+  push:
+    branches: ['fix/**', 'sanitizer/**']
+  workflow_dispatch:
+
+jobs:
+  sanitize:
+    runs-on: ubuntu-latest
+    name: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        container: [clang-ubsan, clang-asan]
+    container:
+      image: ghcr.io/r-hub/containers/${{ matrix.container }}:latest
+    timeout-minutes: 180
+    env:
+      # Suggests are only used by comparison tests that skip when the package is absent, and building them
+      # under a sanitizer costs far more than it tells us. The paths that matter here -- the CPB and GEC
+      # likelihoods, their fixed-effects search, and the alpha_confint example -- need none of them.
+      _R_CHECK_FORCE_SUGGESTS_: false
+      R_KEEP_PKG_SOURCE: yes
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install hard dependencies
+        run: R -q -e 'pak::pkg_install(c("deps::.", "any::rcmdcheck"), dependencies = NA)'
+
+      - name: R CMD check
+        run: |
+          R -q -e 'rcmdcheck::rcmdcheck(args = c("--no-manual"), error_on = "never", check_dir = "check")'
+
+      - name: Fail if the sanitizer reported anything
+        run: |
+          echo "Searching the check output for sanitizer diagnostics..."
+          if grep -rnE "runtime error:|AddressSanitizer|UndefinedBehaviorSanitizer|SUMMARY: .*Sanitizer" check/ ; then
+            echo "::error::${{ matrix.container }} reported sanitizer diagnostics (see the matches above)"
+            exit 1
+          fi
+          echo "Clean: no sanitizer diagnostics in the check output."
+
+      - name: Show the check log
+        if: always()
+        run: cat check/*.Rcheck/00check.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-${{ matrix.container }}
+          path: check
+          retention-days: 14
