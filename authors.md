@@ -8,7 +8,7 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/bagozzib/underdisp/blob/main/inst/CITATION)
+[`inst/CITATION`](https://github.com/bagozzib/underdisp/blob/v0.1.1/inst/CITATION)
 
 Bagozzi, B.E. (2026). underdisp: Diagnostics and Models for
 Underdispersed Count Data. R package version 0.1.1.
