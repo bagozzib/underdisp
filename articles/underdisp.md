@@ -158,8 +158,8 @@ cold-multistart pairs bootstrap (validated to nominal coverage in the
 companion paper), and the dispersion parameter carries a
 profile-likelihood interval. That interval is first-order by default:
 the estimate of `alpha` is biased toward zero (the log-ceiling
-coefficients behave like endpoint parameters), so it covers about 0.88
-to 0.95 in simulations, with its misses on the upper side.
+coefficients behave like endpoint parameters), so it covers about 0.90
+to 0.94 in simulations, with its misses on the upper side.
 [`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md)
 is the opt-in remedy: it stores the parametric-bootstrap distribution of
 the signed root of the profile likelihood ratio in the fit
@@ -480,7 +480,7 @@ temporal halves disagree beyond that placebo noise, the correction is
 *refused* with a warning naming the failed assumption and the
 maximum-likelihood fit is returned. On a trending or regime-changing
 panel, the refusal is the correct answer. The gate is deliberately
-powered over sized: in calibration it refuses about 9% of genuinely
+powered over sized: in calibration it refuses about 7% of genuinely
 homogeneous panels (you keep the ordinary ML fit) while catching 98% of
 dispersion regime changes and all smooth unmodeled trends.
 

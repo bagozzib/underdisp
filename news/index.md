@@ -63,8 +63,8 @@
   parameter. The support of the CPB moves with the parameters through
   the log-ceiling coefficients, which behave like endpoint parameters,
   and the estimate of `alpha` inherits a bias toward zero from them; the
-  first-order (chi-square) profile interval therefore covers about 0.88
-  to 0.95 in simulations from the CPB, with its misses on the upper
+  first-order (chi-square) profile interval therefore covers about 0.90
+  to 0.94 in simulations from the CPB, with its misses on the upper
   side. `calibrate_alpha(fit, B, cores, seed)` stores the
   parametric-bootstrap distribution of the signed root of the profile
   likelihood ratio in the fit, and
@@ -72,7 +72,7 @@
   [`confint()`](https://rdrr.io/r/stats/confint.html),
   [`implied_ceiling()`](https://bagozzib.github.io/underdisp/reference/implied_ceiling.md)
   and [`summary()`](https://rdrr.io/r/base/summary.html) then report the
-  interval cut at its quantiles (0.94 to 0.96 in the same simulations,
+  interval cut at its quantiles (0.92 to 0.96 in the same simulations,
   misses balanced). The responses are drawn once on the calling process
   and the refits use no random numbers, so the result does not depend on
   `cores`. It is refused, with the reason, for a fit at the

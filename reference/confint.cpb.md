@@ -3,7 +3,7 @@
 Coefficient intervals use the cold-multistart bootstrap percentile
 method (validated to nominal coverage). The interval for `alpha` is a
 profile-likelihood interval: first-order by default (it covers about
-0.88 to 0.95 in simulations from the CPB, with its misses on the upper
+0.90 to 0.94 in simulations from the CPB, with its misses on the upper
 side; see
 [`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md)
 for the reason), and calibrated by parametric bootstrap when the fit

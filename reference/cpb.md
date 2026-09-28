@@ -172,7 +172,7 @@ Journal of Political Science*, 33(3), 762-784.
 
 ``` r
 set.seed(1)
-n <- 300; x <- rnorm(n)
+n <- 200; x <- rnorm(n)
 N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1)
 y <- rbinom(n, N, 0.5)                 # underdispersed (var/mean approx 0.5)
 d <- data.frame(y = y, x = x)
@@ -180,15 +180,15 @@ fit <- cpb(y ~ x, data = d[d$y > 0, ], se = "none")
 summary(fit)
 #> 
 #> Continuous Parameter Binomial regression (zero-truncated)
-#> N = 298    inference: none 
+#> N = 199    inference: none 
 #> 
 #>             Estimate Std. Error z value Pr(>|z|)
-#> (Intercept)  1.58998         NA      NA       NA
-#> x            0.50639         NA      NA       NA
+#> (Intercept)  1.61276         NA      NA       NA
+#> x            0.51797         NA      NA       NA
 #> 
-#> alpha = 0.4862   (first-order profile 95% CI: 0.457 to 0.591)
-#> Implied ceiling lambda/(1-alpha): median 9.37   range 2.21 to 36.5 
-#> logLik = -559.53    AIC = 1125.06 
-#> LR vs ZT-Poisson (H0: alpha = 1): 51.09, p 4.4046e-13
+#> alpha = 0.5141   (first-order profile 95% CI: 0.475 to 0.618)
+#> Implied ceiling lambda/(1-alpha): median 10.09   range 3.28 to 35.82 
+#> logLik = -377.13    AIC = 760.25 
+#> LR vs ZT-Poisson (H0: alpha = 1): 33.82, p 3.0231e-09
 #> Note: the p-value is asymptotic, which over-rejects in finite samples at this boundary; dispersion_test() gives the parametric-bootstrap p-value.
 ```

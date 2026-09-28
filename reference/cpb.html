@@ -212,7 +212,7 @@ parallel.</p>
     <div class="section level2">
     <h2 id="ref-examples">Examples<a class="anchor" aria-label="anchor" href="#ref-examples"></a></h2>
     <div class="sourceCode"><pre class="sourceCode r"><code><span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span></span>
-<span class="r-in"><span><span class="va">n</span> <span class="op">&lt;-</span> <span class="fl">300</span>; <span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span></span>
+<span class="r-in"><span><span class="va">n</span> <span class="op">&lt;-</span> <span class="fl">200</span>; <span class="va">x</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Normal.html" class="external-link">rnorm</a></span><span class="op">(</span><span class="va">n</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">N</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/Extremes.html" class="external-link">pmax</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Round.html" class="external-link">round</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/Log.html" class="external-link">exp</a></span><span class="op">(</span><span class="fl">1.6</span> <span class="op">+</span> <span class="fl">0.5</span> <span class="op">*</span> <span class="va">x</span><span class="op">)</span> <span class="op">/</span> <span class="fl">0.5</span><span class="op">)</span>, <span class="fl">1</span><span class="op">)</span></span></span>
 <span class="r-in"><span><span class="va">y</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="va">n</span>, <span class="va">N</span>, <span class="fl">0.5</span><span class="op">)</span>                 <span class="co"># underdispersed (var/mean approx 0.5)</span></span></span>
 <span class="r-in"><span><span class="va">d</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>y <span class="op">=</span> <span class="va">y</span>, x <span class="op">=</span> <span class="va">x</span><span class="op">)</span></span></span>
@@ -220,16 +220,16 @@ parallel.</p>
 <span class="r-in"><span><span class="fu"><a href="https://rdrr.io/r/base/summary.html" class="external-link">summary</a></span><span class="op">(</span><span class="va">fit</span><span class="op">)</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Continuous Parameter Binomial regression (zero-truncated)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> N = 298    inference: none </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> N = 199    inference: none </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>             Estimate Std. Error z value Pr(&gt;|z|)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.58998         NA      NA       NA</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> x            0.50639         NA      NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> (Intercept)  1.61276         NA      NA       NA</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> x            0.51797         NA      NA       NA</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> alpha = 0.4862   (first-order profile 95% CI: 0.457 to 0.591)</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> Implied ceiling lambda/(1-alpha): median 9.37   range 2.21 to 36.5 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> logLik = -559.53    AIC = 1125.06 </span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> LR vs ZT-Poisson (H0: alpha = 1): 51.09, p 4.4046e-13</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> alpha = 0.5141   (first-order profile 95% CI: 0.475 to 0.618)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> Implied ceiling lambda/(1-alpha): median 10.09   range 3.28 to 35.82 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> logLik = -377.13    AIC = 760.25 </span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> LR vs ZT-Poisson (H0: alpha = 1): 33.82, p 3.0231e-09</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Note: the p-value is asymptotic, which over-rejects in finite samples at this boundary; dispersion_test() gives the parametric-bootstrap p-value.</span>
 </code></pre></div>
     </div>

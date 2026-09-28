@@ -2,7 +2,7 @@
 
 The interval inverts the likelihood-ratio test of `alpha`, re-maximizing
 the coefficients at each value. By default the cut is the chi-square one
-(a first-order interval); it covers about 0.88 to 0.95 in simulations
+(a first-order interval); it covers about 0.90 to 0.94 in simulations
 from the CPB, with nearly all misses on the upper side, because the
 estimate of `alpha` is biased toward zero
 ([`calibrate_alpha()`](https://bagozzib.github.io/underdisp/reference/calibrate_alpha.md)
@@ -38,15 +38,15 @@ A length-2 numeric vector (`lower`, `upper`) with attributes `alpha`
 ## Examples
 
 ``` r
-set.seed(7); x <- rnorm(300)
-N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)
+set.seed(7); x <- rnorm(200)
+N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(200, N, 0.5)
 fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "none")
 alpha_confint(fit)
 #>     lower     upper 
-#> 0.4383949 0.5920518 
+#> 0.4359848 0.6107149 
 #> attr(,"alpha")
 #>           
-#> 0.4846687 
+#> 0.4815937 
 #> attr(,"method")
 #> [1] "first-order profile likelihood"
 #> attr(,"boundary")
