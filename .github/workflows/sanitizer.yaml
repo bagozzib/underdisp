@@ -24,21 +24,35 @@ jobs:
       image: ghcr.io/r-hub/containers/${{ matrix.container }}:latest
     timeout-minutes: 180
     env:
-      # Suggests are only used by comparison tests that skip when the package is absent, and building them
-      # under a sanitizer costs far more than it tells us. The paths that matter here -- the CPB and GEC
-      # likelihoods, their fixed-effects search, and the alpha_confint example -- need none of them.
+      # The heavy Suggests (glmmTMB, gamlss.dist, COMPoissonReg, ...) back comparison tests that skip when
+      # the package is absent, and compiling them under a sanitizer costs far more than it tells us. But
+      # testthat is NOT optional here: without it R CMD check runs no tests at all, and tests/testthat.Rout
+      # is exactly where CRAN's fixed-effects reports came from. knitr only has to exist so the build does
+      # not stop looking for the vignette builder.
       _R_CHECK_FORCE_SUGGESTS_: false
       R_KEEP_PKG_SOURCE: yes
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install hard dependencies
-        run: R -q -e 'pak::pkg_install(c("deps::.", "any::rcmdcheck"), dependencies = NA)'
+      - name: Install dependencies
+        run: |
+          R -q -e 'pak::pkg_install(c("deps::.", "any::rcmdcheck", "any::testthat", "any::knitr"), dependencies = NA)'
 
+      # Vignettes are skipped: they need pandoc and add sanitizer minutes, and none of the reported errors
+      # came from them. The coverage that matters is the examples and the test suite, both of which run.
       - name: R CMD check
         run: |
-          R -q -e 'rcmdcheck::rcmdcheck(args = c("--no-manual"), error_on = "never", check_dir = "check")'
+          R -q -e 'rcmdcheck::rcmdcheck(args = c("--no-manual", "--ignore-vignettes"), build_args = "--no-build-vignettes", error_on = "never", check_dir = "check")'
+
+      - name: Confirm the tests actually ran
+        run: |
+          if [ ! -f check/*.Rcheck/tests/testthat.Rout ] && [ ! -f check/*.Rcheck/tests/testthat.Rout.fail ]; then
+            echo "::error::no testthat output -- the suite did not run, so this proves nothing"
+            ls -R check/*.Rcheck/tests || true
+            exit 1
+          fi
+          echo "testthat output present."
 
       - name: Fail if the sanitizer reported anything
         run: |
