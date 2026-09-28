@@ -4,6 +4,7 @@
 ^docs$
 ^pkgdown$
 ^cran-comments\.md$
+^cran-comments\.txt$
 ^.*\.Rproj$
 ^\.Rproj\.user$
 ^src/.*\.o$
