@@ -20,7 +20,7 @@ lower limit is the parameter bound).
 \description{
 The interval inverts the likelihood-ratio test of \code{alpha}, re-maximizing the
 coefficients at each value. By default the cut is the chi-square one (a
-first-order interval); it covers about 0.88 to 0.95 in simulations from the
+first-order interval); it covers about 0.90 to 0.94 in simulations from the
 CPB, with nearly all misses on the upper side, because the estimate of
 \code{alpha} is biased toward zero (\code{\link[=calibrate_alpha]{calibrate_alpha()}} explains the mechanism).
 A fit that went through \code{\link[=calibrate_alpha]{calibrate_alpha()}} gets the interval calibrated by
@@ -28,8 +28,8 @@ parametric bootstrap instead. Either interval is model-based: it assumes the
 CPB and independent observations.
 }
 \examples{
-set.seed(7); x <- rnorm(300)
-N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)
+set.seed(7); x <- rnorm(200)
+N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(200, N, 0.5)
 fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "none")
 alpha_confint(fit)
 }

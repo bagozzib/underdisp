@@ -178,7 +178,7 @@
 #'
 #' @examples
 #' set.seed(1)
-#' n <- 300; x <- rnorm(n)
+#' n <- 200; x <- rnorm(n)
 #' N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1)
 #' y <- rbinom(n, N, 0.5)                 # underdispersed (var/mean approx 0.5)
 #' d <- data.frame(y = y, x = x)
@@ -318,7 +318,7 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
 ## unobserved top support point is shed, the maximum stops at the first count on
 ## its ceiling, and alpha-hat inherits a bias toward zero from them (given the
 ## ceilings, alpha is a regular exponential-family parameter). With the
-## chi-square cut the interval covers about 0.88 to 0.95 in simulations from the
+## chi-square cut the interval covers about 0.90 to 0.94 in simulations from the
 ## CPB, its misses on the upper side.
 ## The profile is traced by continuation: each alpha starts from the solution
 ## at the previous alpha, and the start is first repaired to feasibility (a

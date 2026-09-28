@@ -122,7 +122,7 @@ parallel.
 }
 \examples{
 set.seed(1)
-n <- 300; x <- rnorm(n)
+n <- 200; x <- rnorm(n)
 N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1)
 y <- rbinom(n, N, 0.5)                 # underdispersed (var/mean approx 0.5)
 d <- data.frame(y = y, x = x)

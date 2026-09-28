@@ -61,7 +61,7 @@
 #' half-panel dispersion estimates disagree beyond what the 1/T bias can
 #' explain. A refusal is diagnostic information about the panel, not an error.
 #' The gate is deliberately powered over sized: in the package's calibration
-#' Monte Carlo it refuses about 9 percent of genuinely time-homogeneous panels
+#' Monte Carlo it refuses about 7 percent of genuinely time-homogeneous panels
 #' (a conservative nuisance; the returned fit is exactly the ordinary
 #' maximum-likelihood estimate) while catching 98 percent of dispersion regime
 #' changes and 100 percent of smooth unmodeled trends -- the cases where an

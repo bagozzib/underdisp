@@ -21,8 +21,8 @@ A matrix of lower/upper bounds.
 \description{
 Coefficient intervals use the cold-multistart bootstrap percentile method
 (validated to nominal coverage). The interval for \code{alpha} is a
-profile-likelihood interval: first-order by default (it covers about 0.88 to
-0.95 in simulations from the CPB, with its misses on the upper side; see
+profile-likelihood interval: first-order by default (it covers about 0.90 to
+0.94 in simulations from the CPB, with its misses on the upper side; see
 \code{\link[=calibrate_alpha]{calibrate_alpha()}} for the reason), and calibrated by parametric bootstrap
 when the fit went through \code{\link[=calibrate_alpha]{calibrate_alpha()}}.
 }

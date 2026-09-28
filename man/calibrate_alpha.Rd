@@ -45,8 +45,9 @@ below its maximum on both sides. For the CPB that cut is not calibrated: the
 support \verb{0, ..., floor(lambda / (1 - alpha))} moves with the parameters, the
 log-ceiling coefficients behave like endpoint parameters, and \code{alpha}-hat
 inherits a bias toward zero from them. In simulations from the CPB the
-first-order 95\% interval covers between 0.88 and 0.95, and nearly all of its
-misses have the true \code{alpha} above the upper limit.
+first-order 95\% interval covers between 0.90 and 0.94 across a grid of nine
+designs, and nearly all of its misses have the true \code{alpha} above the upper
+limit.
 
 The calibration simulates \code{B} responses from the fitted model (the fitted
 rates, \code{alpha}-hat, the same truncation and offset), refits each one, and
@@ -56,7 +57,7 @@ The interval is then \verb{\{alpha : q_lo <= r(alpha) <= q_hi\}}, with \code{q_l
 each end (the 5th smallest and 5th largest of 199 at the 95\% level), so the
 upper limit sits \code{q_lo^2 / 2} and the lower limit \code{q_hi^2 / 2} below the
 maximum of the profile. In the same simulations the calibrated 95\% interval
-covers 0.94 to 0.96, with its misses balanced between the two sides. The
+covers 0.92 to 0.96, with its misses balanced between the two sides. The
 first-order interval falls short only when the design has many distinct
 covariate patterns (the endpoint effect needs many distinct ceilings): with an
 intercept only, or a covariate taking ten or fewer values, it covers at or
