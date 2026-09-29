@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">underdisp</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.1</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.1.2</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,11 +34,21 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/bagozzib/underdisp/blob/v0.1.1/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/bagozzib/underdisp/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
     <div class="section level2">
-<h2 class="pkg-version" data-toc-text="0.1.1" id="underdisp-011">underdisp 0.1.1<a class="anchor" aria-label="anchor" href="#underdisp-011"></a></h2>
+<h2 class="pkg-version" data-toc-text="0.1.2" id="underdisp-012">underdisp 0.1.2<a class="anchor" aria-label="anchor" href="#underdisp-012"></a></h2>
+<div class="section level3">
+<h3 id="bug-fixes-0-1-2">Bug fixes<a class="anchor" aria-label="anchor" href="#bug-fixes-0-1-2"></a></h3>
+<ul><li>
+<p>Converting a fitted ceiling to an integer is now guarded against values outside the range of <code>int</code>. The CPB’s ceiling is <code>lambda / (1 - alpha)</code> and the GEC’s is <code>mu / (1 - delta)</code>; both diverge as the dispersion parameter approaches its equidispersed limit, which an optimizer reaches routinely, and the conversion was undefined behaviour there. CRAN’s macOS sanitizer build reported it in <code>cpb_pmf.h</code> and <code>cpb_fe.cpp</code>. All six conversions of this kind, including two the sanitizer did not reach, now cap the ceiling at <code>max.support + 1</code> first, through a single rule in <code>src/support_cap.h</code>.</p>
+<p>A ceiling past <code>max.support</code> was already treated as infeasible, on both of the platforms whose out-of-range conversions differ, so fitted values are unchanged: every cross-sectional and fixed-effects CPB fit, every GEC fit without fixed effects, and the calibrated interval reproduce bit for bit. The exception is <code><a href="../reference/gec_fe.html">gec_fe()</a></code> on data whose dispersion is driven to the Katz limit, where the breakpoint scan now runs from a defined bound and the optimizer can settle a few parts in 10^8 away.</p>
+</li>
+</ul></div>
+</div>
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.1.1" id="underdisp-011">underdisp 0.1.1<a class="anchor" aria-label="anchor" href="#underdisp-011"></a></h2><p class="text-muted">CRAN release: 2026-09-28</p>
 <div class="section level3">
 <h3 id="new-families-0-1-1">New families<a class="anchor" aria-label="anchor" href="#new-families-0-1-1"></a></h3>
 <ul><li>
