@@ -1,0 +1,75 @@
+# Undefined-behaviour and address sanitizers, in the r-hub containers.
+#
+# CRAN's own macOS-arm64 sanitizer build (M1-SAN) reported undefined behaviour in 0.1.1 that none of the
+# ordinary check platforms sees, because a sanitizer finding does not change the check status: the errors
+# appear only as "runtime error:" lines inside the .Rout files, and 00check.log still reads "Status: OK".
+# This workflow therefore does not trust the check's exit code. It greps the check directory for sanitizer
+# output and fails the job if any is present.
+name: sanitizer
+
+on:
+  push:
+    branches: ['fix/**', 'sanitizer/**']
+  workflow_dispatch:
+
+jobs:
+  sanitize:
+    runs-on: ubuntu-latest
+    name: ${{ matrix.container }}
+    strategy:
+      fail-fast: false
+      matrix:
+        container: [clang-ubsan, clang-asan]
+    container:
+      image: ghcr.io/r-hub/containers/${{ matrix.container }}:latest
+    timeout-minutes: 180
+    env:
+      # The heavy Suggests (glmmTMB, gamlss.dist, COMPoissonReg, ...) back comparison tests that skip when
+      # the package is absent, and compiling them under a sanitizer costs far more than it tells us. But
+      # testthat is NOT optional here: without it R CMD check runs no tests at all, and tests/testthat.Rout
+      # is exactly where CRAN's fixed-effects reports came from. knitr only has to exist so the build does
+      # not stop looking for the vignette builder.
+      _R_CHECK_FORCE_SUGGESTS_: false
+      R_KEEP_PKG_SOURCE: yes
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          R -q -e 'pak::pkg_install(c("deps::.", "any::rcmdcheck", "any::testthat", "any::knitr"), dependencies = NA)'
+
+      # Vignettes are skipped: they need pandoc and add sanitizer minutes, and none of the reported errors
+      # came from them. The coverage that matters is the examples and the test suite, both of which run.
+      - name: R CMD check
+        run: |
+          R -q -e 'rcmdcheck::rcmdcheck(args = c("--no-manual", "--ignore-vignettes"), build_args = "--no-build-vignettes", error_on = "never", check_dir = "check")'
+
+      - name: Confirm the tests actually ran
+        run: |
+          if [ ! -f check/*.Rcheck/tests/testthat.Rout ] && [ ! -f check/*.Rcheck/tests/testthat.Rout.fail ]; then
+            echo "::error::no testthat output -- the suite did not run, so this proves nothing"
+            ls -R check/*.Rcheck/tests || true
+            exit 1
+          fi
+          echo "testthat output present."
+
+      - name: Fail if the sanitizer reported anything
+        run: |
+          echo "Searching the check output for sanitizer diagnostics..."
+          if grep -rnE "runtime error:|AddressSanitizer|UndefinedBehaviorSanitizer|SUMMARY: .*Sanitizer" check/ ; then
+            echo "::error::${{ matrix.container }} reported sanitizer diagnostics (see the matches above)"
+            exit 1
+          fi
+          echo "Clean: no sanitizer diagnostics in the check output."
+
+      - name: Show the check log
+        if: always()
+        run: cat check/*.Rcheck/00check.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-${{ matrix.container }}
+          path: check
+          retention-days: 14
