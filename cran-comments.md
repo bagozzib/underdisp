@@ -1,48 +1,45 @@
 ## underdisp 0.1.2
 
-This release exists to correct the undefined behaviour reported for 0.1.1 on
-https://www.stats.ox.ac.uk/pub/bdr/M1-SAN/underdisp (mail of 2026-09-28, to be
-corrected before 2026-10-19).
+This release fixes the undefined behaviour reported for 0.1.1 at
+https://www.stats.ox.ac.uk/pub/bdr/M1-SAN/underdisp, which is why it follows
+0.1.1 so closely.
 
-## The issue and the fix
-
-The sanitizer reported "outside the range of representable values of type 'int'"
-at `cpb_pmf.h:30`, `cpb_fe.cpp:106` (twice) and `cpb_fe.cpp:164`. The value being
-converted is a fitted ceiling, `lambda / (1 - alpha)` for the CPB and
-`mu / (1 - delta)` for the GEC. Both diverge as the dispersion parameter
-approaches its equidispersed limit, and the limit is reachable exactly, because
-the parameter is carried on the logit scale and `plogis()` returns 1 once its
-argument passes about 40. The ceiling was then `+Inf` and the conversion
-undefined.
-
-Every caller already rejected a ceiling above `max.support`, so the fix caps the
-value at `max.support + 1` before converting, through one rule in the new
-`src/support_cap.h`. I audited every `double` to `int` conversion in `src/` and
-routed all six of this kind through it, including two the sanitizer's runs did
-not reach (`cpb_fe.cpp:67` and `gec_fe.cpp:104`), so the same defect cannot
-resurface from a path your tests happen to exercise later. `tests/testthat/
-test-support-cap.R` pins the behaviour at and beyond the limit.
+The fitted ceiling lambda / (1 - alpha) leaves the range of int as the
+dispersion parameter approaches its equidispersed limit, so converting it was
+undefined. Ceilings are now capped at max.support + 1 before the conversion.
+Callers already treated anything above max.support as out of range, so fitted
+values are unchanged. The other conversions of the same kind in src/ get the
+same treatment.
 
 ## Test environments
 
-* local Windows 11, R 4.6.1 (`R CMD check --as-cran`).
-* GitHub Actions (r-lib/actions): ubuntu-latest (R release, devel, oldrel-1),
-  macOS-latest (release), windows-latest (release), with NOT_CRAN = true so the
-  full test suite runs.
-* win-builder R-devel and R-release.
+* local Windows 11, R 4.6.1 (R CMD check --as-cran)
+* r-hub containers clang-ubsan and clang-asan
+* GitHub Actions: ubuntu-latest (R release, devel, oldrel-1), macOS-latest,
+  windows-latest, with NOT_CRAN = true so the full test suite runs
+* win-builder R-devel
 
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note. The note is the usual incoming-feasibility one,
-naming the maintainer and flagging Katz, equidispersion and rootograms in the
-Description; these are standard statistical terms.
+On win-builder R-devel: 0 errors | 0 warnings | 1 note, the incoming
+feasibility note. 0.1.1 was published on 2026-09-28 and the sanitizer report
+arrived the same day; this submission answers it. Check time was 361 seconds,
+unchanged from 0.1.1.
 
-Check time is unchanged and well inside the ten-minute budget (the 0.1.1 incoming
-check ran 363 seconds).
+Two further notes appear only on my own machine: 'V8' is unavailable there, so
+math rendering is skipped, and implied_ceiling's example crosses the five-second
+elapsed threshold under load (4.6 seconds of CPU time). Neither appears on
+win-builder.
+
+The clang-ubsan and clang-asan containers are clean on this version, and the
+same check reproduces the reported errors on 0.1.1.
 
 ## Notes for the reviewer
 
-* No user-visible interface changed, and no fitted value changed: I compared the
-  0.1.1 and 0.1.2 builds on an identical battery of fits and every cross-sectional
-  and fixed-effects CPB result, and the calibrated interval, agree bit for bit.
-* Long-running test batteries remain gated behind `testthat::skip_on_cran()`.
+* The package compiles a small amount of C++ (Rcpp); no system requirements
+  beyond a C++11 compiler.
+* Long-running test batteries are gated behind testthat::skip_on_cran() so the
+  check stays inside the ten-minute budget; they run in continuous integration.
+* Tests and examples comparing against glmmTMB, gamlss.dist, rmutil,
+  COMPoissonReg and the Ecdat/wooldridge data sets are guarded by
+  requireNamespace() and skip when those Suggests are unavailable.
