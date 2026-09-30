@@ -3,8 +3,10 @@
 # CRAN's own macOS-arm64 sanitizer build (M1-SAN) reported undefined behaviour in 0.1.1 that none of the
 # ordinary check platforms sees, because a sanitizer finding does not change the check status: the errors
 # appear only as "runtime error:" lines inside the .Rout files, and 00check.log still reads "Status: OK".
-# This workflow therefore does not trust the check's exit code. It greps the check directory for sanitizer
-# output and fails the job if any is present.
+# CRAN's Linux clang-UBSAN flavour then reported the same sites on 2026-09-30, and that run reached them
+# through the vignette build as well as the examples and tests. This workflow therefore builds the
+# vignette, runs R CMD build and R CMD check with every line of their output captured to disk, and does
+# not trust the check's exit code: it greps everything for sanitizer output and fails the job on any hit.
 name: sanitizer
 
 on:
@@ -27,25 +29,34 @@ jobs:
       # The heavy Suggests (glmmTMB, gamlss.dist, COMPoissonReg, ...) back comparison tests that skip when
       # the package is absent, and compiling them under a sanitizer costs far more than it tells us. But
       # testthat is NOT optional here: without it R CMD check runs no tests at all, and tests/testthat.Rout
-      # is exactly where CRAN's fixed-effects reports came from. knitr only has to exist so the build does
-      # not stop looking for the vignette builder.
+      # is exactly where CRAN's fixed-effects reports came from. knitr and rmarkdown are needed to build
+      # the vignette, which CRAN's clang-UBSAN run showed reaches the same code.
       _R_CHECK_FORCE_SUGGESTS_: false
       R_KEEP_PKG_SOURCE: yes
 
     steps:
       - uses: actions/checkout@v4
 
+      - uses: r-lib/actions/setup-pandoc@v2
+
       - name: Install dependencies
         run: |
-          R -q -e 'pak::pkg_install(c("deps::.", "any::rcmdcheck", "any::testthat", "any::knitr"), dependencies = NA)'
+          R -q -e 'pak::pkg_install(c("deps::.", "any::testthat", "any::knitr", "any::rmarkdown"), dependencies = NA)'
+          pandoc --version | head -1
 
-      # Vignettes are skipped: they need pandoc and add sanitizer minutes, and none of the reported errors
-      # came from them. The coverage that matters is the examples and the test suite, both of which run.
+      # Both steps tee their complete output into check/, so that sanitizer diagnostics printed by the
+      # child R processes that render the vignette (during build, and again during check) are on disk
+      # next to the .Rout files and get grepped below. Exit codes are deliberately not trusted.
+      - name: R CMD build (vignette included)
+        run: |
+          mkdir -p check
+          R CMD build . 2>&1 | tee check/build.log
+
       - name: R CMD check
         run: |
-          R -q -e 'rcmdcheck::rcmdcheck(args = c("--no-manual", "--ignore-vignettes"), build_args = "--no-build-vignettes", error_on = "never", check_dir = "check")'
+          R CMD check --no-manual -o check underdisp_*.tar.gz 2>&1 | tee check/check.log || true
 
-      - name: Confirm the tests actually ran
+      - name: Confirm the tests and the vignette actually ran
         run: |
           if [ ! -f check/*.Rcheck/tests/testthat.Rout ] && [ ! -f check/*.Rcheck/tests/testthat.Rout.fail ]; then
             echo "::error::no testthat output -- the suite did not run, so this proves nothing"
@@ -53,15 +64,25 @@ jobs:
             exit 1
           fi
           echo "testthat output present."
+          if ! grep -q "creating vignettes" check/build.log || ! tar -tzf underdisp_*.tar.gz | grep -q "inst/doc/underdisp.html"; then
+            echo "::error::the vignette was not built -- the vignette code path was not exercised"
+            exit 1
+          fi
+          echo "vignette built into the tarball."
+          if ! grep -q "checking re-building of vignette outputs" check/check.log; then
+            echo "::error::R CMD check did not re-build the vignette"
+            exit 1
+          fi
+          echo "vignette re-built during check."
 
       - name: Fail if the sanitizer reported anything
         run: |
-          echo "Searching the check output for sanitizer diagnostics..."
+          echo "Searching the build and check output for sanitizer diagnostics..."
           if grep -rnE "runtime error:|AddressSanitizer|UndefinedBehaviorSanitizer|SUMMARY: .*Sanitizer" check/ ; then
             echo "::error::${{ matrix.container }} reported sanitizer diagnostics (see the matches above)"
             exit 1
           fi
-          echo "Clean: no sanitizer diagnostics in the check output."
+          echo "Clean: no sanitizer diagnostics in the build or check output."
 
       - name: Show the check log
         if: always()
