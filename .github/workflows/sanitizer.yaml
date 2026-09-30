@@ -4,9 +4,14 @@
 # ordinary check platforms sees, because a sanitizer finding does not change the check status: the errors
 # appear only as "runtime error:" lines inside the .Rout files, and 00check.log still reads "Status: OK".
 # CRAN's Linux clang-UBSAN flavour then reported the same sites on 2026-09-30, and that run reached them
-# through the vignette build as well as the examples and tests. This workflow therefore builds the
-# vignette, runs R CMD build and R CMD check with every line of their output captured to disk, and does
-# not trust the check's exit code: it greps everything for sanitizer output and fails the job on any hit.
+# through the vignette build as well as the examples and tests. This workflow therefore exercises the
+# vignette explicitly, captures every line of output to disk, and does not trust any exit code: it greps
+# everything for sanitizer output and fails the job on any hit.
+#
+# Why the vignette is rendered by tools::buildVignettes() directly: R CMD build and R CMD check both render
+# it in a child R process whose output they capture and discard when the render succeeds, so a sanitizer
+# diagnostic printed during a successful render never reaches their logs. CRAN's build_vignettes.log is
+# the direct call's output, and so is ours.
 name: sanitizer
 
 on:
@@ -33,23 +38,43 @@ jobs:
       # the vignette, which CRAN's clang-UBSAN run showed reaches the same code.
       _R_CHECK_FORCE_SUGGESTS_: false
       R_KEEP_PKG_SOURCE: yes
+      R_LIBS_USER: /tmp/rlib
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: r-lib/actions/setup-pandoc@v2
 
+      # pak's binary mirror occasionally fails a download (a fresh testthat binary 404'd on 2026-09-30),
+      # so the install is retried before the job gives up.
       - name: Install dependencies
         run: |
-          R -q -e 'pak::pkg_install(c("deps::.", "any::testthat", "any::knitr", "any::rmarkdown"), dependencies = NA)'
+          mkdir -p /tmp/rlib
+          for i in 1 2 3; do
+            R -q -e 'pak::pkg_install(c("deps::.", "any::testthat", "any::knitr", "any::rmarkdown"), dependencies = NA)' && break
+            echo "install attempt $i failed; retrying in 30 s"; sleep 30
+          done
+          R -q -e 'stopifnot(requireNamespace("testthat"), requireNamespace("knitr"), requireNamespace("rmarkdown"))'
           pandoc --version | head -1
 
-      # Both steps tee their complete output into check/, so that sanitizer diagnostics printed by the
-      # child R processes that render the vignette (during build, and again during check) are on disk
-      # next to the .Rout files and get grepped below. Exit codes are deliberately not trusted.
-      - name: R CMD build (vignette included)
+      - name: Install the package under the sanitizer
+        run: |
+          R CMD INSTALL --preclean . 2>&1 | tee /tmp/install.log
+
+      # The vignette path, with its output on disk. Rendered in a copy so the source tree stays clean
+      # for R CMD build below.
+      - name: Render the vignette directly (tools::buildVignettes)
         run: |
           mkdir -p check
+          rm -rf /tmp/vigpkg && cp -r . /tmp/vigpkg
+          cd /tmp/vigpkg
+          R -q -e 'tools::buildVignettes(dir = ".", tangle = TRUE, clean = FALSE)' 2>&1 | tee "$GITHUB_WORKSPACE/check/build_vignettes.log"
+          ls -la vignettes/ | tee -a "$GITHUB_WORKSPACE/check/build_vignettes.log"
+          test -f vignettes/underdisp.html || { echo "::error::the vignette did not render -- the vignette code path was not exercised"; exit 1; }
+          echo "vignette rendered directly."
+
+      - name: R CMD build (vignette included)
+        run: |
           R CMD build . 2>&1 | tee check/build.log
 
       - name: R CMD check
@@ -65,7 +90,7 @@ jobs:
           fi
           echo "testthat output present."
           if ! grep -q "creating vignettes" check/build.log || ! tar -tzf underdisp_*.tar.gz | grep -q "inst/doc/underdisp.html"; then
-            echo "::error::the vignette was not built -- the vignette code path was not exercised"
+            echo "::error::the vignette was not built into the tarball"
             exit 1
           fi
           echo "vignette built into the tarball."
@@ -77,12 +102,12 @@ jobs:
 
       - name: Fail if the sanitizer reported anything
         run: |
-          echo "Searching the build and check output for sanitizer diagnostics..."
-          if grep -rnE "runtime error:|AddressSanitizer|UndefinedBehaviorSanitizer|SUMMARY: .*Sanitizer" check/ ; then
+          echo "Searching the vignette, build and check output for sanitizer diagnostics..."
+          if grep -rnE "runtime error:|AddressSanitizer|UndefinedBehaviorSanitizer|SUMMARY: .*Sanitizer" check/ /tmp/install.log ; then
             echo "::error::${{ matrix.container }} reported sanitizer diagnostics (see the matches above)"
             exit 1
           fi
-          echo "Clean: no sanitizer diagnostics in the build or check output."
+          echo "Clean: no sanitizer diagnostics in the vignette, build or check output."
 
       - name: Show the check log
         if: always()
