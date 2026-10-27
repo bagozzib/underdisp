@@ -12,7 +12,7 @@ zi_gec(
   se = c("none", "bootstrap"),
   B = 500,
   cluster = NULL,
-  max.support = 500,
+  max.support = NULL,
   maxit = 200,
   tol = 1e-06,
   offset = NULL,
@@ -37,7 +37,8 @@ equation, entered as factor dummies (opt-in).}
 
 \item{cluster}{Optional cluster (column name or vector) for the bootstrap.}
 
-\item{max.support}{Guard on the maximum evaluated support.}
+\item{max.support}{Guard on the evaluated support of the count component;
+\code{NULL} (default) sets \code{max(500, 10 * max(y))}. See \code{\link[=gec]{gec()}}.}
 
 \item{maxit, tol}{Optimizer controls.}
 
@@ -55,11 +56,19 @@ An object of class \code{"zi_gec"}.
 }
 \description{
 A structural-zero mixture with a GEC count component whose dispersion \code{delta}
-is estimated freely. Estimated by robust direct maximum likelihood, seeded
-from separate fits (a GEC on the positive counts for the count parameters and
-a logit of the zero indicator for the inflation), exactly as in \code{\link[=zi_cpb]{zi_cpb()}};
-this avoids the degenerate \code{pi -> 0} basin that coordinate-wise EM falls into.
+is estimated freely. Estimated by direct maximum likelihood from several
+starts, as in \code{\link[=zi_cpb]{zi_cpb()}}: the single-equation GEC with a logit of the zero
+indicator for the inflation, at four dispersions; the zero-inflated Poisson's
+coefficients; and a low-inflation start. The best is polished, which avoids
+the degenerate \code{pi -> 0} basin that coordinate-wise EM falls into.
 }
+\section{Separation}{
+
+The fit checks its zero-inflation equation for separation as \code{\link[=zi_cpb]{zi_cpb()}} does
+(see its Separation section). It warns when the data put no useful bound on a
+covariate coefficient, and stores the check in the component \code{separation}.
+}
+
 \examples{
 \donttest{
 set.seed(4); n <- 300; x <- rnorm(n); z <- rnorm(n)

@@ -8,7 +8,7 @@ zi_count(
   formula,
   data,
   family = c("poisson", "negbin", "compois", "mpcmp", "genpois", "gammacount",
-    "doublepois"),
+    "doublepois", "hyperpois", "ewp3", "ewp2"),
   zero = NULL,
   fe = NULL,
   zero_fe = NULL,
@@ -59,6 +59,15 @@ mean-parameterized families, on the rate \eqn{\lambda} for \code{"compois"}) and
 the inflation probability a link set by \code{link}. Returned as a \code{"zi_count"}
 object that \code{\link[=compare_models]{compare_models()}} and \code{\link[=score]{score()}} accept.
 }
+\section{Separation}{
+
+The fit checks its zero-inflation equation for separation as \code{\link[=zi_cpb]{zi_cpb()}} does
+(see its Separation section), under its own \code{link}. It warns when the data put
+no useful bound on a covariate coefficient, and stores the check in the
+component \code{separation}. Such a coefficient's standard error is not meaningful
+either.
+}
+
 \examples{
 set.seed(2); n <- 300; x <- rnorm(n); z <- rnorm(n)
 y <- ifelse(rbinom(n, 1, plogis(-0.5 + 0.8 * z)) == 1, 0L, rpois(n, exp(1 + 0.3 * x)))

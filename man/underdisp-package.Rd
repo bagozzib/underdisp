@@ -25,9 +25,10 @@ The hard-ceiling family \code{\link[=cpb]{cpb()}} / \code{\link[=cpb_fe]{cpb_fe(
 (\code{\link[=hurdle_cpb]{hurdle_cpb()}}, \code{\link[=zi_cpb]{zi_cpb()}}, \code{\link[=hurdle_gec]{hurdle_gec()}}, \code{\link[=zi_gec]{zi_gec()}}); the matched count
 families through one interface, \code{\link[=count_reg]{count_reg()}}, \code{\link[=hurdle_count]{hurdle_count()}},
 \code{\link[=zi_count]{zi_count()}} (Poisson, negative binomial, COM-Poisson in the rate and the
-mean parameterization, generalized Poisson, gamma-count, double Poisson),
-all with offsets, frequency weights, fixed effects, and analytic, robust,
-cluster, or bootstrap inference.
+mean parameterization, generalized Poisson, gamma-count, double Poisson,
+hyper-Poisson, exponentially weighted Poisson), all with offsets, frequency
+weights and fixed effects; the CPB and GEC classes take bootstrap inference,
+the count families analytic, robust or clustered errors.
 }
 
 \section{Comparison and quantities of interest}{

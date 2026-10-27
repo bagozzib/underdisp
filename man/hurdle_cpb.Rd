@@ -34,7 +34,11 @@ within-unit underdispersion is recovered.}
 
 \item{part_fe}{Optional column name for fixed effects in the participation
 model (added as factors). Units with no within-unit variation in
-participation are uninformative for a fixed-effects logit.}
+participation are uninformative for a fixed-effects logit, and the dummy
+logit's coefficients carry the incidental-parameters bias of order 1/T (in
+short panels the slopes are inflated, roughly toward twice their value at
+T = 2); the split-panel jackknife (\code{bias_correct}) corrects only the
+intensity.}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}. Positive participation coefficients raise the probability of
@@ -44,10 +48,10 @@ a positive count.}
 exposure): a numeric vector or the name of a column in \code{data}.}
 
 \item{cluster}{Optional cluster identifier (a column name in \code{data} or a
-vector) for cluster-robust bootstrap inference on the intensity
-coefficients; see \code{\link[=cpb]{cpb()}}. Cluster-robust errors for the participation
-logit are available directly via
-\code{sandwich::vcovCL(fit$participation, cluster = ...)}.}
+vector). The participation equation's standard errors are then
+cluster-robust (the sandwich, with the G/(G - 1) factor), and with
+\code{se = "bootstrap"} the intensity's bootstrap resamples whole clusters; see
+\code{\link[=cpb]{cpb()}}.}
 
 \item{se}{Inference for the intensity coefficients: \code{"none"} or \code{"bootstrap"}.}
 
@@ -58,7 +62,8 @@ applied to both margins; see \code{\link[=cpb]{cpb()}}.}
 
 \item{cores}{Worker processes for the intensity bootstrap; see \code{\link[=cpb]{cpb()}}.}
 
-\item{...}{Passed to \code{\link[=cpb]{cpb()}} or \code{\link[=cpb_fe]{cpb_fe()}}.}
+\item{...}{Passed to \code{\link[=cpb]{cpb()}} or \code{\link[=cpb_fe]{cpb_fe()}}, including \code{support} (King's CPB,
+\code{"ceiling"}, by default; see \code{\link[=cpb]{cpb()}}).}
 }
 \value{
 An object of class \code{"hurdle_cpb"} with elements \code{participation} (a

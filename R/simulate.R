@@ -41,8 +41,8 @@
 }
 
 ## raw (untruncated) pmf rows per family
-.sim_pmf_cpb <- function(lambda, alpha, max.support) {
-  .cpb_pmf_row(lambda, alpha, truncated = FALSE, max.support = max.support)
+.sim_pmf_cpb <- function(lambda, alpha, max.support, support) {
+  .cpb_pmf_row(lambda, alpha, truncated = FALSE, max.support = max.support, support = support)
 }
 .sim_pmf_gec <- function(rate, delta, max.support) {
   km <- .gec_kmax_qr(rate, delta, max.support)
@@ -111,10 +111,10 @@ NULL
 #' @method simulate cpb
 #' @export
 simulate.cpb <- function(object, nsim = 1, seed = NULL, ...) {
-  lam <- .cpb_rate(object); a <- object$alpha
+  lam <- .cpb_rate(object); a <- object$alpha; sup <- .cpb_support(object)
   ms  <- if (is.null(object$max.support)) 500L else object$max.support
   .sim_wrap(nsim, seed, function()
-    .sim_from_pmf(object$n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms),
+    .sim_from_pmf(object$n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms, sup),
                   truncated = isTRUE(object$truncated)))
 }
 
@@ -122,10 +122,10 @@ simulate.cpb <- function(object, nsim = 1, seed = NULL, ...) {
 #' @method simulate cpb_fe
 #' @export
 simulate.cpb_fe <- function(object, nsim = 1, seed = NULL, ...) {
-  lam <- .cpb_rate(object); a <- object$alpha
+  lam <- .cpb_rate(object); a <- object$alpha; sup <- .cpb_support(object)
   ms  <- if (is.null(object$max.support)) 500L else object$max.support
   .sim_wrap(nsim, seed, function()
-    .sim_from_pmf(object$n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms),
+    .sim_from_pmf(object$n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms, sup),
                   truncated = isTRUE(object$truncated)))
 }
 
@@ -153,10 +153,10 @@ simulate.count_reg <- function(object, nsim = 1, seed = NULL, ...) {
 #' @method simulate hurdle_cpb
 #' @export
 simulate.hurdle_cpb <- function(object, nsim = 1, seed = NULL, ...) {
-  n <- object$n; lam <- object$lambda_full; a <- object$intensity$alpha
+  n <- object$n; lam <- object$lambda_full; a <- object$intensity$alpha; sup <- .cpb_support(object)
   ms <- if (is.null(object$intensity$max.support)) 500L else object$intensity$max.support
   .sim_wrap(nsim, seed, function() {
-    cnt <- .sim_from_pmf(n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms), truncated = TRUE)
+    cnt <- .sim_from_pmf(n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms, sup), truncated = TRUE)
     cnt * .sim_binary(object$p_full, n, nsim)
   })
 }
@@ -188,11 +188,11 @@ simulate.hurdle_count <- function(object, nsim = 1, seed = NULL, ...) {
 #' @method simulate zi_cpb
 #' @export
 simulate.zi_cpb <- function(object, nsim = 1, seed = NULL, ...) {
-  n <- object$n; lam <- object$lambda_full; a <- object$alpha
+  n <- object$n; lam <- object$lambda_full; a <- object$alpha; sup <- .cpb_support(object)
   ms <- if (is.null(object$max.support)) 500L else object$max.support
   .sim_wrap(nsim, seed, function() {
-    cnt <- .sim_from_pmf(n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms), truncated = FALSE)
-    cnt * (1L - .sim_binary(object$pi_full, n, nsim))
+    cnt <- .sim_from_pmf(n, nsim, function(i) .sim_pmf_cpb(lam[i], a, ms, sup), truncated = FALSE)
+    cnt * (1L - .sim_binary(.zi_pi0(object$pi_full), n, nsim))
   })
 }
 
@@ -241,7 +241,7 @@ fitted.cpb_fe <- function(object, ...) object$fitted.values
 #' @method fitted hurdle_cpb
 #' @export
 fitted.hurdle_cpb <- function(object, ...)
-  object$p_full * .cpb_ztmean(object$lambda_full, object$intensity$alpha)   # P(Y>0) * E(Y | Y>0)
+  object$p_full * .cpb_ztmean(object$lambda_full, object$intensity$alpha, .cpb_support(object))   # P(Y>0) * E(Y | Y>0)
 
 #' @rdname fitted.underdisp
 #' @method fitted hurdle_gec
@@ -263,7 +263,7 @@ fitted.hurdle_count <- function(object, ...) {
 #' @rdname fitted.underdisp
 #' @method fitted zi_cpb
 #' @export
-fitted.zi_cpb <- function(object, ...) (1 - object$pi_full) * object$lambda_full
+fitted.zi_cpb <- function(object, ...) (1 - .zi_pi0(object$pi_full)) * .zi_cpb_cmean(object, object$lambda_full)
 
 #' @rdname fitted.underdisp
 #' @method fitted zi_gec

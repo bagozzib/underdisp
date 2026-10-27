@@ -16,9 +16,10 @@
 #' ([hurdle_cpb()], [zi_cpb()], [hurdle_gec()], [zi_gec()]); the matched count
 #' families through one interface, [count_reg()], [hurdle_count()],
 #' [zi_count()] (Poisson, negative binomial, COM-Poisson in the rate and the
-#' mean parameterization, generalized Poisson, gamma-count, double Poisson),
-#' all with offsets, frequency weights, fixed effects, and analytic, robust,
-#' cluster, or bootstrap inference.
+#' mean parameterization, generalized Poisson, gamma-count, double Poisson,
+#' hyper-Poisson, exponentially weighted Poisson), all with offsets, frequency
+#' weights and fixed effects; the CPB and GEC classes take bootstrap inference,
+#' the count families analytic, robust or clustered errors.
 #'
 #' @section Comparison and quantities of interest:
 #' [compare_models()], [score()], [cv_score()]; [predict()],

@@ -24,7 +24,9 @@ test_that("texreg extract methods build a texreg object", {
   expect_true(all(c("AIC", "Log Likelihood", "Num. obs.") %in% tr@gof.names))
   cr <- count_reg(y ~ x, data = data.frame(y = rpois(n, 3), x = x), family = "gammacount")
   tr2 <- texreg::extract(cr)
-  expect_true("Dispersion (alpha)" %in% tr2@gof.names)
+  ## the dispersion under its own name, with the side of its Poisson value that is underdispersion
+  expect_true("Dispersion (alpha; > 1 under)" %in% tr2@gof.names)
+  expect_true("Dispersion (alpha; < 1 under)" %in% tr@gof.names)
   out <- withCallingHandlers(utils::capture.output(texreg::screenreg(cr)),
                              warning = function(w) stop("screenreg warned: ", conditionMessage(w)))
   expect_true(any(grepl("Num. obs.", out, fixed = TRUE)))

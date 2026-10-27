@@ -7,11 +7,13 @@
 ## parameters bias of order 1/T. The correction refits the model on the first
 ## and second temporal halves of every unit's series and reports
 ##   theta_jack = 2 * theta_full - (theta_half1 + theta_half2) / 2,
-## which removes the leading 1/T bias term. Validated by the committed
-## fixed-effects bias Monte Carlo (replication/main_paper/main_fe_bias_mc.R):
-## alpha bias -0.153/-0.100/-0.057/-0.033 at T = 6/10/20/40 falls to
-## -0.046/-0.024/-0.013/-0.009. Within each unit, rows are split in the order
-## supplied, which should be temporal order.
+## which removes the leading 1/T bias term. In the package's fixed-effects bias
+## Monte Carlo (150 units, alpha 0.5):
+## on King's support the alpha bias -0.122/-0.071/-0.036/-0.018 at
+## T = 6/10/20/40 falls to +0.009/+0.005/+0.000/-0.000; on the floor support
+## -0.153/-0.100/-0.057/-0.033 falls to -0.046/-0.024/-0.013/-0.009. Within each
+## unit, rows are split in time order (the fits' `time` argument, which the
+## correction requires).
 ##
 ## VALIDITY GATE. The jackknife identity requires the two half-panels to
 ## estimate the SAME pseudo-true parameter, differing only through the 1/T
@@ -39,10 +41,12 @@
 ## R1 (corrected dispersion outside its feasible space), R2, or R2b. It WARNS
 ## (but proceeds) when the implied correction exceeds 0.15 * scale and when the
 ## median panel length is below 6. KAPPA = 2.5 and the R2b threshold (p < .01)
-## are calibrated by Monte Carlo (verification/jackknife_gate_mc.R): stationary
-## panels must essentially never refuse; regime-change panels must refuse; and
+## are calibrated by Monte Carlo: stationary
+## panels should rarely refuse (on King's support 9 to 13 percent do, on the
+## floor support about 7); regime-change panels must refuse (98.5 percent); and
 ## on trending panels the corrections that survive must not be worse than the
-## uncorrected fit. The placebo splits cost ten extra half-sample fits.
+## uncorrected fit (every trending panel refuses). The placebo splits cost ten
+## extra half-sample fits.
 ## ---------------------------------------------------------------------------
 
 ## refit(half_data) returns the c(coefficients, dispersion) vector of a half

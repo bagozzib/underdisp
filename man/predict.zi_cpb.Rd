@@ -4,7 +4,16 @@
 \alias{predict.zi_cpb}
 \title{Predict from a zi_cpb fit}
 \usage{
-\method{predict}{zi_cpb}(object, newdata = NULL, type = c("response", "zero", "intensity"), ...)
+\method{predict}{zi_cpb}(
+  object,
+  newdata = NULL,
+  type = c("response", "zero", "intensity", "rate"),
+  offset = NULL,
+  se.fit = FALSE,
+  interval = c("none", "confidence"),
+  level = 0.95,
+  ...
+)
 }
 \arguments{
 \item{object}{A \code{"zi_cpb"} object.}
@@ -12,12 +21,30 @@
 \item{newdata}{Data frame of covariate profiles.}
 
 \item{type}{\code{"response"} for the marginal expected count E(Y), \code{"zero"} for
-the structural-zero probability, or \code{"intensity"} for the CPB mean.}
+the structural-zero probability, or \code{"intensity"} for the CPB mean (on the
+floor support, the rate lambda, as before version 0.2.0), or \code{"rate"} for the
+count component's rate lambda.}
+
+\item{offset}{Optional offset (log scale) of the count component for the
+\code{newdata} rows; see \code{\link[=predict.cpb]{predict.cpb()}}. With \code{fe}, a row whose \code{fe} column
+names a unit of the fit enters at that unit's count effect, a row of an
+unseen unit (or every row, when \code{newdata} has no \code{fe} column) at the
+reference unit, the mean effect of the units the data identify. A unit
+left out for having no positive count (see \code{\link[=zi_cpb]{zi_cpb()}}, \code{fe}) predicts a
+mean of zero, and a structural-zero probability of \code{NA} where its own
+\code{zero_fe} dummy would be needed.}
+
+\item{se.fit, interval, level}{Standard errors (\code{se.fit = TRUE}) and a
+\code{level} confidence interval (\code{interval = "confidence"}) of the predicted
+quantity at the rows of \code{newdata}; see \code{\link[=predict.cpb]{predict.cpb()}}.}
 
 \item{...}{Unused.}
 }
 \value{
-A numeric vector.
+A numeric vector. With \code{interval = "confidence"}, a matrix with
+columns \code{fit}, \code{lwr} and \code{upr}; with \code{se.fit = TRUE}, a list of \code{fit} (the
+vector or the matrix), \code{se.fit} and \code{method} (each row's interval source).
+Without \code{se.fit}, the source is the attribute \code{method}.
 }
 \description{
 Predict from a zi_cpb fit

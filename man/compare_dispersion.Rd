@@ -7,9 +7,10 @@
 compare_dispersion(
   formula,
   data,
-  max.support = 500,
+  max.support = NULL,
   hurdle = FALSE,
-  zi = FALSE
+  zi = FALSE,
+  support = c("ceiling", "floor")
 )
 }
 \arguments{
@@ -17,7 +18,9 @@ compare_dispersion(
 
 \item{data}{A data frame.}
 
-\item{max.support}{Passed to \code{\link[=cpb]{cpb()}}.}
+\item{max.support}{Passed to the CPB and GEC fits; the default \code{NULL} lets
+each set its own (see \code{\link[=cpb]{cpb()}}), and on the floor support it is 500, as
+before version 0.2.0.}
 
 \item{hurdle}{If \code{TRUE} and the data contain zeros, also fit and score a
 \code{\link[=hurdle_cpb]{hurdle_cpb()}}.}
@@ -25,16 +28,19 @@ compare_dispersion(
 \item{zi}{If \code{TRUE} and the data contain zeros, also fit and score a
 \code{\link[=zi_cpb]{zi_cpb()}}. The mixture EM is slow on large panels, so it is a separate
 opt-in from \code{hurdle}.}
+
+\item{support}{The CPB's support for the CPB-family fits, \code{"ceiling"} (King's
+CPB, the default) or \code{"floor"}; see \code{\link[=cpb]{cpb()}}.}
 }
 \value{
 A list with \code{table} (a data frame of \code{df}, \code{logLik}, \code{AIC}, \code{BIC},
 \code{logscore}, \code{rps}, and \code{zero_fit} per model), \code{obs_zero} (the observed zero
 share), \code{nu} (the COM-Poisson dispersion, \verb{>1} = underdispersion, \code{NA} if the
-COM-Poisson fit failed), \code{alpha} (the CPB shape parameter),
-\code{ceiling_exceedance} (share of observations above the CPB ceiling), and
+COM-Poisson fit failed), \code{alpha} (the CPB shape parameter), and
 \code{cpb_ok} (\code{FALSE} if the single-equation CPB could not satisfy its feasibility
 constraint on the data, e.g. under heavy zero-inflation with a wide count
-range --- itself a signal that a hurdle or zero-inflated model is needed).
+range: the CPB's support cannot hold the counts, which another family, or
+a hurdle or zero-inflated model, may fit).
 }
 \description{
 Fits the Poisson and negative binomial defaults alongside the two underdispersed
@@ -45,8 +51,9 @@ probability score, lower is better, plus the fitted share of zeros against the
 observed share). Whether the tail is better described by an accelerated decay
 (COM-Poisson) or a binding ceiling (CPB) is a testable question, not an
 assumption; the scoring rules are the calibration counterpart to the
-information criteria. The CPB's ceiling-exceedance share (observations above
-the implied ceiling) is reported as a falsification check on the hard bound.
+information criteria. The CPB's hard bound itself is tested only on held-out
+counts, with \code{\link[=ceiling_exceedance]{ceiling_exceedance()}}: on the data it was fit to every feasible
+CPB respects its bound, since its likelihood forbids exceedance.
 }
 \details{
 With \code{hurdle = TRUE} and zeros present, a hurdle-CPB is added, so a

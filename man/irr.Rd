@@ -25,7 +25,11 @@ A \code{"ud_irr"} data frame -- the package-wide rate-ratio contract
 intervals from the stored draws.
 }
 \description{
-Incidence rate ratios for a CPB fit
+The ratios are \eqn{\exp(\beta)}, ratios of the CPB's rate parameter
+\eqn{\lambda}. The CPB's mean equals \eqn{\lambda} only where
+\eqn{\lambda/(1-\alpha)} is an integer, and a zero-truncated fit (the \code{cpb()}
+default) models \eqn{E(Y \mid Y \ge 1)}, so a ratio of expected counts can
+differ from them; \code{\link[=first_difference]{first_difference()}} reports the exact mean contrast.
 }
 \examples{
 \donttest{

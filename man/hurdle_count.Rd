@@ -8,7 +8,7 @@ hurdle_count(
   formula,
   data,
   family = c("poisson", "negbin", "compois", "mpcmp", "genpois", "gammacount",
-    "doublepois"),
+    "doublepois", "hyperpois", "ewp3", "ewp2"),
   participation = NULL,
   fe = NULL,
   part_fe = NULL,
@@ -42,8 +42,10 @@ scale: a numeric vector or the name of a column in \code{data}.}
 \item{weights}{Optional frequency weights (a numeric vector or a column name),
 applied to both margins; see \code{\link[=count_reg]{count_reg()}}.}
 
-\item{se, cluster}{Standard-error type and optional cluster for the intensity;
-see \code{\link[=count_reg]{count_reg()}}.}
+\item{se, cluster}{Standard-error type and optional cluster; see
+\code{\link[=count_reg]{count_reg()}}. They apply to both margins: the participation equation's
+standard errors are model-based, robust or cluster-robust with the
+intensity's.}
 }
 \value{
 An object of class \code{"hurdle_count"}.

@@ -8,6 +8,10 @@
   object,
   newdata = NULL,
   type = c("response", "participation", "intensity"),
+  offset = NULL,
+  se.fit = FALSE,
+  interval = c("none", "confidence"),
+  level = 0.95,
   ...
 )
 }
@@ -21,10 +25,21 @@ intensity and participation covariates).}
 included), \code{"participation"} for P(Y > 0), or \code{"intensity"} for
 E(Y | Y > 0).}
 
+\item{offset}{Optional offset (log scale) of the intensity for the \code{newdata}
+rows: a numeric vector or a column name in \code{newdata}; by default the fit's
+own offset column is read from \code{newdata} (see \code{\link[=predict.cpb]{predict.cpb()}}).}
+
+\item{se.fit, interval, level}{Standard errors (\code{se.fit = TRUE}) and a
+\code{level} confidence interval (\code{interval = "confidence"}) of the predicted
+quantity at the rows of \code{newdata}; see \code{\link[=predict.cpb]{predict.cpb()}}.}
+
 \item{...}{Unused.}
 }
 \value{
-A numeric vector.
+A numeric vector. With \code{interval = "confidence"}, a matrix with
+columns \code{fit}, \code{lwr} and \code{upr}; with \code{se.fit = TRUE}, a list of \code{fit} (the
+vector or the matrix), \code{se.fit} and \code{method} (each row's interval source).
+Without \code{se.fit}, the source is the attribute \code{method}.
 }
 \description{
 Predict from a hurdle-CPB fit

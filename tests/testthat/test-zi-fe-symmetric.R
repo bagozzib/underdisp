@@ -53,3 +53,21 @@ test_that("EM FE-ZI handles units with no positive counts (all-zero units)", {
   full_count <- length(em$coefficients) + nu + 1L + length(em$zero_coef)
   expect_lt(em$df, full_count)                             # df excludes never-estimated unit effects
 })
+
+test_that("the EM reports convergence as it happened on King's support", {
+  set.seed(6); dz <- data.frame(x = rnorm(300)); dz$y <- rzicpb(300, exp(1 + 0.4 * dz$x), 0.5, 0.3)
+  expect_false(suppressWarnings(zi_cpb(y ~ x, dz, zero = ~ 1, method = "em", maxit = 2))$converged)
+  expect_true(suppressWarnings(zi_cpb(y ~ x, dz, zero = ~ 1, method = "em", maxit = 2, support = "floor"))$converged)
+})
+
+test_that("zi_cpb(fe, ml) is a joint maximum on King's support, whatever the covariates' centring", {
+  skip_on_cran()
+  set.seed(5)
+  pz <- do.call(rbind, lapply(1:40, function(i) { x <- rnorm(8); yr <- 2000 + 1:8
+    data.frame(unit = i, x = x, year = yr, y = rzicpb(8, exp(0.5 + rnorm(1, 0, .5) + 0.4 * x + 0.05 * (yr - 2004)), 0.5, 0.3)) }))
+  f0 <- suppressWarnings(zi_cpb(y ~ x + yr, transform(pz, yr = year - 2000), zero = ~ 1, fe = "unit"))
+  f2 <- suppressWarnings(zi_cpb(y ~ x + yr, transform(pz, yr = year - 2000, x = x + 5), zero = ~ 1, fe = "unit"))
+  em <- suppressWarnings(zi_cpb(y ~ x + yr, transform(pz, yr = year - 2000), zero = ~ 1, fe = "unit", method = "em"))
+  expect_lt(abs(f2$loglik - f0$loglik), 0.1)                            # the plug-in alone differed by about 3
+  expect_gt(f0$loglik, em$loglik - 0.1)                                  # the plug-in alone lay about 7 below
+})

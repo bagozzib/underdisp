@@ -1,17 +1,17 @@
-## Regression tests for the numerics items of the second panel (referee I; see
-## verification/referee_panels_2026-09/panel2/response_p2.md).
+## Regression tests of the numerics: the FE inner search at large ceilings, covariances at large means, the
+## COM-Poisson mean parameterization, the GEC support guard, and convergence reporting.
 
-test_that("the inner search finds a unit's supremum at ceilings in the hundreds (I-R1)", {
+test_that("the inner search finds a unit's supremum at ceilings in the hundreds", {
   set.seed(3); Tn <- 10L; x <- rnorm(Tn); y <- rpois(Tn, 400)
   X <- matrix(x, ncol = 1); off <- rep(0, Tn); w <- rep(1, Tn); ms <- max(500L, 10L * max(y))
-  r <- underdisp:::cpb_fe_nll_cpp(c(0.5, qlogis(0.5)), X, as.integer(y), off, w, c(0L, Tn), 1L, ms, FALSE, 30L, numeric(0))
+  r <- underdisp:::cpb_fe_nll_cpp(c(0.5, qlogis(0.5)), X, as.integer(y), off, w, c(0L, Tn), 1L, ms, FALSE, 30L, numeric(0), FALSE)
   a_cpp <- r[[2]][1]
   unit_ll <- function(a) sum(dcpb(y, exp(a + 0.5 * x), 0.5, log = TRUE))
   o <- optimize(unit_ll, c(a_cpp - 0.02, a_cpp + 0.02), maximum = TRUE, tol = 1e-12)
   expect_gte(-r[[1]], o$objective - 1e-6)
 })
 
-test_that("count-family covariances are finite at large fitted means (I-R2)", {
+test_that("count-family covariances are finite at large fitted means", {
   set.seed(4); n <- 300; x <- rnorm(n); d <- data.frame(y = rpois(n, exp(7 + 0.3 * x)), x = x)
   f <- count_reg(y ~ x, d, family = "gammacount")
   expect_true(all(is.finite(f$se.beta)))
@@ -19,13 +19,13 @@ test_that("count-family covariances are finite at large fitted means (I-R2)", {
   expect_true(all(is.finite(g$se.beta)))
 })
 
-test_that("the COM-Poisson mean parameterization is right at strong underdispersion (I-R4, I-R7)", {
+test_that("the COM-Poisson mean parameterization is right at strong underdispersion", {
   expect_equal(sum(dcompois(0:400, lambda = 1, nu = 5, mu = 200)), 1, tolerance = 1e-8)
   set.seed(1); expect_equal(mean(rcompois(2000, lambda = 1, nu = 5, mu = 200)), 200, tolerance = 0.01)
   expect_true(is.na(dcompois(1, NA, 2))); expect_true(is.na(pcompois(1, Inf, 2)))
 })
 
-test_that("the GEC support guard refuses instead of renormalizing (I-R5)", {
+test_that("the GEC support guard refuses instead of renormalizing", {
   set.seed(3); n <- 200; x <- rnorm(n); d <- data.frame(y = rpois(n, exp(3 + 0.5 * x)), x = x)
   g <- gec(y ~ x, d, se = "none", max.support = 500)
   expect_false(g$support_binding)
@@ -36,7 +36,7 @@ test_that("the GEC support guard refuses instead of renormalizing (I-R5)", {
   expect_error(gec(y ~ x, d, se = "none", max.support = 60), "max.support")
 })
 
-test_that("a matched-family fit that never leaves the infeasible plateau is not converged (I-R3)", {
+test_that("a matched-family fit that never leaves the infeasible plateau is not converged", {
   ## the family's mean wall is 1e8: counts near 3e8 leave no finite point for the optimizer
   set.seed(5); n <- 60; x <- rnorm(n); d <- data.frame(y = rpois(n, 3e8), x = x)
   expect_warning(f <- count_reg(y ~ x, d, family = "poisson", se = "none"), "did not converge")

@@ -45,10 +45,18 @@ directions, an odds ratio above one raising P(Y > 0) in the first and
 P(structural zero) in the second), \code{ratio} (\code{"IRR"} or \code{"OR"}),
 \code{estimate}, \code{lower}, \code{upper}, and \code{method} (the interval source; \code{"none"}
 with \code{NA} bounds when no covariance is available). Two-part models stack
-both equations. The \code{IRR} rows are ratios of the rate parameter
-\eqn{\exp(\beta)}; for the CPB and the underdispersed GEC the ratio of
-fitted means differs from it by the support renormalization, and
-\code{\link[=first_difference]{first_difference()}} reports the exact mean contrast.
+both equations. The \code{IRR} rows are \eqn{\exp(\beta)}, the ratio of the
+family's natural parameter. That is a ratio of means for the Poisson, the
+negative binomial, the mean-parameterized COM-Poisson (\code{"mpcmp"}), the
+hyper-Poisson, and the generalized Poisson with \eqn{\lambda \ge 0}. It is
+not for the others: the CPB and the underdispersed GEC (their rate,
+renormalized over a finite support), the rate-parameterized COM-Poisson
+(\code{"compois"}, whose mean moves roughly as the rate to the power
+\eqn{1/\nu}, so that \eqn{\exp(\beta)} is roughly the mean ratio to the
+power \eqn{\nu}), the
+EWP (its centrality), the gamma count (its long-run rate) and the double
+Poisson (its location), and the generalized Poisson below zero. For those,
+\code{\link[=first_difference]{first_difference()}} and \code{\link[=ame]{ame()}} report the exact mean contrast.
 }
 \description{
 Rate ratios (\code{exp} of the count/intensity coefficients, column \code{IRR}) and, for

@@ -4,7 +4,16 @@
 \alias{predict.zi_gec}
 \title{Predict from a zi_gec fit}
 \usage{
-\method{predict}{zi_gec}(object, newdata = NULL, type = c("response", "zero", "intensity"), ...)
+\method{predict}{zi_gec}(
+  object,
+  newdata = NULL,
+  type = c("response", "zero", "intensity"),
+  offset = NULL,
+  se.fit = FALSE,
+  interval = c("none", "confidence"),
+  level = 0.95,
+  ...
+)
 }
 \arguments{
 \item{object}{A \code{"zi_gec"} object.}
@@ -14,10 +23,20 @@
 \item{type}{\code{"response"} (marginal E(Y)), \code{"zero"} (structural-zero
 probability), or \code{"intensity"} (the count mean E of the GEC component).}
 
+\item{offset}{Optional offset (log scale) of the count component for the
+\code{newdata} rows; see \code{\link[=predict.cpb]{predict.cpb()}}.}
+
+\item{se.fit, interval, level}{Standard errors (\code{se.fit = TRUE}) and a
+\code{level} confidence interval (\code{interval = "confidence"}) of the predicted
+quantity at the rows of \code{newdata}; see \code{\link[=predict.cpb]{predict.cpb()}}.}
+
 \item{...}{Unused.}
 }
 \value{
-A numeric vector.
+A numeric vector. With \code{interval = "confidence"}, a matrix with
+columns \code{fit}, \code{lwr} and \code{upr}; with \code{se.fit = TRUE}, a list of \code{fit} (the
+vector or the matrix), \code{se.fit} and \code{method} (each row's interval source).
+Without \code{se.fit}, the source is the attribute \code{method}.
 }
 \description{
 Predict from a zi_gec fit

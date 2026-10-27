@@ -30,11 +30,14 @@ static double gec_logpmf(int y, double mu, double delta, int max_support,
                          double* p0out, std::vector<double>& lw, int kmin = 0) {
   double gamma = (delta - 1.0) / delta;
   double omega = mu / delta;
-  lw.clear(); lw.push_back(0.0);
+  lw.clear();
+  // a non-finite rate has no pmf: the empty vector tells the callers to report NA
+  if (!R_finite(mu)) { if (p0out) *p0out = NA_REAL; return -1e300; }
+  lw.push_back(0.0);
   double mx = 0.0;
   int k = 0;
   int need = std::max(y, kmin);
-  if (!R_finite(mu) || mu <= 0.0) { if (p0out) *p0out = NA_REAL; return -1e300; }
+  if (mu <= 0.0) { if (p0out) *p0out = NA_REAL; return -1e300; }
   while (k <= max_support) {
     double num = omega + gamma * (double)k;
     if (num <= 0.0) break;                          // finite support (gamma < 0)

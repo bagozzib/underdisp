@@ -12,8 +12,8 @@ home:
     at-risk screen, regression-adjusted dispersion tests and profiles, the
     continuous parameter binomial and generalized event count families with
     high-dimensional fixed effects, matched Poisson, negative binomial,
-    COM-Poisson, generalized Poisson, gamma-count and double Poisson
-    regressions, hurdle and zero-inflated forms, proper scores, and one set
+    COM-Poisson, generalized Poisson, gamma-count, double Poisson,
+    hyper-Poisson and exponentially weighted Poisson regressions, hurdle and zero-inflated forms, proper scores, and one set
     of quantities of interest for every model.
 
 navbar:
@@ -90,6 +90,7 @@ reference:
       - first_difference
       - first_difference.count
       - first_difference.hurdle_cpb
+      - ame
       - implied_ceiling
       - irr
       - irr.count
@@ -98,6 +99,7 @@ reference:
       - compare_models
       - score
       - cv_score
+      - ceiling_exceedance
   - title: Panel tools
     contents:
       - mundlak
@@ -113,6 +115,8 @@ reference:
       - gammacount-distribution
       - doublepois-distribution
       - genpois-distribution
+      - hyperpois-distribution
+      - ewp-distribution
   - title: broom methods
     contents:
       - tidy.cpb

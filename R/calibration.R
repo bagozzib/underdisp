@@ -2,15 +2,46 @@
 ## Calibration tooling: predicted pmf, rootogram, PIT, proper scores
 ## ---------------------------------------------------------------------------
 
-## internal SINGLE SOURCE for the CPB pmf: the normalized untruncated pmf over
-## 0..min(floor(nu), kcap), computed in log space. Every CPB pmf consumer
-## (.cpb_pmf1 here, .cpb_pmf_row in qoi.R, rcpb in hurdle.R) goes through this
-## core, so the numerics cannot drift apart. kcap bounds the allocation against
-## a pathological ceiling (alpha -> 1); at 1e5 it never binds in real use.
-.cpb_pmf_core <- function(lambda, alpha, kcap = 100000L) {
-  nn <- lambda / (1 - alpha); K <- min(floor(nn + 1e-9), kcap); k <- 0:K   # tolerance matches the C++ core
-  lw <- lgamma(nn + 1) - lgamma(k + 1) - lgamma(nn - k + 1) +
-        k * log(1 - alpha) + (nn - k) * log(alpha)
+## The CPB's support. "ceiling" is King's CPB (King 1989; Winkelmann, Signorino
+## and King 1995), k = 0..ceiling(n), n = lambda/(1-alpha), the default from
+## 0.2.0; "floor" is the package's earlier definition, k = 0..floor(n). A fit
+## stores its support; an object fitted before 0.2.0 carries none and was fitted
+## on the floor support.
+.cpb_support <- function(obj) {
+  ## [[ ]], not $: a 0.1.x object has no $support, and $ would partial-match its $support_binding
+  s <- if (is.list(obj)) obj[["support"]] else NULL
+  if (is.null(s) && is.list(obj) && is.list(obj[["intensity"]])) s <- obj[["intensity"]][["support"]]
+  if (is.null(s)) "floor" else s
+}
+.cpb_fl <- function(support) identical(support, "floor")      # the C++ flag
+## the largest count the support admits at ceiling nn = lambda/(1-alpha)
+.cpb_top <- function(nn, support) if (.cpb_fl(support)) floor(nn + 1e-9) else ceiling(nn - 1e-9)
+
+## internal SINGLE SOURCE for the CPB pmf: the normalized untruncated pmf from
+## zero, computed in log space. Every CPB pmf consumer (.cpb_pmf1 here,
+## .cpb_pmf_row in qoi.R, rcpb in hurdle.R) goes through this core, so the
+## numerics cannot drift apart. kcap bounds the allocation.
+## Floor support: the lgamma form summed over 0..min(floor(n), kcap), as before
+## 0.2.0. King's support: the Katz ratio t_k/t_{k-1} = (lambda - (k-1)(1-alpha))
+## / (alpha k), cumulated from k = 0, which never forms n and so stays exact as
+## alpha approaches one; the vector stops at ceiling(n) or 40 standard
+## deviations above the rate (lambda + 40 sqrt(lambda + 1) + 40), beyond which
+## the omitted mass is below exp(-30). Where that end lies past kcap (a rate of
+## order 1e5) the pmf is refused, NA, as the other families refuse at their cap,
+## rather than renormalized over a cut support. The tolerance 1e-9 matches the
+## C++ core.
+.cpb_pmf_core <- function(lambda, alpha, support, kcap = 100000L) {
+  if (.cpb_fl(support)) {
+    nn <- lambda / (1 - alpha); K <- min(floor(nn + 1e-9), kcap); k <- 0:K
+    lw <- lgamma(nn + 1) - lgamma(k + 1) - lgamma(nn - k + 1) +
+          k * log(1 - alpha) + (nn - k) * log(alpha)
+  } else {
+    om <- 1 - alpha
+    K <- min(ceiling(lambda / om - 1e-9), ceiling(lambda + 40 * sqrt(lambda + 1) + 40))
+    if (!is.finite(K) || K > kcap) return(NA_real_)
+    k <- seq_len(max(K, 0))
+    lw <- c(0, cumsum(log((lambda - (k - 1) * om) / (alpha * k))))
+  }
   pr <- exp(lw - max(lw))
   pr / sum(pr)
 }
@@ -23,11 +54,12 @@
 ## internal: pmf of the (possibly truncated) CPB for one lambda, over 0..kmax.
 ## Normalized over the FULL support then cut to kmax (rows may sum to < 1 when
 ## the ceiling exceeds kmax) -- calibration consumers rely on this semantics.
-.cpb_pmf1 <- function(lambda, alpha, kmax, truncated = FALSE) {
-  pr <- .cpb_pmf_core(lambda, alpha)
+.cpb_pmf1 <- function(lambda, alpha, kmax, truncated = FALSE, support) {
+  pr <- .cpb_pmf_core(lambda, alpha, support)
+  if (anyNA(pr)) return(rep(NA_real_, kmax + 1))             # refused at the cap
   K  <- length(pr) - 1L
   if (truncated) {
-    if (K < 1) { out <- numeric(kmax + 1); if (kmax >= 1) out[2L] <- 1; return(out) }   # ceiling below 1: the point mass at 1
+    if (K < 1) { out <- numeric(kmax + 1); if (kmax >= 1) out[2L] <- 1; return(out) }   # floor support, ceiling below 1: the point mass at 1
     pr[1] <- 0; pr <- pr / sum(pr)
   }
   out <- numeric(kmax + 1); m <- min(K + 1, kmax + 1); out[seq_len(m)] <- pr[seq_len(m)]
@@ -36,30 +68,34 @@
 
 ## Exact moments of the (possibly zero-truncated) CPB at rate lambda from its
 ## normalized pmf. The CPB is a binomial with non-integer N = lambda/(1-alpha)
-## renormalized over 0..floor(N), so its mean equals lambda and its variance
-## alpha*lambda only when N is an integer; the fitted mean, the residuals, the
-## first differences, and the dispersion profile all use the exact values.
-.cpb_moments <- function(lambda, alpha, truncated = FALSE) {
+## renormalized over its support, so its mean equals lambda and its variance
+## alpha*lambda only when N is an integer (on King's support the mean is then
+## above lambda, on the floor support below it); the fitted mean, the
+## residuals, the first differences, and the dispersion profile all use the
+## exact values.
+.cpb_moments <- function(lambda, alpha, truncated = FALSE, support) {
   out <- vapply(lambda, function(l) {
-    pr <- .cpb_pmf_core(l, alpha); k <- seq_along(pr) - 1
+    pr <- .cpb_pmf_core(l, alpha, support); k <- seq_along(pr) - 1
+    if (anyNA(pr)) return(c(NA_real_, NA_real_))              # refused at the cap
     if (truncated) { if (length(pr) < 2L) return(c(1, 0)); pr[1] <- 0; pr <- pr / sum(pr) }   # ceiling below 1: the point mass at 1
     m <- sum(k * pr); c(m, max(sum(k * k * pr) - m * m, 0))
   }, numeric(2))
   list(mean = out[1, ], var = out[2, ])
 }
-.cpb_mean <- function(lambda, alpha, truncated = FALSE) .cpb_moments(lambda, alpha, truncated)$mean
+.cpb_mean <- function(lambda, alpha, truncated = FALSE, support) .cpb_moments(lambda, alpha, truncated, support)$mean
 ## conditional mean E(Y | Y >= 1) at rate lambda
-.cpb_ztmean <- function(lambda, alpha) .cpb_mean(lambda, alpha, TRUE)
+.cpb_ztmean <- function(lambda, alpha, support) .cpb_mean(lambda, alpha, TRUE, support)
 
 ## the CPB rate of a fit: stored as $rate; older objects carry it in fitted.values
 .cpb_rate <- function(fit) if (!is.null(fit$rate)) fit$rate else fit$fitted.values
 
 ## internal: observed y and an n x (kmax+1) predicted-pmf matrix for a fit
 .pmf_and_y <- function(fit, kmax) {
+  sup <- .cpb_support(fit)
   if (inherits(fit, "hurdle_cpb")) {
     alpha <- fit$intensity$alpha
     P <- t(mapply(function(pi, li) {
-      row <- pi * .cpb_pmf1(li, alpha, kmax, truncated = TRUE)
+      row <- pi * .cpb_pmf1(li, alpha, kmax, truncated = TRUE, support = sup)
       row[1] <- 1 - pi
       row
     }, fit$p_full, fit$lambda_full))
@@ -67,11 +103,11 @@
   } else if (inherits(fit, "zi_cpb")) {
     alpha <- fit$alpha
     P <- t(mapply(function(pi, li) {
-      cpb0 <- .cpb_pmf1(li, alpha, kmax, truncated = FALSE)
+      cpb0 <- .cpb_pmf1(li, alpha, kmax, truncated = FALSE, support = sup)
       row <- (1 - pi) * cpb0
       row[1] <- pi + (1 - pi) * cpb0[1]
       row
-    }, fit$pi_full, fit$lambda_full))
+    }, .zi_pi0(fit$pi_full), fit$lambda_full))
     y <- fit$y
   } else if (inherits(fit, "hurdle_gec")) {
     U <- .zt_rows(gec_pmf_cpp(fit$lambda_full, fit$delta, kmax, fit$max.support))
@@ -84,11 +120,11 @@
   } else if (inherits(fit, "cpb")) {
     y <- fit$Y                                   # the stored rate carries the offset
     P <- t(vapply(.cpb_rate(fit), .cpb_pmf1, numeric(kmax + 1),
-                  alpha = fit$alpha, kmax = kmax, truncated = isTRUE(fit$truncated)))
+                  alpha = fit$alpha, kmax = kmax, truncated = isTRUE(fit$truncated), support = sup))
   } else if (inherits(fit, "cpb_fe")) {
     y <- fit$Y                                   # the rate already carries the fixed effects
     P <- t(vapply(.cpb_rate(fit), .cpb_pmf1, numeric(kmax + 1),
-                  alpha = fit$alpha, kmax = kmax, truncated = isTRUE(fit$truncated)))
+                  alpha = fit$alpha, kmax = kmax, truncated = isTRUE(fit$truncated), support = sup))
   } else if (inherits(fit, "gec_fe")) {
     y <- fit$Y                                   # rate already carries the fixed effects
     P <- gec_pmf_cpp(fit$rate, fit$delta, kmax, fit$max.support)
@@ -155,21 +191,24 @@
 ## participation/inflation probability, are recomputed from the fitted coefficients
 ## applied to newdata's design matrices. Fixed-effect units unseen in training fall
 ## back to the mean fixed effect (intensity) and to the average estimated unit
-## effect (participation/inflation dummies). Offsets are assumed absent on newdata.
+## effect (participation/inflation dummies). A fit made with an offset reads it
+## from the same column of newdata (.ud_newdata_offset).
 .pmf_and_y_newdata <- function(fit, newdata, kmax) {
+  sup <- .cpb_support(fit)
+  off <- function(obj) .ud_newdata_offset(obj, newdata)
   cpbmat <- function(lam, alpha, trunc)
-    t(vapply(lam, .cpb_pmf1, numeric(kmax + 1), alpha = alpha, kmax = kmax, truncated = trunc))
+    t(vapply(lam, .cpb_pmf1, numeric(kmax + 1), alpha = alpha, kmax = kmax, truncated = trunc, support = sup))
   yof <- function(tf) as.integer(stats::model.response(stats::model.frame(tf, newdata)))
 
   if (inherits(fit, "cpb")) {
     Tm <- stats::delete.response(fit$terms)
     X  <- .ud_newdata_matrix(Tm, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
-    P  <- cpbmat(as.numeric(exp(X %*% fit$coefficients)), fit$alpha, isTRUE(fit$truncated))
+    P  <- cpbmat(as.numeric(exp(off(fit) + X %*% fit$coefficients)), fit$alpha, isTRUE(fit$truncated))
     y  <- yof(fit$terms)
   } else if (inherits(fit, "cpb_fe")) {
     X  <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$levels, fit$contrasts, names(fit$coefficients))
-    fe <- fit$fe[as.character(newdata[[fit$fe_var]])]; fe[is.na(fe)] <- mean(fit$fe)
-    P  <- cpbmat(as.numeric(exp(fe + X %*% fit$coefficients)), fit$alpha, isTRUE(fit$truncated))
+    fe <- fit$fe[as.character(newdata[[fit$fe_var]])]; fe[is.na(fe)] <- .fe_ref(fit)
+    P  <- cpbmat(as.numeric(exp(fe + off(fit) + X %*% fit$coefficients)), fit$alpha, isTRUE(fit$truncated))
     y  <- yof(fit$formula)
   } else if (inherits(fit, "hurdle_cpb")) {
     pg   <- fit$participation
@@ -178,29 +217,30 @@
     p    <- as.numeric(stats::family(pg)$linkinv(peta))
     b    <- fit$int_beta
     Xb   <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts, names(b)) %*% b
+    Xb   <- Xb + off(fit$intensity)
     lam  <- if (is.null(fit$fe)) as.numeric(exp(Xb))
             else { fe <- fit$intensity$fe[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- fit$int_fe_ref
                    as.numeric(exp(fe + Xb)) }
     a <- fit$intensity$alpha
-    P <- t(mapply(function(pi, li) { row <- pi * .cpb_pmf1(li, a, kmax, truncated = TRUE); row[1] <- 1 - pi; row },
+    P <- t(mapply(function(pi, li) { row <- pi * .cpb_pmf1(li, a, kmax, truncated = TRUE, support = sup); row[1] <- 1 - pi; row },
                   p, lam))
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "zi_cpb")) {
     b  <- fit$coefficients
     Xb <- .ud_newdata_matrix(fit$int_terms, newdata, fit$int_xlev, fit$int_contrasts, names(b)) %*% b
-    lam <- if (is.null(fit$fe)) as.numeric(exp(Xb))
-           else { fe <- fit$fe_hat[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- mean(fit$fe_hat)
+    lam <- if (is.null(fit$fe)) as.numeric(exp(off(fit) + Xb))
+           else { fe <- fit$fe_hat[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- fit$int_fe_ref
                   as.numeric(exp(fe + Xb)) }
     pit <- as.numeric(stats::plogis(.binary_eta_newdata(fit$zero_terms, fit$zero_xlev,
                                                         fit$zero_coef, newdata, contrasts = fit$zero_contrasts)))
     a <- fit$alpha
-    P <- t(mapply(function(pi, li) { c0 <- .cpb_pmf1(li, a, kmax, truncated = FALSE)
+    P <- t(mapply(function(pi, li) { c0 <- .cpb_pmf1(li, a, kmax, truncated = FALSE, support = sup)
                                      row <- (1 - pi) * c0; row[1] <- pi + (1 - pi) * c0[1]; row }, pit, lam))
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "count_reg")) {
     fam <- .count_fam(fit$family)
     X   <- .ud_newdata_matrix(fit$terms, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
-    lam <- as.numeric(exp(X %*% fit$coefficients))
+    lam <- as.numeric(exp(off(fit) + X %*% fit$coefficients))
     P   <- t(vapply(lam, function(mu) { v <- fam$pvec(mu, fit$theta, kmax)
                                         if (isTRUE(fit$truncated)) { v[1] <- 0; v <- v / max(1 - fam$p0(mu, fit$theta), 1e-12) }; v },
                     numeric(kmax + 1)))
@@ -217,7 +257,7 @@
     fam <- .count_fam(fit$family); linkinv <- stats::make.link(fit$link)$linkinv
     Xc  <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$levels, fit$contrasts)
     Zz  <- .ud_newdata_matrix(if (!is.null(fit$zero_terms)) fit$zero_terms else stats::terms(fit$zero.formula), newdata, fit$levels, fit$zero_contrasts)
-    lam <- as.numeric(exp(Xc[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
+    lam <- as.numeric(exp(off(fit) + Xc[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
     pit <- as.numeric(linkinv(Zz[, names(fit$zero.coefficients), drop = FALSE] %*% fit$zero.coefficients))
     P <- t(mapply(function(pi, li) { f0 <- fam$pvec(li, fit$theta, kmax)
                                      row <- (1 - pi) * f0; row[1] <- pi + (1 - pi) * f0[1]; row }, pit, lam))
@@ -225,19 +265,19 @@
   } else if (inherits(fit, "gec_fe")) {                  # check before "gec": gec_fe inherits gec
     Tm  <- stats::delete.response(stats::terms(fit$formula))
     X   <- .ud_newdata_matrix(Tm, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
-    fe  <- fit$fe[as.character(newdata[[fit$fe_var]])]; fe[is.na(fe)] <- mean(fit$fe)
-    P   <- gec_pmf_cpp(as.numeric(exp(fe + X %*% fit$coefficients)), fit$delta, kmax, fit$max.support)
+    fe  <- fit$fe[as.character(newdata[[fit$fe_var]])]; fe[is.na(fe)] <- .fe_ref(fit)
+    P   <- gec_pmf_cpp(as.numeric(exp(fe + off(fit) + X %*% fit$coefficients)), fit$delta, kmax, fit$max.support)
     y   <- yof(fit$formula)
   } else if (inherits(fit, "gec")) {
     X   <- .ud_newdata_matrix(fit$terms, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
-    lam <- as.numeric(exp(X %*% fit$coefficients))
+    lam <- as.numeric(exp(off(fit) + X %*% fit$coefficients))
     P   <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support)
     if (isTRUE(fit$truncated)) P <- .zt_rows(P)
     y   <- yof(fit$terms)
   } else if (inherits(fit, "hurdle_gec")) {
     p    <- .ud_glm_predict(fit$participation, newdata)
     Xall <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts)
-    lam  <- as.numeric(exp(Xall[, names(fit$int_beta), drop = FALSE] %*% fit$int_beta))
+    lam  <- as.numeric(exp(off(fit$intensity) + Xall[, names(fit$int_beta), drop = FALSE] %*% fit$int_beta))
     U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support); p0 <- U[, 1]; U[, 1] <- 0; U <- U / pmax(1 - p0, 1e-12)
     P <- U * p; P[, 1] <- 1 - p
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
@@ -245,7 +285,7 @@
     Ti  <- stats::delete.response(fit$int_terms)
     Xn  <- .ud_newdata_matrix(Ti, newdata, fit$int_xlev, fit$int_contrasts, names(fit$coefficients))
     Zn  <- .ud_newdata_matrix(fit$zero_terms, newdata, fit$zero_xlev, fit$zero_contrasts, names(fit$zero_coef))
-    lam <- as.numeric(exp(Xn[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
+    lam <- as.numeric(exp(off(fit) + Xn[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
     pit <- as.numeric(stats::plogis(Zn[, names(fit$zero_coef), drop = FALSE] %*% fit$zero_coef))
     U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support)
     P <- U * (1 - pit); P[, 1] <- pit + (1 - pit) * U[, 1]
@@ -444,9 +484,10 @@ rootogram <- function(fit, kmax = NULL, main = "Rootogram", xlab = "Count",
 #'
 #' Draws the non-randomized probability integral transform histogram of
 #' Czado, Gneiting, and Held (2009). A well-calibrated model yields a flat
-#' histogram at height one (the reference line); a U shape indicates
-#' under-dispersion in the predictive distribution and a hump indicates
-#' over-dispersion.
+#' histogram at height one (the reference line). A hump means the data are
+#' less dispersed than the fitted model predicts (underdispersed relative to it,
+#' as a Poisson fit to underdispersed counts shows), and a U shape means they are
+#' more dispersed.
 #'
 #' @param fit A fitted `underdisp` count model (any class [score()] takes); a
 #'   fit with frequency weights counts each row as many times as its weight.

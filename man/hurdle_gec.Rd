@@ -16,7 +16,7 @@ hurdle_gec(
   B = 500,
   weights = NULL,
   cores = 1L,
-  max.support = 500
+  max.support = NULL
 )
 }
 \arguments{
@@ -36,8 +36,9 @@ or \code{"cloglog"}.}
 \item{offset}{Optional offset (log scale) for the intensity: a numeric vector
 or a column name in \code{data}.}
 
-\item{cluster}{Optional cluster (column name or vector) for the intensity's
-cluster bootstrap.}
+\item{cluster}{Optional cluster (column name or vector): cluster-robust
+standard errors for the participation equation, and the cluster bootstrap
+of the intensity with \code{se = "bootstrap"}.}
 
 \item{se}{Intensity inference: \code{"none"} (default) or \code{"bootstrap"}.}
 
@@ -48,7 +49,8 @@ applied to both margins; see \code{\link[=cpb]{cpb()}}.}
 
 \item{cores}{Worker processes for the intensity bootstrap; see \code{\link[=cpb]{cpb()}}.}
 
-\item{max.support}{Guard on the maximum evaluated support.}
+\item{max.support}{Guard on the evaluated support of the intensity; \code{NULL}
+(default) sets \code{max(500, 10 * max(y))}. See \code{\link[=gec]{gec()}}.}
 }
 \value{
 An object of class \code{"hurdle_gec"}.

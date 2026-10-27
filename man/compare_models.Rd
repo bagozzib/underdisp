@@ -7,18 +7,26 @@
 compare_models(...)
 }
 \arguments{
-\item{...}{Two or more fitted models (\code{cpb}, \code{cpb_fe}, \code{hurdle_cpb},
-\code{zi_cpb}), optionally named.}
+\item{...}{Two or more fitted models of the classes above, optionally named.
+With frequency weights, BIC uses the weight total (\code{\link[=nobs]{nobs()}}).}
 }
 \value{
 A data frame with \code{df}, \code{logLik}, \code{AIC}, \code{BIC}, and (where the
 predicted distribution is available) \code{logscore} and \code{rps}, one row per
-model, ordered by AIC.
+model, ordered by AIC, and the flags \code{truncated} (a zero-truncated
+likelihood, conditional on \code{Y >= 1}) and \code{separated} (a zero-inflation or
+participation equation the data do not bound, whose log-likelihood is a
+supremum along a divergent ridge; see \code{\link[=zi_cpb]{zi_cpb()}}, Separation). The
+function warns when the models mix truncated and untruncated likelihoods,
+whose log-likelihoods are of different events, or when a model is
+separated.
 }
 \description{
-Compares fitted models from this package --- \code{cpb}, \code{cpb_fe}, \code{hurdle_cpb}, or
-\code{zi_cpb}, in any combination of fixed effects and robust/clustered standard
-errors --- on information criteria and, where a predicted distribution is
+Compares fitted models from this package --- \code{cpb}, \code{cpb_fe}, \code{hurdle_cpb},
+\code{zi_cpb}, \code{gec}, \code{gec_fe}, \code{hurdle_gec}, \code{zi_gec}, \code{count_reg},
+\code{hurdle_count}, and \code{zi_count}, in any combination of fixed effects and
+robust/clustered standard errors --- on information criteria and, where a
+predicted distribution is
 available, on proper scores. Unlike \code{\link[=zi_test]{zi_test()}} this is not a hypothesis test:
 the models need not be nested, so it is the appropriate tool for the
 non-nested hurdle-versus-mixture choice. Passing an object that is not a

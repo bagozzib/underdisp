@@ -1,3 +1,461 @@
+# underdisp 0.2.0
+
+## The continuous parameter binomial follows King's definition
+
+* Every CPB function now defaults to King's (1989) continuous parameter binomial
+  as Winkelmann, Signorino, and King (1995) normalize it: the pmf on
+  `0, ..., ceiling(lambda / (1 - alpha))`, which is the generalized event count
+  of `gec()` at `delta = alpha < 1`. Earlier versions put the mass on
+  `0, ..., floor(lambda / (1 - alpha))`, a distinct distribution that the
+  documentation attributed to King. The two coincide when the ceiling is an
+  integer. Under King's definition the realized mean sits at or above `lambda`
+  (Winkelmann, Signorino, and King's equation 5), the log-likelihood is
+  continuous in the parameters (the support point that enters as a ceiling
+  crosses an integer carries mass that grows from zero), and a fit approaches
+  the Poisson continuously as `alpha` approaches 1, so `max.support` no longer
+  bounds `alpha`.
+* The earlier definition remains available through `support = "floor"` in
+  `cpb()`, `cpb_fe()`, `hurdle_cpb()`, `zi_cpb()`, `dcpb()`, `pcpb()`, `qcpb()`,
+  `rcpb()`, `rhurdle_cpb()`, `rzicpb()`, `compare_dispersion()`, and
+  `ud_screen()`, and reproduces 0.1.x results bit for bit (the zero-inflated fits
+  can reach higher maxima; see below). A fit stores its `support` and every
+  method reads it; an object saved by an earlier version is treated as a
+  floor-support fit.
+* On King's support the first-order profile interval for `alpha` covers
+  between 0.935 and 0.956 in simulations from the CPB. On the floor support it
+  covers 0.90 to 0.94, with most misses on the upper side. `calibrate_alpha()`
+  remains available for either support. The documentation now presents it as
+  the remedy for floor-support fits and as an optional refinement on King's.
+* On King's support the pairs bootstrap's 95% percentile interval for a slope
+  covers 0.92 at `alpha` = 0.3 and 0.94 at 0.5 and 0.7, in simulations at
+  n = 300. Neither a parametric bootstrap (0.922) nor 999 replicates (0.932)
+  brings it to the nominal level.
+  The documentation reports these rates in place of "validated to nominal
+  coverage", which held on the floor support (0.95).
+* In the fixed-effects bias simulations (150 units, `alpha` = 0.5) the bias of
+  `cpb_fe()`'s `alpha` under King's definition is -0.122 at T = 6 and -0.018 at
+  T = 40 (floor support: -0.153 and -0.033), and `bias_correct = "jackknife"`
+  removes it to within 0.009 (on the floor support it leaves 23 to 30 percent).
+  The jackknife's validity gate refuses 9 to 13 percent of time-homogeneous
+  panels (floor support: about 7 percent).
+* A King's-support fit whose `alpha` reaches the equidispersed limit (above
+  0.999) warns that the data show no underdispersion, in place of the support
+  guard's warning, and `dispersion_test()` and `summary()` report the boundary
+  value 0 there.
+* At the other end, a fit whose `alpha` falls below 0.001 prints a note: as
+  `alpha` approaches 0 the pmf at each rate puts its mass on at most two
+  adjacent counts, which a series taking only two neighbouring values fits
+  exactly, and the interval and tests for `alpha` are at that boundary. The
+  maximum is legitimate, so this is a note, not a warning.
+* `predict()` and `fitted()` of a King's-support `zi_cpb()` fit use the exact
+  mean of the count component, as `zi_gec()` does.
+
+## New families
+
+* `count_reg()`, `hurdle_count()`, and `zi_count()` gain the hyper-Poisson
+  (`"hyperpois"`, Saez-Castillo and Conde-Sanchez 2013, in its mean
+  parameterization) and the exponentially weighted Poisson of Ridout and Besbeas
+  (2004) with one or two tail weights (`"ewp2"`, `"ewp3"`), with
+  `dhyperpois()`/`dewp()` and their p/q/r companions. `dispersion_test()` tests
+  the two weights of `"ewp3"` jointly.
+
+## Optimization
+
+* `zi_cpb()`, `zi_gec()`, and `zi_count()` start from points that span the
+  structural share of zeros, where the mixture likelihood's optima differ: the
+  zero-inflated Poisson's coefficients and a low-inflation start (the
+  single-equation fit with a constant inflation probability of 0.02) beside the
+  separate-stage seeds, followed by a BFGS pass. On the pooled conflicts panel of
+  the companion paper the earlier starts stopped 25 log-likelihood points short.
+* `zi_cpb(fe = , method = "em")` follows its classification EM, which maximizes
+  the classification likelihood rather than the mixture likelihood it reports,
+  with block coordinate ascent on the observed-data likelihood.
+* `gec()` polishes its Nelder-Mead solution by BFGS.
+* `zi_cpb()`, `zi_gec()`, and `zi_count()` check their zero-inflation equation
+  for separation. They warn when the data put no useful bound on a covariate
+  coefficient.
+  - The check uses the profile likelihood of each coefficient, with the count
+    component held at its estimate. A coefficient is flagged when its profile
+    falls by less than `qchisq(0.95, 1) / 2` over 100 standard deviations of its
+    covariate.
+  - The result is stored in the component `separation`, and the print methods
+    note it. They also note when the check finds a higher point of the
+    likelihood than the fit.
+  - When the check finds a point at least 0.01 higher, the fit restarts its
+    final polish there, keeps the result only if it gains, and checks again, up
+    to three times.
+  - A fit near the no-inflation boundary (data with few or no structural zeros)
+    leaves every zero-equation coefficient unbounded for that reason alone. It
+    is not reported as separated; the print methods note the boundary instead.
+  - In a mixture, separation needs no covariate that splits the zeros from the
+    positives, because the count component's probability of a zero covers the
+    zeros on the wrong side. A hurdle on the same covariates can therefore have
+    a finite maximum where the mixture has none.
+  - Earlier versions muffled the warnings of the zero equation's internal logit
+    fits and reported nothing.
+
+## The ceiling as a quantity and as a test
+
+* `implied_ceiling()` gains `max_count`, the largest count with positive
+  probability (the integer ceiling of `lambda / (1 - alpha)` on King's
+  support, its floor on the floor support); `ceiling` stays the continuous
+  number of trials.
+* New `ceiling_exceedance(fit, newdata)` counts held-out observations above the
+  fitted bound, for `cpb()`, `cpb_fe()`, `hurdle_cpb()` and `zi_cpb()` fits.
+* `compare_dispersion()` and `ud_screen()` no longer report a ceiling-exceedance
+  share: computed on the data the CPB was fit to, it was zero for every
+  feasible fit.
+* `predict.zi_cpb()` gains `type = "rate"`.
+
+## Quantities of interest and their intervals
+
+* Every `first_difference()` method takes its interval by one rule. A fit with
+  stored bootstrap draws gives the percentile interval of the quantity computed
+  at every draw, jointly over the coefficients, the dispersion parameter and,
+  for a fixed-effects fit, the reference unit's effect; a fixed-effects fit's
+  draws are first recentered on its reported estimate, since its replicates
+  share the incidental-parameters bias (this also centres a jackknife-corrected
+  fit's intervals on the corrected estimate). Other fits use the delta method
+  over the full covariance, the dispersion parameter included, and a hurdle the
+  independent covariances of its two margins. The intervals of `gec()`,
+  `gec_fe()`, `cpb_fe()` and `count_reg()` used to hold the dispersion
+  parameter fixed, and the zero and marginal rows of `zi_count()` and the
+  decompositions of `hurdle_cpb()`, `zi_cpb()`, `hurdle_gec()` and `zi_gec()`
+  without `B` had none.
+* `first_difference()` gains `at =`, a named vector that fixes other
+  model-matrix columns (a factor's dummies, say) instead of holding them at
+  their means.
+* `predict()` gains `se.fit`, `interval = "confidence"` and `level` for every
+  class, by the same rule: the predicted quantity at each row of `newdata` is
+  computed at every stored draw, or by the delta method over the fit's
+  covariance. A row at a fixed-effects unit's own effect, or at its own
+  zero-equation dummy, has no interval, since the draws do not carry that
+  parameter; a row of an unseen unit, or `newdata` without the unit column,
+  enters at the reference unit, which they do. These arguments used to be
+  ignored.
+* New `ame()`: average marginal effects, the average over the rows of `newdata`
+  (weighted by `weights =`, such as a tabulated fit's frequency weights) of the
+  derivative of a predicted quantity in a numeric variable, or of its contrast
+  between two values of any variable, with the interval of the same rule. The
+  variable enters through the model's formula, so interactions and
+  transformations of it are handled, which `first_difference()` refuses. For a
+  concentrated fixed-effects fit, rows at their own unit effects (the sample's
+  average partial effect) have no interval from the stored draws; rows at the
+  reference unit (a typical, geometric-mean unit) do. The derivative of a
+  floor-support fit, whose mean jumps at integer ceilings, is refused.
+* `predict(newdata)` on a fixed-effects fit (`cpb_fe()`, `gec_fe()`,
+  `zi_cpb(fe =)`) enters a unit the fit estimated at its own effect, as
+  `score()` and `ceiling_exceedance()` do, and an unseen unit, or every row when
+  `newdata` has no unit column, at the reference unit. Every row used to enter
+  at the reference unit.
+* `irr()` takes its intervals as `confint()` does (for `gec()`, the exponential
+  of the percentile interval). A term the data do not bound has `NA` ratios,
+  with a message, and the fixed-effects dummies are left out of the table.
+* `implied_ceiling()`'s `lower` and `upper` are renamed
+  `ceiling_at_alpha_lower` and `ceiling_at_alpha_upper`: they hold the rate at
+  its estimate and are not a confidence interval for the ceiling.
+* `confint(fit, "alpha")` gives the profile interval of a `cpb()` fit without a
+  bootstrap; coefficient intervals still need one.
+
+## One bootstrap
+
+* Every class bootstraps through one engine: the same resampling (rows,
+  clusters, or fixed-effects units, a unit drawn twice relabeled as two), one
+  layout of the stored draws (named columns, the dispersion parameter on its
+  natural scale, and a fixed-effects fit's reference unit effect), replicates
+  dropped when their refit fails or does not report convergence, and the
+  attributes `nboot_ok`, `B` and `cluster`. The draws of `cpb_fe()`, `gec_fe()`
+  and `zi_cpb()` now carry the dispersion parameter, and `zi_gec()` stores
+  `delta` rather than its logarithm. A `zi_cpb()` or `zi_gec()` replicate runs
+  the separation check's restart as the fit does, and relabels the zero
+  equation's unit dummies with the count equation's units. Objects saved by
+  earlier versions are read in their own layout. The intervals of `confint()`
+  follow the same rules as before.
+* A serial bootstrap or parametric bootstrap (`dispersion_test()`,
+  `calibrate_alpha()`, `ud_screen()`) that will take over a minute says so, with
+  the time its first replicate took. Fewer than 100 bootstrap replicates bring a
+  note on the Monte Carlo error of the standard errors. `print()` of
+  `dispersion_test()` says when its p-value sits at the floor 1/(B + 1).
+* `cpb_fe()` and `gec_fe()` sort a `cluster` given as a vector together with
+  the data. It was not reordered when the rows were sorted by unit, which put
+  the wrong clusters on any panel not supplied unit by unit.
+
+## Separation, the hurdles' participation equation, and `zi_test()`
+
+* `zi_cpb(fe =)` leaves a unit with no positive count out of the estimation,
+  as fixest leaves such units out of a Poisson fixed-effects fit, and says how
+  many it left out. At the maximum such a unit's count effect is minus infinity,
+  so its zeros are certain whatever its structural-zero probability and add
+  nothing to the likelihood. Its rows stay in the fit at that limit, with
+  fitted means of zero, and a structural-zero probability of `NA` where
+  `zero_fe` would give the unit its own dummy. Before, the unit's count effect
+  was filled with a value of the fit's choosing (the smallest estimated effect
+  minus 2 under `method = "ml"`, the mean effect under `method = "em"`), whose
+  zeros then shaped the inflation estimates, and the two methods filled it
+  differently. On the floor support the fill is kept, as before 0.2.0.
+* The participation equation of `hurdle_cpb()`, `hurdle_gec()` and
+  `hurdle_count()` is checked for separation by the zero-inflated fits' rule.
+  With `cluster` its standard errors are cluster-robust (`hurdle_count()`
+  follows its `se`, robust or clustered), in `summary()`, `vcov()`,
+  `confint()`, `tidy()`, `irr()`, the tables and the first differences. They
+  were the glm's model-based ones in every case.
+* A separated term has no standard error in `summary()`, `tidy()` and the
+  texreg tables. `compare_models()` gains the columns `truncated` and
+  `separated`, and warns when a separated fit, or a zero-truncated likelihood
+  next to untruncated ones, enters the ranking.
+* `zi_test()` refuses covariate-dependent inflation, a fixed-effects
+  `zi_cpb()`, and a separated zero equation, where its boundary p-value has no
+  reference distribution. It used to warn about the first and accept the others.
+
+## Defaults, tables and messages
+
+* The help pages say what the coefficients are on each family's scale.
+  `?irr.count` lists the families whose `exp(beta)` is a ratio of means (the
+  Poisson, the negative binomial, the mean-parameterized COM-Poisson, the
+  hyper-Poisson, the generalized Poisson at `lambda >= 0`) and those whose is
+  not (the CPB, the underdispersed GEC, the rate-parameterized COM-Poisson,
+  whose `exp(beta)` is roughly the mean ratio to the power `nu`, the EWP, the
+  gamma count, the double Poisson); `print()` of a `count_reg()` fit names the
+  scale for the latter. `?count_reg` says that the robust Poisson is consistent
+  for the conditional mean whatever the distribution (Gourieroux, Monfort and
+  Trognon 1984; Wooldridge 1999) and is the benchmark for mean effects, and its
+  summary of a Poisson fit reads the gap between robust and model-based errors
+  as a misspecified variance. The generalized Poisson's mean departs from
+  `exp(x'b)` when underdispersed at small means; the hyper-Poisson is the
+  constant-dispersion model of \enc{Sáez-Castillo}{Saez-Castillo} and
+  \enc{Conde-Sánchez}{Conde-Sanchez} (2013) (their model with dispersion
+  covariates is `DGLMExtPois::glm.hP()`), and its underdispersion is bounded
+  (Var/Mean at least 0.5 at a mean of 2, 0.9 at 10), with its `gamma -> 0`
+  limit stated for means below one. The families' sources are cited, and
+  `dispersion_profile()` is said to show which variance function the data
+  follow, not the process behind them. The fixed-effects pages no longer say
+  the covariate coefficients are unaffected by the incidental-parameters bias,
+  and `?hurdle_cpb` notes that bias in a participation logit with `part_fe`.
+
+* `bias_correct = "jackknife"` needs `time =` in `cpb_fe()` and `gec_fe()` (and
+  `hurdle_cpb()`, which passes it on), the column that orders each unit's rows;
+  the half-panels and the residual trend check follow it. Rows not supplied in
+  time order used to be split as they came, which defeated the validity gate.
+* `max.support = NULL`, meaning `max(500, 10 * max(y))`, is now the default of
+  `gec()`, `hurdle_gec()`, `zi_gec()`, `zi_cpb()` and `compare_dispersion()`, as
+  it was of `cpb()`, `cpb_fe()` and `gec_fe()`; they used 500, and `gec()`
+  failed on data with a count far above it. On the floor support `zi_cpb()` and
+  `compare_dispersion()` keep 500, as before.
+* `tidy()` takes `conf.int` for every class. `glance()` and the texreg tables
+  report the dispersion parameter under its own name and with the side of its
+  Poisson value that is underdispersion (the CPB's `alpha` below 1 and the
+  gamma-count's `alpha` above 1 are both underdispersion), and `glance()` adds
+  BIC. `augment()` takes `data =`.
+* `residuals(type = "pearson")` for `cpb_fe()`, `gec()`, `gec_fe()` and
+  `count_reg()`, from the exact variance of the fitted distribution.
+* `count_reg()` with `se = "robust"` or `"cluster"` also keeps the model-based
+  standard errors, and `summary()` prints the ratio of the two: King and Roberts
+  (2015) read a large gap as a misspecification to fix. `?cpb` and `?count_reg`
+  say what robust standard errors protect and what they do not.
+* Failures are reported, not masked: a covariance the numerical derivatives
+  cannot form, or a singular information, warns; `compare_dispersion()` has a
+  `converged` column, and `ud_screen()` says which comparators it did not fit
+  and why; a non-finite gradient of the concentrated fixed-effects objective
+  falls back to central differences (it was replaced by zeros, which stopped
+  BFGS where it stood); the matched families' fits report convergence when the
+  BFGS stage or its polish converged (the polish used to set it regardless);
+  and a texreg registration failure is reported at load.
+* `summary()` counts the rows dropped for a missing value; `print()` of a CPB
+  fit says that `alpha` is the variance-to-mean ratio at an integer ceiling;
+  `count_reg(family = poisson)` takes the family object; a `|` inside `I()` is
+  no longer read as a two-part formula; `cpb_fe()` and `gec_fe()` say where
+  two-way fixed effects go.
+* `?cpb` gives the notation of King (1989) and of Winkelmann, Signorino and
+  King (1995), and why standard errors from the Hessian fail: an observation
+  whose ceiling lies a distance `eps` above an integer carries information of
+  order `1/eps` about its rate.
+
+## Fixes
+
+* On King's support, the profile interval for `alpha` follows the profile
+  below 0.005, in geometric steps down to 1e-6, and its limit is found to a
+  thousandth of its value. A lower side that never reaches its cut reaches
+  alpha's limit, 0 (the two-point distribution), which `summary()` says; an
+  upper side that never does ends at 0.999 or at an estimate beyond it. The trace
+  used to stop at 0.005, so an estimate between 0.005 and about 0.02 got 0.005
+  as its lower limit with the note "lower limit at the parameter bound", and an
+  estimate below 0.005 an interval that did not contain it. The floor support
+  keeps its trace and its interval.
+
+* The standard errors of the exponentially weighted Poisson (`"ewp3"`,
+  `"ewp2"`; `count_reg()`, the hurdle intensity, `zi_count()`) come from the
+  expected information, summed over each observation's support. Its
+  log-likelihood is continuous but kinked (its weight switches at
+  \eqn{y = \lambda} and its normalizer at every integer \eqn{\lambda}), and the
+  finite-difference Hessian used before measured only the local curvature of
+  the pieces: with a covariate, the standard errors were erratic and mostly far
+  too small (a slope's by up to an order of magnitude). The robust and
+  clustered sandwiches use the same information and scores differenced at a
+  small step. The message for a covariance that is not positive definite no
+  longer blames fixed effects alone.
+
+* Delta-method intervals (`first_difference()`, `predict(se.fit =, interval =)`,
+  `ame()` and the hurdles' participation equation) differentiate along each
+  parameter in steps of its standard error. The steps were relative to the
+  parameter's value, so a coefficient on a covariate in small units (a
+  population in persons) gave intervals of 1e80 or `NA`, and one in moderate
+  units (an income in dollars) intervals off by a few percent; they now do not
+  depend on the covariates' units.
+
+* `zi_cpb(fe =, method = "ml")`, the default, is a joint maximum of the mixture
+  likelihood on King's support: its plug-in fit (the unit effects of a
+  first-stage fit to the positive counts, with a common shift now free) starts
+  the observed-data polish of the EM path, which frees every unit's count
+  effect. The plug-in alone was not a maximum. A unit whose positive counts are
+  all 1 got an arbitrary effect from the first stage's flat set, the reported
+  log-likelihood (which `compare_models()` ranks) could lie tens of points below
+  the mixture's maximum, and the fit depended on where the covariates were
+  centred. On a 40-unit panel the polish raised the log-likelihood from -394.2
+  to -387.5, the EM path's value, and three centrings of the covariates agreed
+  to 0.03 instead of 4. The floor support keeps the plug-in fit of earlier
+  versions.
+
+* A fixed-effects unit with no positive count sits 30 log units below its
+  largest linear predictor (`cpb_fe()` on King's support, `gec_fe()`, and the
+  left-out units of `zi_cpb(fe =)`), so its rates are at most `exp(-30)` whatever
+  the covariates' scale. The sentinel was an absolute -30: with an uncentred
+  covariate (a year trend) such a unit's rates were as large as `exp(53)`, its
+  fitted values `NA`, and the analytic gradient unusable, which moved the
+  estimates in the third digit. `gec_fe()`'s search for a unit's effect at
+  `delta >= 1` also starts relative to the unit's Poisson intercept, not at an
+  absolute -30 that could lie above the optimum.
+
+* `gec_fe()` refuses a likelihood term whose sum the support guard cuts while
+  its terms are still large, as `gec()` does, instead of renormalizing over the
+  cut support (which overstated the likelihood toward large `delta`), and finds
+  no ceiling crossings past the guard.
+
+* On King's support, `zi_cpb(method = "em")` reports convergence as it happened
+  (the EM's tolerance met, the observed-data polish within its round cap), so
+  the bootstrap drops a replicate that did not converge; it used to report
+  `TRUE` always, as it still does on the floor support.
+
+* The gamma count's log-probabilities are computed from log tails, so they no
+  longer underflow to `-Inf` at large means (a zero at a mean of 400 has log
+  probability about -793); its moments refuse at the support cap, as the other
+  families do, instead of reporting a mean summed over half the mass, and its
+  variance no longer overflows past a mean of about 44,000.
+
+* The variances of the COM-Poisson, the double Poisson, the generalized Poisson
+  and the EWP are computed about the mean in a second pass. The one-pass sums
+  cancelled for concentrated distributions (100% errors at a COM-Poisson
+  `nu` of 1e4 and a double-Poisson `theta` of 100). An EWP sum that the support
+  cap stops while its terms still rise is refused (`NA`) instead of returned as
+  complete.
+
+* The mean-parameterized COM-Poisson finds its rate at a mean below 1 and a
+  large `nu` (a Bernoulli's root, from which it now starts); it returned `NA`
+  there from `nu` of about 2000.
+
+* `compare_models()` warns when the models were fit to different responses,
+  not only to different numbers of observations.
+
+* Parallel bootstraps (`cores > 1`) load the package on the workers from the
+  library the session loaded it from.
+
+* `first_difference(B > 0)` on `hurdle_cpb()` and `zi_cpb()` fits refit each
+  replicate with the fit's own settings (fixed effects, link, offset, weights,
+  support, estimation method), and resamples whole fixed-effects units, or the
+  fit's clusters, when it has them. It used to refit the formulas alone.
+* The COM-Poisson's `nu` and the hyper-Poisson's `gamma` no longer run off
+  toward a limit of the family (the geometric, the Bernoulli, or 1 + Poisson)
+  on data more extreme than the family. The search holds them in `[1e-4, 1e4]`,
+  a fit on that edge is compared with one at the limit itself (`1e-8` or
+  `1e8`), and `print()` notes a value at or past 1e-4 or 1e4.
+* The mean-parameterized COM-Poisson (`family = "mpcmp"`) no longer evaluates
+  a truncated normalizing sum. Its root search refuses a mean that the
+  1e5-term support cap cannot represent, and the likelihood treats such a point
+  as infeasible. An optimizer step to such a mean used to run 200 Newton steps
+  of 1e5 terms per observation, at an overstated likelihood: a fit to
+  zero-heavy overdispersed data that did not finish in half an hour now takes
+  about a minute, and fits that never reach the cap are unchanged. For
+  `nu < 1` the root search starts between the Poisson and the geometric rates
+  rather than from Shmueli et al.'s approximation, whose correction diverges as
+  `nu` approaches 0 (an overdispersed fit: 136 s to 4 s, the same maximum).
+* The other families whose normalizer is a sum over the support (the
+  rate-parameterized COM-Poisson, the double Poisson, the generalized Poisson
+  below zero, the EWP) refuse it in the same way: where the 1e5-term cap would
+  cut off part of the sum, a mean of order 1e5 or more, the normalizer is `NA`
+  and the likelihood treats the point as infeasible. They used to return the
+  truncated sum, and so an overstated likelihood. `dcompois()` and its siblings
+  return `NA` there. Everywhere else the values are unchanged.
+* The generalized Poisson with `lambda >= 0` uses its closed-form normalizer,
+  1, in place of a sum over the capped support, which fell short where the
+  tail is long: at `lambda = 0.99` the log-likelihood per observation was
+  overstated by 1e-6 at a mean of 100 and by 0.03 at a mean of 50,000.
+* The generalized Poisson's predicted probabilities no longer fail for a
+  slightly negative `lambda` at large means, where the end of the support
+  passed the integer range.
+* A fit made with an offset carries it to new rows. `predict()`, `score()`,
+  `cv_score()` and `ceiling_exceedance()` read the fit's offset column from
+  `newdata`, or take `offset =`, and refuse rows without one. They used to
+  evaluate new rows at exposure 1. Every `predict()` method now takes
+  `offset =`, and the first differences of `hurdle_gec()`, `zi_gec()`,
+  `hurdle_count()`, `zi_count()` and `zi_cpb()` hold the offset at its mean, as
+  the other classes did.
+* In first differences and in predictions for new rows, the reference unit of a
+  fixed-effects fit averages only the units whose effect the data identify.
+  Excluded are units with no positive count, whose effect is minus infinity,
+  and, under King's zero-truncated support, units whose counts are all 1. Their
+  sentinel or arbitrary effects used to move the reference, by an order of
+  magnitude on panels with a few all-zero units. The same rule holds the unit
+  dummies of `count_reg()`, `hurdle_count()`, `zi_count()` and the hurdle
+  participation equations.
+* `cpb_fe()`, `gec_fe()` and `zi_cpb(fe =)` return `fitted()`, `residuals()`,
+  `predict()` and `simulate()` in the data's row order. They used to return
+  them sorted by unit.
+* `first_difference()` refuses a variable that also enters another column of the
+  model (`I(x^2)`, `log(x)`, `poly(x, 2)`, a spline basis, an interaction). Only
+  interactions were refused before, and the others gave a silently wrong
+  contrast. `hurdle_gec()` and `zi_gec()` now refuse interactions too.
+* `first_difference()` on a `hurdle_cpb()` fit uses the participation link it
+  was fitted with. It used the logit under every link.
+* `irr()` reports odds ratios only for a logit participation or inflation
+  equation. Under probit or cloglog, exp(coefficient) is not an odds ratio and
+  is no longer reported as one.
+* `count_reg(fe =)`, `hurdle_count(fe =)` and `zi_count()` keep a transformed
+  response (`pmin(y, 3) ~ x`) and accept `y ~ .`. They used to replace the
+  response by its first variable, or fail.
+* `alpha_confint()` refuses a `cpb_fe()` fit, whose profile would need its unit
+  effects re-concentrated. It used to return an interval far too narrow.
+* `zi_cpb(fe =)` stops when its first-stage fixed-effects fit fails. It used to
+  continue with every unit effect at zero. Its two-step path counts in `df`
+  only the unit effects the first stage estimated, not the fill values of units
+  with no positive count.
+* `zi_cpb(method = "em")` reports the observed-data log-likelihood at its
+  estimate. Its fixed-effects polish maximizes that likelihood, with the
+  probabilities floored only against underflow. A floor at 1e-12 on each
+  probability used to overstate the log-likelihood whenever an observation's
+  probability fell below it.
+* `zi_cpb()`'s warning that the count component cannot cover the data no longer
+  fires on legitimate fits whose zeros are all structural at large rates.
+* `zi_test()` refuses a nest fitted on different rows, a zero-truncated nest, or
+  a nest on the other CPB support (an object saved before 0.2.0 reads as the
+  floor support). It used to warn, or to say nothing, and return a p-value.
+* `rgec()` and `qgec()` return `NA` with a warning where the support guard
+  binds, as `dgec()` does. They used to return the cut point. A non-finite rate
+  gives `NA` in the GEC's moments, not a point mass at zero.
+* On King's support, the R-side CPB distribution functions, predictions of
+  `type = "prob"`, `simulate()` and the draws of `calibrate_alpha()` no longer
+  cut the support at `max.support`, which there bounds only the width of the
+  likelihood's pmf. Past the 1e5-term cap they return `NA` with a warning,
+  rather than renormalizing over a cut support.
+* Character covariates predict on new data that hold only some of their values.
+* `glance()` and the BIC of `compare_models()` count the weight total for a
+  weighted fit, as `nobs()` does. `max.support` is limited to one below the
+  integer maximum, where the compiled loops would overflow.
+* The zero equation's reference in the first differences of `zi_cpb()` and
+  `zi_gec()`, and the participation equation's in `hurdle_gec()`, hold the
+  `zero_fe` or `part_fe` dummies at their means over the units the data
+  identify, as the other two-part classes do.
+* `print()` of a CPB fit shows the median largest feasible count, in place of
+  the continuous ceiling. The help pages lose no text to escaped percent signs.
+
 # underdisp 0.1.2
 
 ## Bug fixes
