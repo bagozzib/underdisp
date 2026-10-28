@@ -115,7 +115,10 @@ test_that("the C++ kernel stays a probability near the Poisson limit and outside
     expect_true(all(m[, 1] <= 0) && all(m[, 2] <= 1))
     expect_equal(m[, 1], stats::dpois(ky, l, log = TRUE), tolerance = 1e-4)
   }
-  expect_identical(lp0(5, 200, 1 - 1e-15)[1, 1], -1e300)      # within 1e-12 of one: infeasible, as in the likelihoods
+  ## within 1e-12 of one: infeasible, as in the likelihoods. The kernel's sentinel is the compiler's -1e300, which
+  ## R's own parse of the literal can miss by an ulp where long double is double (macOS arm64), so the test reads
+  ## it the way the package does, as anything below -1e299
+  expect_lt(lp0(5, 200, 1 - 1e-15)[1, 1], -1e299)
   ## counts far below a narrow body (a large rate, a tiny alpha): closed form, against a direct lgamma evaluation
   l <- 2000; a <- 0.001; n <- l / (1 - a); k <- 0:ceiling(n - 1e-9)
   lt <- lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1) + k * log(1 - a) + (n - k) * log(a)
