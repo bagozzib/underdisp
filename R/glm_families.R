@@ -675,8 +675,9 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
   fam <- .count_fam(family); family <- fam$tag; se <- match.arg(se); link <- match.arg(link)
   if (!is.null(cluster) && se_missing) se <- "cluster"   # uniform cluster semantics
   linkinv <- stats::make.link(link)$linkinv
-  fexp <- .ud_add_fe_terms(formula, NULL, data)                 # a '.' expanded
-  cform <- if (is.null(fe)) fexp else .ud_add_fe_terms(formula, fe, data)
+  ## a '.' expanded over the covariates: the columns other than the unit identifiers of either equation
+  fexp <- .ud_add_fe_terms(formula, NULL, data[, setdiff(names(data), c(fe, zero_fe)), drop = FALSE])
+  cform <- if (is.null(fe)) fexp else .ud_add_fe_terms(fexp, fe, data)
   zrhs <- if (is.null(zero)) fexp[-2L] else zero                 # the covariates, not the unit dummies
   if (!is.null(zero_fe))                                        # zero-equation FE is opt-in
     zrhs <- stats::reformulate(c(labels(stats::terms(zrhs, data = data)), paste0("factor(", zero_fe, ")")),

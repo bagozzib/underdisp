@@ -219,7 +219,7 @@ ceiling_exceedance <- function(fit, newdata, weights = NULL, offset = NULL) {
     Xb <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts,
                              names(fit$int_beta)) %*% fit$int_beta + .ud_newdata_offset(fit$intensity, newdata, offset)
     lam <- if (is.null(fit$fe)) as.numeric(exp(Xb))
-           else { fe <- fit$intensity$fe[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- fit$int_fe_ref
+           else { fe <- fit$intensity$fe[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- .fe_ref(fit$intensity)
                   as.numeric(exp(fe + Xb)) }
     a <- fit$intensity$alpha
   } else {

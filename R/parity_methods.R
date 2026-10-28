@@ -152,12 +152,15 @@ NULL
 #' @export
 confint.gec <- function(object, parm, level = 0.95, ...) {
   if (is.null(object$boot)) .no_inference("se = \"bootstrap\"")
-  a <- (1 - level) / 2
-  if (inherits(object, "gec_fe")) {                       # FE bootstrap: normal approximation
-    ok <- .ud_draws(object, names(object$coefficients))
-    ci <- .ci_wald(object$coefficients, apply(ok, 2, stats::sd), level)
+  a <- (1 - level) / 2; fe <- inherits(object, "gec_fe")
+  est <- c(object$coefficients, if (!fe) c(delta = object$delta))
+  ok <- .ud_draws(object, names(est))
+  if (is.null(ok)) {                                      # fewer than two converged replicates
+    .ud_boot_too_few()
+    ci <- .ci_wald(est, rep(NA_real_, length(est)), level)
+  } else if (fe) {                                        # FE bootstrap: normal approximation
+    ci <- .ci_wald(est, apply(ok, 2, stats::sd), level)
   } else {
-    ok <- .ud_draws(object, c(names(object$coefficients), "delta"))
     ci <- t(apply(ok, 2, stats::quantile, c(a, 1 - a)))
     colnames(ci) <- paste0(format(100 * c(a, 1 - a), trim = TRUE), " %")
   }

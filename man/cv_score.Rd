@@ -11,7 +11,8 @@ cv_score(
   kmax = NULL,
   folds = NULL,
   cores = 1L,
-  weights = NULL
+  weights = NULL,
+  offset = NULL
 )
 }
 \arguments{
@@ -37,6 +38,11 @@ name of \code{data} or a numeric vector with one value per row. The mean scores
 are then weighted means, so a row of weight w counts as w held-out
 observations (the folds assign whole rows). The fold fits see the weights
 only through \code{fitfun}, so pass them there as well.}
+
+\item{offset}{Optional offset (log scale) of the held-out rows: a column name
+of \code{data} or a numeric vector with one value per row, split with the folds.
+It is needed when \code{fitfun} gives its fit the offset as a vector. The fold
+fits see the offset only through \code{fitfun}.}
 }
 \value{
 An object of class \code{"cv_score"}: a list with the mean held-out

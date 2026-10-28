@@ -168,7 +168,10 @@ print.ud_irr <- function(x, digits = 3, ...) {
 ##       are first recentered on the reported estimate, since its replicates
 ##       share the incidental-parameters bias (the reason its coefficient
 ##       intervals are normal ones centred on the estimate) and a
-##       jackknife-corrected fit reports the corrected estimate;
+##       jackknife-corrected fit reports the corrected estimate. A recentred
+##       draw whose dispersion parameter leaves its range (`bounds`, an
+##       interval (lower, upper] per parameter: the CPB's alpha above 1, say)
+##       describes no distribution and is dropped;
 ##   (2) otherwise by the delta method over the fit's full covariance, the
 ##       dispersion parameter included: the count families' analytic, robust or
 ##       clustered covariance, and for a hurdle the covariances of its two
@@ -185,15 +188,20 @@ print.ud_irr <- function(x, digits = 3, ...) {
 ## quantity is not finite is dropped for all of them.
 ## ---------------------------------------------------------------------------
 .qoi_ci <- function(qfun, theta, draws = NULL, vc = NULL, level = 0.95, recenter = FALSE, hold = character(0),
-                    each = FALSE) {
+                    each = FALSE, bounds = NULL) {
   q0 <- qfun(theta); k <- length(q0); a <- (1 - level) / 2
   if (!is.null(draws)) {
     for (h in setdiff(intersect(hold, names(theta)), colnames(draws)))
       draws <- cbind(draws, matrix(theta[[h]], nrow(draws), 1L, dimnames = list(NULL, h)))
     if (all(names(theta) %in% colnames(draws))) {
       D <- draws[, names(theta), drop = FALSE]
-      if (recenter) D <- sweep(D, 2L, colMeans(D) - theta)
-      Q <- matrix(unlist(lapply(seq_len(nrow(D)), function(i) qfun(stats::setNames(D[i, ], names(theta))))),
+      if (recenter) {
+        D <- sweep(D, 2L, colMeans(D) - theta)
+        for (nm in intersect(names(bounds), colnames(D)))
+          D[D[, nm] <= bounds[[nm]][1L] | D[, nm] > bounds[[nm]][2L], ] <- NA
+      }
+      Q <- matrix(unlist(lapply(seq_len(nrow(D)), function(i)
+                    if (anyNA(D[i, ])) rep(NA_real_, k) else qfun(stats::setNames(D[i, ], names(theta))))),
                   ncol = k, byrow = TRUE)
       if (each) {
         Q[!is.finite(Q)] <- NA
@@ -254,7 +262,7 @@ print.ud_irr <- function(x, digits = 3, ...) {
 .fd_build <- function(spec, level) {
   pt <- spec$lev(spec$theta)
   ci <- .qoi_ci(function(th) { L <- spec$lev(th); L$to - L$from }, spec$theta, spec$draws, spec$vc, level,
-                isTRUE(spec$recenter), if (is.null(spec$hold)) character(0) else spec$hold)
+                isTRUE(spec$recenter), if (is.null(spec$hold)) character(0) else spec$hold, bounds = spec$bounds)
   .ud_fd(spec$component, pt$from, pt$to, ci$lower, ci$upper, ci$method)
 }
 

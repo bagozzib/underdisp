@@ -7,13 +7,13 @@
 ## ---------------------------------------------------------------------------
 
 ## A fit's parameters `theta` (named as the stored draws' columns or the covariance's dimnames), the source of their
-## uncertainty (`draws` or `vc`, with `recenter` and `hold` as in .qoi_ci()), `set(th)`, the fit with its parameters
+## uncertainty (`draws` or `vc`, with `recenter`, `hold` and `bounds` as in .qoi_ci()), `set(th)`, the fit with its parameters
 ## replaced by `th`, and `own(newdata)`, the rows that enter at a parameter neither the draws nor the covariance
 ## carry: a concentrated fixed-effects unit's own effect (the bootstrap resamples units, so a unit's effect is not a
 ## column of the draws) or a zero_fe unit dummy (not the same units across replicates).
 .qoi_par <- function(object) UseMethod(".qoi_par")
 ## the uncertainty fields of .qoi_par(), as a first difference's specification takes them
-.qoi_unc <- function(p) p[intersect(c("theta", "draws", "vc", "recenter", "hold"), names(p))]
+.qoi_unc <- function(p) p[intersect(c("theta", "draws", "vc", "recenter", "hold", "bounds"), names(p))]
 .qoi_none <- function(newdata) rep(FALSE, nrow(newdata))
 ## the rows of `newdata` whose column `v` names one of `units`
 .qoi_rows_in <- function(newdata, v, units)
@@ -29,7 +29,7 @@
 
 .qoi_par.cpb_fe <- function(object) {
   tt <- .fd_theta1(object, object$alpha, .fe_ref(object)); b <- names(object$coefficients)
-  c(tt, list(recenter = TRUE,
+  c(tt, list(recenter = TRUE, bounds = list(.disp = c(0, 1)),
              set = function(th) { object$coefficients[b] <- th[b]; object$alpha <- th[[".disp"]]
                                   object$fe_ref <- th[[".fe_ref"]]; object },
              own = function(nd) .qoi_rows_in(nd, object$fe_var, names(object$fe))))
@@ -39,7 +39,7 @@
 .qoi_par.gec <- function(object) {
   fe <- inherits(object, "gec_fe"); b <- names(object$coefficients)
   tt <- .fd_theta1(object, object$delta, if (fe) .fe_ref(object))
-  c(tt, list(recenter = fe,
+  c(tt, list(recenter = fe, bounds = list(.disp = c(0, Inf)),
              set = function(th) { object$coefficients[b] <- th[b]; object$delta <- th[[".disp"]]
                                   if (fe) object$fe_ref <- th[[".fe_ref"]]
                                   object },
@@ -129,7 +129,7 @@
   theta <- c(stats::setNames(b, paste0("count:", names(b))), stats::setNames(g, paste0("zero:", names(g))),
              alpha = object$alpha, if (fe) c(fe_ref = object$int_fe_ref))
   draws <- .ud_draws(object); zfe <- object$refit_args$zero_fe
-  list(theta = theta, draws = draws, recenter = fe, hold = .fd_zero_hold(names(theta), draws),
+  list(theta = theta, draws = draws, recenter = fe, bounds = list(alpha = c(0, 1)), hold = .fd_zero_hold(names(theta), draws),
        set = function(th) {
          v <- th[paste0("count:", names(b))]; w <- th[paste0("zero:", names(g))]
          object$coefficients[names(b)] <- v; object$int_beta[names(b)] <- v
@@ -186,7 +186,7 @@
     p <- .qoi_par(object); nd <- newdata[ok, , drop = FALSE]; dk <- .qoi_dots_rows(dots, ok)
     q <- function(th) as.numeric(do.call(stats::predict, c(list(p$set(th), newdata = nd, type = type), dk)))
     ci <- .qoi_ci(q, p$theta, p$draws, p$vc, level, isTRUE(p$recenter), if (is.null(p$hold)) character(0) else p$hold,
-                  each = TRUE)
+                  bounds = p$bounds, each = TRUE)
     own <- p$own(nd)
     if (any(own)) {
       ci$lower[own] <- ci$upper[own] <- ci$se[own] <- NA_real_; ci$method[own] <- "none"
@@ -396,7 +396,8 @@ ame <- function(object, variable, newdata, from = NULL, to = NULL, type = "respo
     .qoi_own_message("ame()", own); list(lower = NA_real_, upper = NA_real_, method = "none")
   } else {
     q <- function(th) { o <- p$set(th); sum(wk * (pr(o, nhi, dk) - pr(o, nlo, dk))) / div }
-    .qoi_ci(q, p$theta, p$draws, p$vc, level, isTRUE(p$recenter), if (is.null(p$hold)) character(0) else p$hold)
+    .qoi_ci(q, p$theta, p$draws, p$vc, level, isTRUE(p$recenter), if (is.null(p$hold)) character(0) else p$hold,
+            bounds = p$bounds)
   }
   out <- data.frame(term = variable, contrast = if (slope) "dY/dx" else paste(to, "-", from), type = type,
                     estimate = sum(wk * d0[ok]), lower = ci$lower, upper = ci$upper, method = ci$method, n = sum(ok),

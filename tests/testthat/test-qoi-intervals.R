@@ -324,3 +324,46 @@ test_that("ame(B =) follows the fit's own jackknife outcome, and ignores a facto
   set.seed(2); b2 <- suppressMessages(ame(raw, "x", d3, B = 6))
   expect_equal(c(b1$lower, b1$upper), c(b2$lower, b2$upper))
 })
+
+test_that("a recentred draw whose dispersion leaves its range is dropped", {
+  D <- cbind(b = c(0.1, 0.2, 0.3, 0.4, 0.5), .disp = c(0.80, 0.84, 0.90, 0.70, 0.76))
+  th <- c(b = 0.3, .disp = 0.95)                 # the draws' mean is 0.80: recentring adds 0.15
+  seen <- numeric(0)
+  q <- function(t) { seen <<- c(seen, t[[".disp"]]); t[[".disp"]] }
+  ci <- underdisp:::.qoi_ci(q, th, draws = D, recenter = TRUE, bounds = list(.disp = c(0, 1)))
+  kept <- D[, ".disp"] - (mean(D[, ".disp"]) - 0.95); kept <- kept[kept <= 1]
+  expect_true(all(seen <= 1)); expect_length(kept, 4L)
+  expect_equal(ci$upper, unname(stats::quantile(kept, 0.975)))
+  expect_gt(underdisp:::.qoi_ci(q, th, draws = D, recenter = TRUE)$upper, 1)     # unbounded, it enters
+  skip_on_cran()
+  fe <- cpb_fe(y ~ x, sim_panel(41), fe = "unit")
+  expect_identical(underdisp:::.qoi_par(fe)$bounds, list(.disp = c(0, 1)))
+})
+
+test_that("draws saved before version 0.2.0 are read in their own layout", {
+  skip_on_cran()
+  set.seed(18); d <- data.frame(x = rnorm(200), z = rnorm(200)); d$y <- rcpb(200, exp(1 + 0.3 * d$x), 0.5)
+  ## rbind() of the replicates' named vectors: the coefficients' names, an empty one for the dispersion, and none
+  ## of the attributes .ud_boot() sets
+  old_layout <- function(D, keep, nm) { D <- unclass(D)[, keep, drop = FALSE]; dimnames(D) <- list(NULL, nm); D }
+  g <- suppressMessages(gec(y ~ x, d, se = "bootstrap", B = 5))
+  og <- g; og$boot <- old_layout(g$boot, colnames(g$boot), c(names(g$coefficients), ""))
+  expect_null(attr(og$boot, "B"))
+  expect_equal(confint(og), confint(g))
+  d$y[rbinom(200, 1, 0.3) == 1] <- 0L
+  z <- suppressMessages(zi_cpb(y ~ x, d, zero = ~ z, se = "bootstrap", B = 5))
+  cz <- c(paste0("count:", names(z$coefficients)), paste0("zero:", names(z$zero_coef)))
+  oz <- z; oz$boot <- old_layout(z$boot, cz, c(names(z$coefficients), names(z$zero_coef)))   # no alpha column
+  expect_equal(vcov(oz), vcov(z))
+})
+
+test_that("a bootstrap with fewer than two converged replicates gives NA intervals", {
+  skip_on_cran()
+  set.seed(18); d <- data.frame(x = rnorm(200)); d$y <- rcpb(200, exp(1 + 0.3 * d$x), 0.5)
+  g <- suppressMessages(gec(y ~ x, d, se = "bootstrap", B = 5)); g$boot[-1, ] <- NA
+  expect_warning(cg <- confint(g), "fewer than two")
+  expect_identical(rownames(cg), c("(Intercept)", "x", "delta")); expect_true(all(is.na(cg)))
+  f <- suppressMessages(cpb(y ~ x, d, truncated = FALSE, se = "bootstrap", B = 5)); f$boot[-1, ] <- NA
+  expect_warning(cf <- confint(f), "fewer than two")
+  expect_true(all(is.na(cf[c("(Intercept)", "x"), ]))); expect_true(all(is.finite(cf["alpha", ])))
+})

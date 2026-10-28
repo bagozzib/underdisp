@@ -142,10 +142,14 @@ print.summary.cpb <- function(x, ...) {
 confint.cpb <- function(object, parm, level = 0.95, ...) {
   a   <- (1 - level) / 2
   ok  <- .ud_draws(object, names(object$coefficients))
-  if (is.null(ok) && (missing(parm) || !all(parm %in% "alpha")))
+  coef_ci <- missing(parm) || !all(parm %in% "alpha")
+  if (is.null(ok) && is.null(object$boot) && coef_ci)
     stop("Coefficient intervals need the bootstrap: refit with se = \"bootstrap\". The profile interval for alpha ",
          "needs none: confint(fit, \"alpha\").", call. = FALSE)
-  cib <- if (is.null(ok)) NULL else t(apply(ok, 2, stats::quantile, c(a, 1 - a)))
+  if (is.null(ok) && coef_ci) .ud_boot_too_few()
+  cib <- if (!is.null(ok)) t(apply(ok, 2, stats::quantile, c(a, 1 - a)))
+         else if (coef_ci) matrix(NA_real_, length(object$coefficients), 2L,
+                                  dimnames = list(names(object$coefficients), NULL))
   aci <- .cpb_alpha_ci(object, level = level)
   ci  <- rbind(cib, alpha = aci[c("lower", "upper")])
   colnames(ci) <- paste0(format(100 * c(a, 1 - a), trim = TRUE), " %")

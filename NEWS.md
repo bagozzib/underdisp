@@ -200,6 +200,10 @@
 * `cpb_fe()` and `gec_fe()` sort a `cluster` given as a vector together with
   the data. It was not reordered when the rows were sorted by unit, which put
   the wrong clusters on any panel not supplied unit by unit.
+* A `cluster` given as a factor with levels the data do not hold no longer
+  draws those levels as empty clusters, so a replicate has as many clusters
+  with rows as the data. Such a factor (a subset of a larger data set, or rows
+  dropped for missing values) used to shrink and vary the replicates' size.
 
 ## Separation, the hurdles' participation equation, and `zi_test()`
 

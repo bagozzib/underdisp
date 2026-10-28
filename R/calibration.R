@@ -191,11 +191,12 @@
 ## participation/inflation probability, are recomputed from the fitted coefficients
 ## applied to newdata's design matrices. Fixed-effect units unseen in training fall
 ## back to the mean fixed effect (intensity) and to the average estimated unit
-## effect (participation/inflation dummies). A fit made with an offset reads it
-## from the same column of newdata (.ud_newdata_offset).
-.pmf_and_y_newdata <- function(fit, newdata, kmax) {
+## effect (participation/inflation dummies). The rows' offset is `offset` when
+## given, and otherwise a fit made with an offset reads it from the same column
+## of newdata (.ud_newdata_offset).
+.pmf_and_y_newdata <- function(fit, newdata, kmax, offset = NULL) {
   sup <- .cpb_support(fit)
-  off <- function(obj) .ud_newdata_offset(obj, newdata)
+  off <- function(obj) .ud_newdata_offset(obj, newdata, offset)
   cpbmat <- function(lam, alpha, trunc)
     t(vapply(lam, .cpb_pmf1, numeric(kmax + 1), alpha = alpha, kmax = kmax, truncated = trunc, support = sup))
   yof <- function(tf) as.integer(stats::model.response(stats::model.frame(tf, newdata)))
@@ -219,7 +220,7 @@
     Xb   <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts, names(b)) %*% b
     Xb   <- Xb + off(fit$intensity)
     lam  <- if (is.null(fit$fe)) as.numeric(exp(Xb))
-            else { fe <- fit$intensity$fe[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- fit$int_fe_ref
+            else { fe <- fit$intensity$fe[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- .fe_ref(fit$intensity)
                    as.numeric(exp(fe + Xb)) }
     a <- fit$intensity$alpha
     P <- t(mapply(function(pi, li) { row <- pi * .cpb_pmf1(li, a, kmax, truncated = TRUE, support = sup); row[1] <- 1 - pi; row },
@@ -248,7 +249,7 @@
   } else if (inherits(fit, "hurdle_count")) {
     fam  <- .count_fam(fit$family)
     p    <- .ud_glm_predict(fit$participation, newdata)
-    lam  <- exp(as.numeric(predict(fit$intensity, newdata = newdata, type = "link")))   # natural parameter
+    lam  <- exp(as.numeric(predict(fit$intensity, newdata = newdata, type = "link", offset = offset)))   # natural parameter
     P <- t(mapply(function(pi, li) { zt <- fam$pvec(li, fit$theta, kmax); zt[1] <- 0
                                      zt <- zt / max(1 - fam$p0(li, fit$theta), 1e-12)
                                      row <- pi * zt; row[1] <- 1 - pi; row }, p, lam))
@@ -317,7 +318,8 @@
 #' @param newdata Optional data frame of held-out observations (including the
 #'   response). When supplied, the fitted model's predicted distribution is
 #'   evaluated on these rows; fixed-effect units unseen in training fall back to
-#'   the mean fixed effect. Offsets are assumed absent on `newdata`.
+#'   the mean fixed effect. A fit made with an offset reads the rows' offset
+#'   from its own offset column in `newdata`, or from `offset`.
 #' @param kmax Highest count to evaluate; defaults to the maximum observed count
 #'   in the fitting data, raised to the maximum held-out count when `newdata`
 #'   contains larger values. Predicted probabilities are floored at 1e-12 in
@@ -326,6 +328,10 @@
 #' @param weights Frequency weights for the rows of `newdata`: a column name of
 #'   `newdata` or a numeric vector with one value per row. The held-out scores
 #'   are then weighted means, as the in-sample scores of a weighted fit are.
+#' @param offset Optional offset (log scale) for the rows of `newdata`: a column
+#'   name of `newdata` or a numeric vector with one value per row. A fit whose
+#'   offset was given as a vector needs it here; one given as a column name
+#'   reads that column of `newdata` by default.
 #' @return A named numeric vector `c(logscore, rps)`.
 #' @seealso [cv_score()]
 #' @examples
@@ -334,14 +340,16 @@
 #' fit <- cpb(y ~ 1, data = data.frame(y = y), truncated = FALSE, se = "none")
 #' score(fit)
 #' @export
-score <- function(fit, newdata = NULL, kmax = NULL, weights = NULL) {
+score <- function(fit, newdata = NULL, kmax = NULL, weights = NULL, offset = NULL) {
   if (!is.null(weights) && is.null(newdata))
     stop("'weights' weights the rows of 'newdata'; in sample, the fit's own frequency weights apply.")
+  if (!is.null(offset) && is.null(newdata))
+    stop("'offset' gives the offset of the rows of 'newdata'; in sample, the fit's own offset applies.")
   if (is.null(kmax)) kmax <- max(.obs_counts(fit))
-  pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax)
+  pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax, offset)
   if (max(pu$y) > kmax) {                       # held-out counts above the in-sample maximum
     kmax <- max(pu$y)
-    pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax)
+    pu <- if (is.null(newdata)) .pmf_and_y(fit, kmax) else .pmf_and_y_newdata(fit, newdata, kmax, offset)
   }
   y <- pu$y; P <- pu$P
   ## frequency-weighted means: in sample by the fit's own weights, as the
@@ -387,6 +395,10 @@ score <- function(fit, newdata = NULL, kmax = NULL, weights = NULL) {
 #'   are then weighted means, so a row of weight w counts as w held-out
 #'   observations (the folds assign whole rows). The fold fits see the weights
 #'   only through `fitfun`, so pass them there as well.
+#' @param offset Optional offset (log scale) of the held-out rows: a column name
+#'   of `data` or a numeric vector with one value per row, split with the folds.
+#'   It is needed when `fitfun` gives its fit the offset as a vector. The fold
+#'   fits see the offset only through `fitfun`.
 #' @return An object of class `"cv_score"`: a list with the mean held-out
 #'   `logscore` and `rps`, the per-observation vectors `logscore_i`/`rps_i`, and
 #'   the `folds` used.
@@ -399,9 +411,12 @@ score <- function(fit, newdata = NULL, kmax = NULL, weights = NULL) {
 #' cv$logscore
 #' }
 #' @export
-cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L, weights = NULL) {
+cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L, weights = NULL, offset = NULL) {
   n <- nrow(data)
   wt <- .ud_weights(weights, data, seq_len(n))
+  off_col <- is.character(offset) && length(offset) == 1L
+  if (!is.null(offset) && !off_col && length(offset) != n)
+    stop("'offset' must be a column name of 'data' or have one value per row.")
   if (is.null(folds)) folds <- sample(rep(seq_len(k), length.out = n))
   if (length(folds) != n) stop("'folds' must have length nrow(data).")
   if (is.null(kmax)) {
@@ -413,8 +428,11 @@ cv_score <- function(fitfun, data, k = 5, kmax = NULL, folds = NULL, cores = 1L,
     idx <- which(folds == kk)
     fit <- tryCatch(fitfun(data[-idx, , drop = FALSE]), error = function(e) NULL)
     if (is.null(fit)) return(list(idx = idx, msg = paste0("fold ", kk, " fit failed; its rows are dropped.")))
-    pu <- tryCatch(.pmf_and_y_newdata(fit, data[idx, , drop = FALSE], kmax), error = function(e) NULL)
-    if (is.null(pu)) return(list(idx = idx, msg = paste0("fold ", kk, " scoring failed; its rows are dropped.")))
+    pu <- tryCatch(.pmf_and_y_newdata(fit, data[idx, , drop = FALSE], kmax,
+                                      if (is.null(offset) || off_col) offset else offset[idx]),
+                   error = function(e) conditionMessage(e))
+    if (is.character(pu))
+      return(list(idx = idx, msg = paste0("fold ", kk, " scoring failed (", pu, "); its rows are dropped.")))
     y <- pu$y; P <- pu$P; yk <- pmin(y, kmax)
     cdf <- t(apply(P, 1, cumsum)); ind <- outer(yk, 0:kmax, function(a, b) as.numeric(a <= b))
     list(idx = idx, ls = -log(pmax(P[cbind(seq_along(y), yk + 1L)], 1e-12)), rps = rowSums((cdf - ind)^2))

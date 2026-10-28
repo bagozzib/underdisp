@@ -36,7 +36,10 @@ component. Under \code{method = "ml"} the unit effects enter as plug-in offsets
 from a first-stage fit to the positive counts, and on King's support the
 fit is then polished on the observed-data likelihood with every unit's
 effect free, so that it is a joint maximum of the mixture likelihood (on
-the floor support the plug-in is kept, as before version 0.2.0); under
+the floor support the plug-in is kept, as before version 0.2.0: it is not
+such a maximum, and a unit whose positive counts are all 1 takes an
+arbitrary point of the first stage's flat set, so the inflation equation
+and the log-likelihood can depend on the order of the rows); under
 \code{method = "em"} a classification (hard-assignment) step handles the
 structural zeros before the same polish. A unit with no
 positive count is left out of the estimation, as fixest leaves such units

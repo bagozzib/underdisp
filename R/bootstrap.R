@@ -22,8 +22,10 @@
 ## it came from (so a fixed-effects refit can relabel a unit drawn twice as two
 ## units), and is NULL for a row bootstrap. A serial run times its first
 ## replicate and says how long the whole run will take when that is over a
-## minute.
+## minute. A factor's unused levels are not clusters (split() would make them
+## empty ones, drawn like the others).
 .ud_boot <- function(n, cl, fit_one, cols, B, cores = 1L, label = "obs") {
+  if (is.factor(cl)) cl <- droplevels(cl)
   grp <- if (is.null(cl)) NULL else split(seq_len(n), cl)
   if (!is.null(grp)) .ud_cluster_guard(cl)
   .ud_boot_size_note(B)
@@ -89,13 +91,14 @@
 }
 
 ## The converged draws of the columns `cols` (all columns when NULL), or NULL when the fit has fewer than two or
-## does not store those columns. An object saved before version 0.2.0 stored its draws unnamed, in the layout
+## does not store those columns. An object saved before version 0.2.0 stored its draws in the layout
 ## .ud_old_draw_names() gives (no dispersion column for the fixed-effects and zero-inflated CPB fits, and the
-## zero-inflated GEC's on the log scale).
+## zero-inflated GEC's on the log scale), with the column names rbind() took from the replicates' vectors (the
+## coefficients' own, an empty one for the dispersion) and without the attributes .ud_boot() sets.
 .ud_draws <- function(object, cols = NULL) {
   D <- object$boot
   if (is.null(D)) return(NULL)
-  if (is.null(colnames(D))) {
+  if (is.null(attr(D, "B"))) {
     nm <- .ud_old_draw_names(object)
     if (length(nm) != ncol(D)) return(NULL)
     colnames(D) <- nm
@@ -107,6 +110,9 @@
   D <- D[stats::complete.cases(D), , drop = FALSE]
   if (nrow(D) < 2L) NULL else D
 }
+## a bootstrapped fit whose draws have fewer than two converged replicates: its intervals are NA, and it says so
+.ud_boot_too_few <- function()
+  warning("fewer than two bootstrap replicates converged, so the intervals are NA.", call. = FALSE)
 .ud_old_draw_names <- function(object) {
   b <- names(object$coefficients); z <- names(object$zero_coef)
   if (inherits(object, "zi_gec")) c(paste0("count:", b), ".log_delta", paste0("zero:", z))

@@ -54,7 +54,10 @@ rzicpb <- function(n, lambda, alpha, pi, support = c("ceiling", "floor")) {
 #'   from a first-stage fit to the positive counts, and on King's support the
 #'   fit is then polished on the observed-data likelihood with every unit's
 #'   effect free, so that it is a joint maximum of the mixture likelihood (on
-#'   the floor support the plug-in is kept, as before version 0.2.0); under
+#'   the floor support the plug-in is kept, as before version 0.2.0: it is not
+#'   such a maximum, and a unit whose positive counts are all 1 takes an
+#'   arbitrary point of the first stage's flat set, so the inflation equation
+#'   and the log-likelihood can depend on the order of the rows); under
 #'   `method = "em"` a classification (hard-assignment) step handles the
 #'   structural zeros before the same polish. A unit with no
 #'   positive count is left out of the estimation, as fixest leaves such units
@@ -452,9 +455,10 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
 ## with restarts, and a BFGS pass on King's support). Each block's move is kept
 ## only when it gains; rounds stop once one gains less than 1e-8 relative. Units
 ## the EM never estimated (no positive count) keep its fill value, as in its own
-## likelihood. Inputs are sorted by unit; ui indexes the units.
-.zi_fe_polish <- function(y, Xcov, Z, ui, fe_hat, b, a, g, ms, fl, estimated, maxit = 50L) {
-  n <- length(y); is0 <- y == 0; one <- matrix(1, n, 1); fe_hat <- as.numeric(fe_hat)
+## likelihood. Inputs are sorted by unit; ui indexes the units; `w` holds the
+## frequency weights of the rows (the direct ML path's; the EM path takes none).
+.zi_fe_polish <- function(y, Xcov, Z, ui, fe_hat, b, a, g, ms, fl, estimated, maxit = 50L, w = NULL) {
+  n <- length(y); is0 <- y == 0; one <- matrix(1, n, 1); fe_hat <- as.numeric(fe_hat); w <- .ud_w1(w, n)
   b <- as.numeric(b); g <- as.numeric(g); k <- length(b)
   rows <- split(seq_len(n), factor(ui, levels = seq_along(fe_hat)))
   ## the inflation column, if any, that is unit u's own dummy (one on its rows, zero elsewhere)
@@ -471,7 +475,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
     ifelse(is0[idx], log(pmax(pit + (1 - pit) * m[, 2], tiny)),
            log(pmax(1 - pit, tiny)) + ifelse(m[, 1] < -1e299, -Inf, m[, 1]))
   }
-  total <- function(fe_hat, b, a, g) sum(rowll(fe_hat[ui] + as.numeric(Xcov %*% b), a, as.numeric(Z %*% g)))
+  total <- function(fe_hat, b, a, g) sum(w * rowll(fe_hat[ui] + as.numeric(Xcov %*% b), a, as.numeric(Z %*% g)))
   ll <- total(fe_hat, b, a, g); it <- 0L
   for (it in seq_len(maxit)) {
     ll_old <- ll
@@ -481,12 +485,12 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
       r <- rows[[u]]; yr <- y[r]; j <- own[u]
       if (!is.na(j)) {
         zr <- zg[r] - g[j]
-        f2 <- function(p) { v <- -sum(rowll(p[1] + xb[r], a, zr + p[2], r)); if (is.finite(v)) v else 1e10 }
+        f2 <- function(p) { v <- -sum(w[r] * rowll(p[1] + xb[r], a, zr + p[2], r)); if (is.finite(v)) v else 1e10 }
         o <- stats::optim(c(fe_hat[u], g[j]), f2, method = "Nelder-Mead", control = list(reltol = 1e-12, maxit = 2000))
         if (o$value < f2(c(fe_hat[u], g[j]))) { fe_hat[u] <- o$par[1]; zg[r] <- zr + o$par[2]; g[j] <- o$par[2] }
         next
       }
-      fu <- function(au) { v <- -sum(rowll(au + xb[r], a, zg[r], r)); if (is.finite(v)) v else 1e10 }
+      fu <- function(au) { v <- -sum(w[r] * rowll(au + xb[r], a, zg[r], r)); if (is.finite(v)) v else 1e10 }
       need <- if (fl) yr > 0 else yr > 1
       lo <- if (any(need)) max(log((if (fl) yr[need] else yr[need] - 1) * (1 - a)) - xb[r][need]) + 1e-9
             else fe_hat[u] - 6
@@ -498,16 +502,16 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
     eta_c <- fe_hat[ui] + xb
     p0 <- cpb_lp0_cpp(c(1, stats::qlogis(a)), one, y, eta_c - 1, ms, FALSE, fl)[, 2]
     fg <- function(gg) { pit <- stats::plogis(as.numeric(Z %*% gg)); tiny <- .Machine$double.xmin
-      -sum(ifelse(is0, log(pmax(pit + (1 - pit) * p0, tiny)), log(pmax(1 - pit, tiny)))) }
+      -sum(w * ifelse(is0, log(pmax(pit + (1 - pit) * p0, tiny)), log(pmax(1 - pit, tiny)))) }
     gr <- function(gg) { pit <- stats::plogis(as.numeric(Z %*% gg))
       d <- ifelse(is0, pit * (1 - pit) * (1 - p0) / pmax(pit + (1 - pit) * p0, .Machine$double.xmin), -pit)
-      -as.numeric(crossprod(Z, d)) }
+      -as.numeric(crossprod(Z, w * d)) }
     og <- tryCatch(stats::optim(g, fg, gr, method = "BFGS", control = list(maxit = 500, reltol = 1e-12)),
                    error = function(e) NULL)
     if (!is.null(og) && og$value < fg(g)) g <- og$par
     ## (3) covariate coefficients and alpha
     zg <- as.numeric(Z %*% g)
-    fb <- function(p) { v <- -sum(rowll(fe_hat[ui] + as.numeric(Xcov %*% p[seq_len(k)]), stats::plogis(p[k + 1L]), zg))
+    fb <- function(p) { v <- -sum(w * rowll(fe_hat[ui] + as.numeric(Xcov %*% p[seq_len(k)]), stats::plogis(p[k + 1L]), zg))
       if (is.finite(v)) v else 1e10 }
     p0b <- c(b, stats::qlogis(a)); v0 <- fb(p0b)
     o <- stats::optim(p0b, fb, method = "Nelder-Mead", control = list(maxit = 4000, reltol = 1e-12))
@@ -689,7 +693,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
       ## compare_models() ranks, could lie tens of points below the maximum. The floor support keeps the plug-in.
       if (!fl) {
         pol <- .zi_fe_polish(y, Xcov, Z, as.integer(uf), fe_hat, b, a, g, as.integer(max.support), fl,
-                             as.logical(tapply(y > 0, uf, any)))
+                             as.logical(tapply(y > 0, uf, any)), w = w)
         fe_hat[] <- pol$fe_hat; b[] <- pol$b; a <- pol$a; g[] <- pol$g; ll <- pol$ll
         conv_fe <- conv_fe && pol$rounds < 50L
       }

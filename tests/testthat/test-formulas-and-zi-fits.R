@@ -14,6 +14,14 @@ test_that("transformed responses and '.' survive the fixed-effects formula", {
   cd <- count_reg(y ~ ., d[, c("y", "x", "u")], family = "poisson", fe = "u")
   expect_false("u" %in% names(cd$coefficients))
   expect_true("x" %in% names(cd$coefficients))
+  ## zi_count: the inflation equation's default right-hand side is the count formula's covariates, so a '.'
+  ## leaves the unit identifier out of it as well
+  d$y0 <- ifelse(z > 0.5, 0L, d$y)
+  zd <- zi_count(y0 ~ ., d[, c("y0", "x", "u")], family = "poisson", fe = "u", se = "none")
+  zx <- zi_count(y0 ~ x, d, family = "poisson", fe = "u", se = "none")
+  expect_identical(names(zd$zero.coefficients), c("(Intercept)", "x"))
+  expect_equal(zd$coefficients, zx$coefficients)
+  expect_equal(zd$loglik, zx$loglik)
 })
 
 test_that("a character covariate predicts on new data holding one of its values", {

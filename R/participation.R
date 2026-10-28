@@ -7,7 +7,9 @@
 ## se = "robust"), or scores summed within clusters with the G/(G - 1) factor
 ## (a fit given `cluster`), frequency weights entering as duplicated rows. The
 ## hurdles store it as `part_vcov`, with `part_vcov_type`, and every table,
-## interval and quantity of interest reads it from there.
+## interval and quantity of interest reads it from there. A clustered covariance
+## asked for without a cluster is NA, as count_reg()'s is (hurdle_count's
+## intensity fit says so).
 ##
 ## Its separation is checked by the zero-inflated fits' rule (.zi_separation;
 ## see ?zi_cpb, Separation), which on a binary equation is the profile of the
@@ -21,6 +23,7 @@
 .part_fit_vcov <- function(pfit, type = "model", cluster = NULL) {
   V <- tryCatch(stats::vcov(pfit), error = function(e) NULL)
   if (is.null(V) || type == "model") return(V)
+  if (type == "cluster" && is.null(cluster)) { V[] <- NA_real_; return(V) }
   ok <- !is.na(stats::coef(pfit)); X <- stats::model.matrix(pfit)[, ok, drop = FALSE]
   mu <- pfit$fitted.values; w <- pfit$prior.weights
   S <- X * ((pfit$y - mu) * pfit$family$mu.eta(pfit$linear.predictors) / pmax(mu * (1 - mu), 1e-300))
@@ -89,7 +92,7 @@
 }
 .part_note <- function(object) {
   ty <- object$part_vcov_type
-  c(if (identical(ty, "cluster"))
+  c(if (identical(ty, "cluster") && isTRUE(object$part_n_clusters > 0))
       sprintf("Participation standard errors are cluster-robust (%d clusters).", object$part_n_clusters)
     else if (identical(ty, "robust")) "Participation standard errors are heteroskedasticity-robust.",
     .sep_note(object$part_separation, "participation"))
