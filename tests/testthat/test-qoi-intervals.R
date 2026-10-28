@@ -125,6 +125,11 @@ test_that("predict() intervals and ame() follow the first difference's rule on e
   d0 <- data.frame(y = rcpb(n, exp(1.2 + 0.5 * x), 0.5), x = x, z = z, u = factor(sample(1:30, n, TRUE)))
   ## zero-inflated data for the mixtures, so that their zero equations move the mean
   dz <- transform(d0, y = rzicpb(n, exp(1.2 + 0.5 * x), 0.5, plogis(-1 + 0.8 * z)))
+  ## overdispersed data for the hurdle negative binomial: on d0 its theta runs to the Poisson limit (log theta
+  ## near 18), where theta no longer moves the mean. Drawn on its own seed with the stream restored, so every
+  ## other fit's data and bootstrap draws are as before
+  dn <- local({ old <- .Random.seed; on.exit(assign(".Random.seed", old, envir = globalenv()))
+                set.seed(23); transform(d0, y = stats::rnbinom(n, mu = exp(1.2 + 0.5 * x), size = 2)) })
   q <- function(e) suppressWarnings(suppressMessages(e))
   fits <- list(cpb = q(cpb(y ~ x + z, d0, truncated = FALSE, se = "bootstrap", B = 20)),
                cpb_fe = q(cpb_fe(y ~ x + z, d0, fe = "u", se = "bootstrap", B = 15)),
@@ -135,7 +140,7 @@ test_that("predict() intervals and ame() follow the first difference's rule on e
                zi_cpb = q(zi_cpb(y ~ x + z, dz, zero = ~ x + z, se = "bootstrap", B = 15)),
                zi_gec = q(zi_gec(y ~ x + z, dz, zero = ~ x + z, se = "bootstrap", B = 15)),
                count_reg = q(count_reg(y ~ x + z, d0, family = "compois")),   # its mean moves with nu
-               hurdle_count = q(hurdle_count(y ~ x + z, d0, family = "negbin", participation = ~ x + z)),
+               hurdle_count = q(hurdle_count(y ~ x + z, dn, family = "negbin", participation = ~ x + z)),
                zi_count = q(zi_count(y ~ x + z, dz, family = "poisson", zero = ~ x + z)))
   nd <- d0[1:5, c("x", "z")]; nd0 <- data.frame(x = 0, z = mean(z))
   qoi_par <- function(f) eval(quote(.qoi_par(f)), list(f = f), asNamespace("underdisp"))   # an internal generic
