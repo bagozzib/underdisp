@@ -71,6 +71,14 @@
   the classification likelihood rather than the mixture likelihood it reports,
   with block coordinate ascent on the observed-data likelihood.
 * `gec()` polishes its Nelder-Mead solution by BFGS.
+* `count_reg()` evaluates its likelihood and its covariance over the distinct
+  rows of the data (the same count, covariates and offset, within a cluster for
+  a clustered covariance), each weighted by its count, and so do the intensity
+  of `hurdle_count()` and the starts of `zi_count()`. The results are those of
+  the full data up to the order of summation; a design with repeated rows runs
+  faster, by a factor of 5 to 20 on a three-level factor in the package's
+  checks, and an intercept-only zero-truncated EWP on 5,414 rows of seven
+  distinct counts fits in about a second instead of eleven minutes.
 * `zi_cpb()`, `zi_gec()`, and `zi_count()` check their zero-inflation equation
   for separation. They warn when the data put no useful bound on a covariate
   coefficient.
@@ -141,7 +149,11 @@
   transformations of it are handled, which `first_difference()` refuses. For a
   concentrated fixed-effects fit, rows at their own unit effects (the sample's
   average partial effect) have no interval from the stored draws; rows at the
-  reference unit (a typical, geometric-mean unit) do. The derivative of a
+  reference unit (a typical, geometric-mean unit) do. `ame(B =)` gives the
+  average partial effect its interval: it refits the model on resampled units
+  (or the fit's clusters, or rows), averages each replicate over its own rows at
+  its own unit effects, and takes the percentile interval, an interval for the
+  average partial effect in the population of units. The derivative of a
   floor-support fit, whose mean jumps at integer ceilings, is refused.
 * `predict(newdata)` on a fixed-effects fit (`cpb_fe()`, `gec_fe()`,
   `zi_cpb(fe =)`) enters a unit the fit estimated at its own effect, as
@@ -176,6 +188,15 @@
   the time its first replicate took. Fewer than 100 bootstrap replicates bring a
   note on the Monte Carlo error of the standard errors. `print()` of
   `dispersion_test()` says when its p-value sits at the floor 1/(B + 1).
+* With `bias_correct = "jackknife"` and `se = "bootstrap"`, `cpb_fe()` and
+  `gec_fe()` (and a `hurdle_cpb()` intensity) correct every bootstrap replicate
+  the same way, by its two half-panel refits, with the validity gate checked once
+  on the data, so the standard errors include the correction's own variance.
+  The replicates used to be uncorrected fits whose interval was recentred on
+  the corrected estimate. On the floor support they still are. In the
+  package's simulations (40 units) the slope interval's coverage rose from 0.81
+  to 0.88 at T = 6 and from 0.89 to 0.94 at T = 12; `?cpb_fe` also reports
+  what the correction costs in the slopes' variance.
 * `cpb_fe()` and `gec_fe()` sort a `cluster` given as a vector together with
   the data. It was not reordered when the rows were sorted by unit, which put
   the wrong clusters on any panel not supplied unit by unit.
@@ -216,7 +237,12 @@
   not (the CPB, the underdispersed GEC, the rate-parameterized COM-Poisson,
   whose `exp(beta)` is roughly the mean ratio to the power `nu`, the EWP, the
   gamma count, the double Poisson); `print()` of a `count_reg()` fit names the
-  scale for the latter. `?count_reg` says that the robust Poisson is consistent
+  scale for the latter, and `irr()` names their ratio for what it is
+  (`"lambda ratio"` for the rate-parameterized COM-Poisson, `"centrality ratio"`
+  for the EWP, `"long-run rate ratio"` for the gamma count, `"location ratio"`
+  for the double Poisson, `"mu ratio"` for the generalized Poisson below zero),
+  with a message pointing to `ame()`; the CPB and the GEC keep `"IRR"`, a ratio
+  of their rate. `?count_reg` says that the robust Poisson is consistent
   for the conditional mean whatever the distribution (Gourieroux, Monfort and
   Trognon 1984; Wooldridge 1999) and is the benchmark for mean effects, and its
   summary of a Poisson fit reads the gap between robust and model-based errors
@@ -230,7 +256,28 @@
   `dispersion_profile()` is said to show which variance function the data
   follow, not the process behind them. The fixed-effects pages no longer say
   the covariate coefficients are unaffected by the incidental-parameters bias,
-  and `?hurdle_cpb` notes that bias in a participation logit with `part_fe`.
+  and `?hurdle_cpb` notes that bias in a participation logit with `part_fe` and
+  points to a conditional logit (`survival::clogit()`) or the bife package for
+  consistent participation slopes.
+* `?cpb` and the vignette's new section "Mean effects and the robust Poisson"
+  say that the CPB's mean effects are consistent only when the CPB is the data's
+  process. On underdispersed counts from other processes (binomial counts with
+  varying trials, a COM-Poisson) the package's checks put its average marginal
+  effects 5 to 7 percent off at n = 5,000, where the robust Poisson's were
+  within 1 percent.
+* `?implied_ceiling` says that the ceiling is the fitted distribution's
+  support end, set by its variance-mean link, and a bound on the counts only
+  when the CPB is the data's process (on binomial counts out of six trials the
+  fitted ceiling ran from 3 to 12); the README describes it the same way, and
+  `?ceiling_exceedance` and `?compare_dispersion` say that the held-out
+  exceedance check is one-sided: it detects a ceiling that is too low, not one
+  that is too high.
+* `tidy()` gains `scale`, what each coefficient multiplies (`"log mean"`, the
+  family's own parameter such as `"log centrality"`, or a binary equation's
+  link), and `glance()` gains `coef_scale`; a texreg column is named by its
+  coefficient scale unless `custom.model.names` replaces it. A table row can
+  hold coefficients on different scales; `ame()` puts every model's effect on
+  the mean.
 
 * `bias_correct = "jackknife"` needs `time =` in `cpb_fe()` and `gec_fe()` (and
   `hurdle_cpb()`, which passes it on), the column that orders each unit's rows;

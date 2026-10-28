@@ -45,11 +45,18 @@ bootstrap resamples whole clusters (a block bootstrap), giving
 cluster-robust standard errors and intervals; when \code{NULL} (default) it
 resamples observations, giving heteroskedasticity-robust errors (a
 Hessian-based sandwich is unreliable here; see Details). Robust errors
-protect inference about the best-fitting CPB, not the CPB's own claims
-(its ceiling, its predicted probabilities) when the CPB is wrong: King and
-Roberts (2015) read a gap between robust and model-based errors as a sign
-of misspecification to fix. \code{\link[=ceiling_exceedance]{ceiling_exceedance()}}, \code{\link[=rootogram]{rootogram()}},
-\code{\link[=pit_hist]{pit_hist()}} and \code{\link[=compare_models]{compare_models()}} check those claims.}
+protect inference about the best-fitting CPB's parameters. The mean effects
+computed from them are the data's only when the CPB is the data's process:
+on underdispersed counts from another process (binomial counts with
+varying trials, a COM-Poisson) the CPB's average marginal effects can be
+off by several percent at any sample size, while the robust Poisson's
+(\code{\link[=count_reg]{count_reg()}} with \code{se = "robust"}) are consistent whenever the mean is
+log-linear; the two fits' \code{\link[=ame]{ame()}} side by side is the check. Nor do robust errors protect
+the CPB's distributional claims (its ceiling, its predicted probabilities)
+when the CPB is wrong: King and Roberts (2015) read a gap between robust
+and model-based errors as a sign of misspecification to fix.
+\code{\link[=ceiling_exceedance]{ceiling_exceedance()}}, \code{\link[=rootogram]{rootogram()}}, \code{\link[=pit_hist]{pit_hist()}} and \code{\link[=compare_models]{compare_models()}}
+check those claims.}
 
 \item{offset}{Optional offset on the log-mean scale (an exposure): a numeric
 vector or the name of a column in \code{data}, making the model a rate model.}

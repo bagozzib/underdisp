@@ -169,7 +169,7 @@
   message(fun, ": ", k, if (k == 1L) " row enters" else " rows enter", " at a unit's own fixed effect or its own ",
           "zero-equation dummy, which the fit's bootstrap draws do not carry, so ", if (k == 1L) "it has" else "they have",
           " no interval. A row of a unit the fit has not seen, or newdata without the unit column, enters at the ",
-          "reference unit.")
+          "reference unit.", if (fun == "ame()") " ame(B = ) gives the average an interval by refitting the model on resampled units.")
 
 ## predict() with standard errors or a confidence interval (see predict.cpb(), `se.fit`): the quantity predict()
 ## gives at each row of `newdata`, as a function of the fit's parameters, through .qoi_ci() row by row
@@ -208,6 +208,14 @@
   fs <- Filter(function(f) inherits(f, "formula"), fs)
   v <- unique(unlist(lapply(fs, function(f) all.vars(stats::delete.response(stats::terms(f))))))
   setdiff(v, .ud_unit_vars(object))
+}
+## the columns a refit of the fit needs: its formulas' variables, the responses included, and its unit columns
+.ud_data_vars <- function(object) {
+  fs <- list(object$formula, object$terms, object$int_terms, object$zero_terms, object$zero_formula,
+             object$zero.formula, object$part_formula,
+             if (inherits(object$participation, "glm")) stats::formula(object$participation))
+  fs <- Filter(function(f) inherits(f, "formula"), fs)
+  setdiff(unique(c(unlist(lapply(fs, all.vars)), .ud_unit_vars(object))), ".d")
 }
 .ud_unit_vars <- function(object)
   unique(unlist(Filter(is.character, list(object$fe, object$fe_var, object$zero_fe, object$part_fe,
@@ -249,7 +257,7 @@
 #' covariance, and otherwise there is none. A row at a fixed-effects unit's own
 #' effect, or at its own zero-equation dummy, depends on a parameter the draws
 #' do not carry, so an average over such rows, the sample's average partial
-#' effect, has no interval. Without the unit column in `newdata` every row
+#' effect, has no interval of this kind (`B` below gives it one). Without the unit column in `newdata` every row
 #' enters at the reference unit, the mean of the identified units' effects on
 #' the log scale (a typical, geometric-mean unit), whose draws the fit carries:
 #' that is the average effect for such a unit over the rows' covariates, not
@@ -260,6 +268,24 @@
 #' dummies in its covariance, so its average partial effect has a delta-method
 #' interval. The slope of a fit on the floor support (`support = "floor"`) is
 #' refused, since its mean jumps at integer ceilings; a contrast is available.
+#'
+#' `B > 0` gives the average a refit-bootstrap interval instead, for any class:
+#' the model is refit on `B` resampled copies of `newdata`, which must then be
+#' the data the model was fit to, resampling whole clusters of the fit's
+#' `cluster`, else whole units of its first fixed-effects column, else rows (a
+#' unit drawn twice becomes two units). Each replicate averages over its
+#' own rows at its own unit effects, and the percentile interval is taken.
+#' Resampling the units treats them as a sample, so this is an interval for a
+#' fixed-effects fit's average partial effect in the population of units they
+#' represent, which carries the variability of which units are drawn: with few
+#' units, or a few with large effects, it is wide and asymmetric. Each refit is the fit's own call with its
+#' data replaced and its standard errors off (on King's support, every
+#' replicate of a jackknife-corrected fit is corrected without re-running the
+#' validity gate, as in [cpb_fe()]'s own bootstrap, and none is when the gate
+#' refused the fit's correction); the call's other arguments
+#' are evaluated where `ame()` is called, as [update()] does, and an offset or
+#' weights given to the fit as one value per row follow the resampled rows.
+#' The run takes about `B` times one fit (see `cores`).
 #'
 #' @param object A fitted model of any class in the package.
 #' @param variable The name of a variable of the model, a column of `newdata`.
@@ -279,6 +305,9 @@
 #'   vector or the name of a column of `newdata`, such as the frequency weights
 #'   of a fit to tabulated data (the average then equals the one over the
 #'   expanded rows). By default the rows count equally.
+#' @param B Refit-bootstrap replicates for a percentile interval; `0`
+#'   (default) uses the fit's own inference (see Details).
+#' @param cores Worker processes for the refits; see [cpb()].
 #' @return A data frame of class `"ud_ame"` with `term`, `contrast` (`"dY/dx"`,
 #'   or `"to - from"`), `type`, `estimate`, `lower`, `upper`, `method` (the
 #'   interval's source) and `n`, the rows averaged (a row with a missing value
@@ -291,11 +320,21 @@
 #' fit <- cpb(y ~ x * g, data = d, truncated = FALSE, se = "bootstrap", B = 100)
 #' ame(fit, "x", d)
 #' ame(fit, "g", d, from = "a", to = "b")
+#'
+#' ## a fixed-effects fit's average partial effect over its own units
+#' pd <- do.call(rbind, lapply(1:30, function(i) {
+#'   x <- rnorm(8); data.frame(unit = i, x = x, y = rcpb(8, exp(rnorm(1, 0, 0.5) + 0.4 * x), 0.5))
+#' }))
+#' ffit <- cpb_fe(y ~ x, data = pd, fe = "unit")
+#' ame(ffit, "x", pd, B = 50)
 #' }
 #' @export
 ame <- function(object, variable, newdata, from = NULL, to = NULL, type = "response", eps = NULL, level = 0.95,
-                offset = NULL, weights = NULL) {
+                offset = NULL, weights = NULL, B = 0, cores = 1L) {
   .qoi_check_level(level)
+  if (!is.numeric(B) || length(B) != 1L || !is.finite(B) || B < 0 || B != floor(B))
+    stop("'B' must be a whole number, 0 or more.", call. = FALSE)
+  if (B == 1) stop("'B' must be 0 or at least 2.", call. = FALSE)
   if (!is.data.frame(newdata) || !nrow(newdata)) stop("'newdata' must be a data frame with at least one row.",
                                                       call. = FALSE)
   wt <- if (is.null(weights)) rep(1, nrow(newdata))
@@ -341,7 +380,19 @@ ame <- function(object, variable, newdata, from = NULL, to = NULL, type = "respo
   wk <- wt[ok] / sum(wt[ok])
   p <- .qoi_par(object)
   own <- sum(p$own(newdata[ok, , drop = FALSE]))
-  ci <- if (own) {
+  ci <- if (B > 0) {
+    shift <- function(nd) {
+      if (!slope) return(list(.ud_set_value(nd, variable, from), .ud_set_value(nd, variable, to)))
+      lo <- nd; lo[[variable]] <- nd[[variable]] - h / 2; hi <- nd; hi[[variable]] <- nd[[variable]] + h / 2
+      list(lo, hi)
+    }
+    est <- function(o, nd, w, dk) {
+      s <- shift(nd); v <- (pr(o, s[[2L]], dk) - pr(o, s[[1L]], dk)) / div
+      k <- is.finite(v) & w > 0
+      if (any(k)) sum(w[k] * v[k]) / sum(w[k]) else NA_real_
+    }
+    .ame_refit_boot(object, newdata, est, wt, offset, B, level, cores, parent.frame())
+  } else if (own) {
     .qoi_own_message("ame()", own); list(lower = NA_real_, upper = NA_real_, method = "none")
   } else {
     q <- function(th) { o <- p$set(th); sum(wk * (pr(o, nhi, dk) - pr(o, nlo, dk))) / div }
@@ -352,6 +403,74 @@ ame <- function(object, variable, newdata, from = NULL, to = NULL, type = "respo
                     row.names = NULL, stringsAsFactors = FALSE)
   class(out) <- c("ud_ame", "data.frame")
   out
+}
+
+## ame(B > 0): the model refit on B resampled copies of `newdata` (the data it was fit to): whole units of its first
+## fixed-effects column (a unit drawn twice relabeled as two units), else whole clusters of its call's `cluster`, else
+## rows. Each refit is the fit's own call with `data` replaced and its standard errors off, its other arguments
+## evaluated in `env` (as update() does), run as a bootstrap replicate (.ud_replicate(): a jackknife fit is corrected
+## without its gate); an offset or weights given as one value per row follow the rows. `est(fit, rows, weights,
+## predict_args)` is the replicate's average; the interval is the percentile one.
+.ame_refit_boot <- function(object, newdata, est, wt, offset, B, level, cores, env) {
+  cl <- object$call
+  if (is.null(cl)) stop("ame(B > 0) refits the model from its call, which this fit does not store.", call. = FALSE)
+  miss <- setdiff(.ud_data_vars(object), names(newdata))
+  if (length(miss))
+    stop("ame(B > 0) refits the model on resampled rows of 'newdata', which must be the data the model was fit to; ",
+         "it lacks ", paste0("'", miss, "'", collapse = ", "), ".", call. = FALSE)
+  fun <- get(intersect(class(object), c("cpb_fe", "gec_fe", "cpb", "gec", "count_reg", "hurdle_cpb", "hurdle_gec",
+                                        "hurdle_count", "zi_cpb", "zi_gec", "zi_count"))[1L],
+             envir = asNamespace("underdisp"), mode = "function")
+  args <- as.list(cl)[-1L]
+  ccl <- args$cluster
+  args <- args[setdiff(names(args), c("data", "se", "B", "cores", "cluster"))]
+  ev <- function(a) tryCatch(eval(a, env), error = function(e)
+    stop("ame(B > 0) refits the model from its call, whose arguments must still be available where ame() is called: ",
+         conditionMessage(e), call. = FALSE))
+  args <- lapply(args, ev); ccl <- if (!is.null(ccl)) ev(ccl)
+  ## a replicate skips the jackknife's gate, so it follows the fit's own outcome (no correction when the gate refused)
+  bc <- if (!is.null(object$bias_correct)) object$bias_correct else object$intensity$bias_correct
+  if (!is.null(args$bias_correct) && !is.null(bc)) args$bias_correct <- bc
+  cols <- unlist(Filter(function(v) is.character(v) && length(v) == 1L,
+                        c(args[intersect(c("time", "offset", "weights"), names(args))], list(ccl))))
+  miss <- setdiff(cols, names(newdata))
+  if (length(miss))
+    stop("ame(B > 0) refits the model on resampled rows of 'newdata', which must be the data the model was fit to; ",
+         "it lacks ", paste0("'", miss, "'", collapse = ", "), ".", call. = FALSE)
+  n <- nrow(newdata)
+  rowvec <- character(0)
+  for (v in intersect(c("offset", "weights"), names(args))) {
+    a <- args[[v]]
+    if (is.null(a) || (is.character(a) && length(a) == 1L)) next
+    if (length(a) != n)
+      stop("ame(B > 0) refits the model on resampled rows of 'newdata': the fit's '", v, "' must be a column of ",
+           "the data or one value per row of 'newdata'.", call. = FALSE)
+    rowvec <- c(rowvec, v)
+  }
+  ## the fit's cluster when it has one (its units relabelled within each drawn cluster, as cpb_fe()'s own bootstrap
+  ## does), else its first fixed-effects column, else rows
+  units <- intersect(.ud_unit_vars(object), names(newdata))
+  cv <- if (length(units)) units[1L]; clv <- NULL; lab <- "obs"
+  if (is.character(ccl) && length(ccl) == 1L) { clv <- newdata[[ccl]]; lab <- ccl }
+  else if (!is.null(ccl) && length(ccl) == n) { clv <- ccl; lab <- "custom" }
+  else if (!is.null(cv)) { clv <- newdata[[cv]]; lab <- cv }
+  if (is.factor(clv)) clv <- droplevels(clv)                 # an unused level would be drawn as an empty cluster
+  off_rows <- !is.null(offset) && !is.character(offset) && length(offset) == n && n > 1L
+  D <- .ud_boot(n, clv, function(idx, blk) {
+    d <- newdata[idx, , drop = FALSE]
+    if (!is.null(cv)) d[[cv]] <- paste0(blk, "_", as.character(d[[cv]]))
+    a <- args; for (v in rowvec) a[[v]] <- a[[v]][idx]
+    f2 <- .ud_quiet_guard(.ud_replicate(do.call(fun, c(list(data = d, se = "none"), a))))
+    if (isFALSE(f2$converged)) return(NULL)
+    dk <- if (is.null(offset)) list() else list(offset = if (off_rows) offset[idx] else offset)
+    v <- est(f2, d, wt[idx], dk)
+    if (is.finite(v)) v else NULL
+  }, "ame", B, cores, label = lab)
+  ok <- D[is.finite(D[, 1L]), 1L]
+  if (length(ok) < 2L) return(list(lower = NA_real_, upper = NA_real_, method = "none"))
+  a <- (1 - level) / 2
+  list(lower = stats::quantile(ok, a, names = FALSE), upper = stats::quantile(ok, 1 - a, names = FALSE),
+       method = sprintf("bootstrap (refit, B=%d)", B))
 }
 
 #' @export

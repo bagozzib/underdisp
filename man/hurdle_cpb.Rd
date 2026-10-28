@@ -38,7 +38,12 @@ participation are uninformative for a fixed-effects logit, and the dummy
 logit's coefficients carry the incidental-parameters bias of order 1/T (in
 short panels the slopes are inflated, roughly toward twice their value at
 T = 2); the split-panel jackknife (\code{bias_correct}) corrects only the
-intensity.}
+intensity. The hurdle's likelihood separates its two parts, so for the
+logit link a conditional logit on the same data
+(\code{survival::clogit()}) gives participation slopes free of that bias,
+and an analytical correction (the \pkg{bife} package, for the logit and
+the probit) reduces it to second order; the hurdle's predictions and
+quantities of interest use the dummy logit's unit effects.}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}. Positive participation coefficients raise the probability of

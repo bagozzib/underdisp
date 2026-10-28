@@ -98,7 +98,10 @@ values re-concentrated at the corrected parameters and \code{logLik}/\code{AIC} 
 the maximum-likelihood fit (uncorrected estimates in \verb{$uncorrected}). The
 same time-homogeneity validity gate applies: on panels where the two halves
 do not estimate a common parameter the correction is REFUSED with a warning
-and the maximum-likelihood fit is returned (see \code{\link[=cpb_fe]{cpb_fe()}}, Details).
+and the maximum-likelihood fit is returned (see \code{\link[=cpb_fe]{cpb_fe()}}, Details). As
+there, the covariate coefficients are corrected too, and with
+\code{se = "bootstrap"} each replicate is corrected the same way, so the standard
+errors include the correction's own variance.
 }
 \examples{
 \donttest{

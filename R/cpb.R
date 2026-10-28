@@ -234,11 +234,18 @@
 #'   cluster-robust standard errors and intervals; when `NULL` (default) it
 #'   resamples observations, giving heteroskedasticity-robust errors (a
 #'   Hessian-based sandwich is unreliable here; see Details). Robust errors
-#'   protect inference about the best-fitting CPB, not the CPB's own claims
-#'   (its ceiling, its predicted probabilities) when the CPB is wrong: King and
-#'   Roberts (2015) read a gap between robust and model-based errors as a sign
-#'   of misspecification to fix. [ceiling_exceedance()], [rootogram()],
-#'   [pit_hist()] and [compare_models()] check those claims.
+#'   protect inference about the best-fitting CPB's parameters. The mean effects
+#'   computed from them are the data's only when the CPB is the data's process:
+#'   on underdispersed counts from another process (binomial counts with
+#'   varying trials, a COM-Poisson) the CPB's average marginal effects can be
+#'   off by several percent at any sample size, while the robust Poisson's
+#'   ([count_reg()] with `se = "robust"`) are consistent whenever the mean is
+#'   log-linear; the two fits' [ame()] side by side is the check. Nor do robust errors protect
+#'   the CPB's distributional claims (its ceiling, its predicted probabilities)
+#'   when the CPB is wrong: King and Roberts (2015) read a gap between robust
+#'   and model-based errors as a sign of misspecification to fix.
+#'   [ceiling_exceedance()], [rootogram()], [pit_hist()] and [compare_models()]
+#'   check those claims.
 #' @param offset Optional offset on the log-mean scale (an exposure): a numeric
 #'   vector or the name of a column in `data`, making the model a rate model.
 #' @param weights Optional frequency weights: a numeric vector or the name of a

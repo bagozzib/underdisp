@@ -49,10 +49,12 @@ dependency) and the hard-ceiling CPB---and returns a comparison on both fit
 (log-likelihood, AIC, BIC) and calibration (mean logarithmic score and ranked
 probability score, lower is better, plus the fitted share of zeros against the
 observed share). Whether the tail is better described by an accelerated decay
-(COM-Poisson) or a binding ceiling (CPB) is a testable question, not an
-assumption; the scoring rules are the calibration counterpart to the
-information criteria. The CPB's hard bound itself is tested only on held-out
-counts, with \code{\link[=ceiling_exceedance]{ceiling_exceedance()}}: on the data it was fit to every feasible
+(COM-Poisson) or a hard ceiling (CPB) is a question for the data's fit and
+calibration, not an assumption; the scoring rules are the calibration
+counterpart to the information criteria. Either family's better fit
+describes the distribution, not the process behind it. The CPB's bound can
+be checked only on held-out counts, with \code{\link[=ceiling_exceedance]{ceiling_exceedance()}}, and only
+against a ceiling that is too low: on the data it was fit to every feasible
 CPB respects its bound, since its likelihood forbids exceedance.
 }
 \details{

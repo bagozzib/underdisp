@@ -41,6 +41,16 @@ and none above its integer floor on the floor support (\code{support = "floor"})
 that largest feasible count is returned as \code{max_count}. Whether held-out
 counts respect the bound is tested by \code{\link[=ceiling_exceedance]{ceiling_exceedance()}}.
 }
+\details{
+The ceiling is the fitted distribution's support end. With the rate and
+\code{alpha} it is fixed by the CPB's variance-mean link, so it is a bound on the
+counts only when the CPB is the data's process. On counts with a common
+hard bound from another process (binomial counts out of six trials, say),
+the fitted ceiling follows the mean and the dispersion instead: in the
+package's check it ran from 3 where the mean was low to 12 where it was
+high, below the true bound in the first case and well above it in the
+second.
+}
 \examples{
 set.seed(6); x <- rnorm(300)
 N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(300, N, 0.5)

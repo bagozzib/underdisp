@@ -30,6 +30,9 @@
   out
 }
 .tidy_finish <- function(x, out, conf.int, conf.level) {
+  cs <- .coef_scale(x)$scale
+  sc <- if (is.null(out$component)) rep(cs, nrow(out))
+        else ifelse(out$component %in% c("participation", "zero"), if (is.null(x$link)) "logit" else x$link, cs)
   if (!is.null(out$component)) out$term <- paste(out$component, out$term, sep = ":")
   if (conf.int) {
     ci <- tryCatch(stats::confint(x, level = conf.level), error = function(e) NULL)
@@ -37,6 +40,7 @@
     out$conf.low  <- if (is.null(ci)) NA_real_ else unname(ci[k, 1])
     out$conf.high <- if (is.null(ci)) NA_real_ else unname(ci[k, 2])
   }
+  out$scale <- sc
   rownames(out) <- NULL
   out
 }
@@ -50,6 +54,16 @@
 #' \pkg{modelsummary} lays the table out without a `shape` argument. A term of
 #' a zero-inflation or participation equation that the data do not bound
 #' (separation; see [zi_cpb()]) has no standard error.
+#'
+#' The `scale` column names what each coefficient multiplies: `"log mean"`
+#' for the mean-parameterized count families (`"log untruncated mean"` for a
+#' zero-truncated fit or a hurdle's intensity), the binary equation's link for a
+#' participation or zero-inflation row, and otherwise the family's own
+#' parameter (`"log rate"` for the CPB and GEC, `"log lambda"` for the
+#' rate-parameterized COM-Poisson, `"log centrality"` for the EWP, and so on;
+#' see [irr.count]). Coefficients on different scales are not comparable
+#' across the columns of a table; [ame()] puts every model's effect on the
+#' mean.
 #'
 #' @param x A fitted model from this package.
 #' @param conf.int If `TRUE`, add `conf.low`/`conf.high`, the intervals of
@@ -139,9 +153,10 @@ tidy.zi_count <- function(x, conf.int = FALSE, conf.level = 0.95, ...)
 #' (`dispersion_parameter`) and the direction its estimate points
 #' (`dispersion_direction`; the families' parameters point different ways, so
 #' the CPB's `alpha` below 1 and the gamma-count's `alpha` above 1 are both
-#' underdispersion), and the class's own columns (`alpha` for the CPB family,
-#' `family` for the matched count families, `n.units` for the fixed-effects
-#' fits).
+#' underdispersion), `coef_scale`, the scale of the count equation's
+#' coefficients (see [tidy.cpb()]), and the class's own columns (`alpha` for
+#' the CPB family, `family` for the matched count families, `n.units` for the
+#' fixed-effects fits).
 #'
 #' @param x A fitted model from this package.
 #' @param ... Unused.
@@ -153,7 +168,7 @@ glance.cpb <- function(x, ...) .glance(x, alpha = x$alpha)
   di <- .disp_info(x)
   out <- data.frame(..., logLik = ll, AIC = -2 * ll + 2 * df, BIC = -2 * ll + df * log(n), df = df, nobs = n,
                     dispersion = di$value[1L], dispersion_parameter = di$name, dispersion_direction = di$direction,
-                    row.names = NULL, stringsAsFactors = FALSE)
+                    coef_scale = .coef_scale(x)$scale, row.names = NULL, stringsAsFactors = FALSE)
   if (length(di$value) > 1L) out$dispersion2 <- di$value[2L]               # the EWP's second tail
   out
 }

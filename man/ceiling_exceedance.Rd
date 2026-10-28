@@ -23,9 +23,13 @@ A one-row data frame with \code{n} (held-out rows, weighted), \code{exceed}
 (rows above the bound, weighted), and \code{share}.
 }
 \description{
-The CPB's ceiling is a testable claim, but not in sample: its likelihood is
-minus infinity for any count above the bound, so every feasible fit respects
-the bound on the data it was fit to. \code{ceiling_exceedance()} takes held-out
+Whether counts respect the CPB's ceiling can be checked, but not in sample:
+its likelihood is minus infinity for any count above the bound, so every
+feasible fit respects the bound on the data it was fit to. The check is
+one-sided: it detects a ceiling that is too low, where held-out counts reach
+it, and has no power against one that is too high (a fitted ceiling above a
+true bound is never exceeded), nor where counts stay well below the ceiling
+(see \code{\link[=implied_ceiling]{implied_ceiling()}}). \code{ceiling_exceedance()} takes held-out
 observations and reports how many of their counts exceed the largest count
 the fitted model allows at their covariates (\code{max_count} of
 \code{\link[=implied_ceiling]{implied_ceiling()}}); for a two-part model the bound is the count

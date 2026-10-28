@@ -48,7 +48,8 @@ the dispersion parameter as \code{dispersion} with its name
 (\code{dispersion_parameter}) and the direction its estimate points
 (\code{dispersion_direction}; the families' parameters point different ways, so
 the CPB's \code{alpha} below 1 and the gamma-count's \code{alpha} above 1 are both
-underdispersion), and the class's own columns (\code{alpha} for the CPB family,
-\code{family} for the matched count families, \code{n.units} for the fixed-effects
-fits).
+underdispersion), \code{coef_scale}, the scale of the count equation's
+coefficients (see \code{\link[=tidy.cpb]{tidy.cpb()}}), and the class's own columns (\code{alpha} for
+the CPB family, \code{family} for the matched count families, \code{n.units} for the
+fixed-effects fits).
 }

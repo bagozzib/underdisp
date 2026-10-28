@@ -17,7 +17,8 @@
 #' @param participation One-sided formula for the participation logit; defaults
 #'   to the intensity's right-hand side.
 #' @param part_fe Optional column name for fixed effects in the participation
-#'   model (added as factor dummies).
+#'   model (added as factor dummies), whose slopes carry the dummy logit's
+#'   incidental-parameters bias in short panels (see [hurdle_cpb()]).
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`.
 #' @param offset Optional offset (log scale) for the intensity: a numeric vector

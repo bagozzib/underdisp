@@ -68,7 +68,23 @@
 #' are the corrected estimates (the maximum-likelihood values are kept in
 #' `$uncorrected`), the unit effects and fitted values are re-concentrated at the
 #' corrected parameters, and `logLik`/`AIC` continue to refer to the
-#' maximum-likelihood fit.
+#' maximum-likelihood fit. The covariate coefficients are corrected too: unlike
+#' the Poisson's, whose slopes carry no first-order bias, the CPB's can carry one
+#' (see Short panels above). The correction leaves the estimator's asymptotic
+#' variance unchanged (Dhaene and Jochmans 2015) but adds variance in short
+#' panels. In the package's simulations (40 units, alpha = 0.5, a slope with no
+#' bias to remove) the corrected slope's standard deviation was 28 percent above
+#' the uncorrected slope's at T = 6 and 14 percent at T = 12, while alpha's bias
+#' fell from -0.13 and -0.06 to under 0.01; where the slopes' own bias is small
+#' next to their standard error, the uncorrected fit (`bias_correct = "none"`)
+#' estimates them more precisely. With `se = "bootstrap"` each replicate is
+#' corrected the same way (its two half-panel refits; the validity gate below is
+#' a check on the data, made once), so the standard errors include that variance
+#' and the bootstrap takes about three times as long. In the same simulations the
+#' corrected slope's 95% interval covered 0.88 at T = 6 and 0.94 at T = 12 (0.81
+#' and 0.89 with uncorrected replicates). On the floor support the replicates stay
+#' uncorrected and the interval is centered on the corrected estimate, as before
+#' version 0.2.0.
 #'
 #' Validity gate: the split-panel identity requires the two half-panels to
 #' estimate the same pseudo-true parameter (time-homogeneity; Dhaene & Jochmans
@@ -225,29 +241,6 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
             "The panel may not be underdispersed (compare gec_fe()), or raise max.support.")
   .cpb_warn_limit(alpha, support)
 
-  ## pairs/cluster bootstrap for the covariate coefficients: resample whole
-  ## clusters (default = the fixed-effects unit) and relabel each sampled block
-  ## so the concentration treats duplicated draws as distinct units.
-  se.beta <- setNames(rep(NA_real_, p), keep); ci.beta <- NULL; boot <- NULL
-  clab <- NULL
-  if (se == "bootstrap") {
-    fev  <- as.character(data[[fe]][rows]); dest <- data[rows, , drop = FALSE]
-    cval <- if (is.null(cluster)) fev else .ud_cluster_values(cluster, data, rows)
-    clab <- if (is.null(cluster)) fe else cl_label
-    boot <- .ud_boot(length(Y), cval, function(idx, blk) {
-      bd <- dest[idx, , drop = FALSE]; bd[[".bootunit"]] <- paste0(blk, "_", fev[idx])
-      fb <- .ud_quiet_guard(cpb_fe(formula, data = bd, fe = ".bootunit", truncated = truncated,
-                                   se = "none", offset = offset, weights = weights, max.support = max.support,
-                                   inner_it = inner_it, maxit = maxit, reltol = reltol, support = support))
-      if (isTRUE(fb$converged)) c(fb$coefficients[keep], fb$alpha, fb$fe_ref) else NULL
-    }, c(keep, "alpha", "fe_ref"), B, cores, label = clab)
-    ## normal-approximation interval centered on the point estimate: FE bootstrap
-    ## replicates share the incidental-parameters bias, so a percentile interval
-    ## is off-center; the bootstrap SD is the robust quantity to keep.
-    bs <- .ud_boot_stats(boot, keep, beta, normal = TRUE)
-    se.beta <- bs$se; ci.beta <- bs$ci
-  }
-
   ## split-panel jackknife: refit on each unit's temporal halves and remove the
   ## leading 1/T incidental-parameters bias term (see .fe_jackknife)
   uncorrected <- NULL
@@ -259,11 +252,13 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
                                   maxit = maxit, reltol = reltol, support = support))
       c(f$coefficients[keep], f$alpha)
     }, error = function(e) NULL)
+    rep_mode <- .fe_jack_replicate() && !.cpb_fl(support)   # the floor support's replicates run the gate, as before
     jk <- .fe_jackknife(dest, uf, refit, c(beta, alpha),
                         resid  = (Y - fitted) / sqrt(pmax(alpha * lam, 1e-12)),
                         torder = stats::ave(seq_along(Y), as.integer(uf), FUN = seq_along),
-                        disp_lower = 1e-3, disp_upper = 1 - 1e-3)
+                        disp_lower = 1e-3, disp_upper = 1 - 1e-3, replicate = rep_mode)
     if (!is.null(jk$refused)) {
+      if (rep_mode) stop("bias_correct = \"jackknife\" in a bootstrap replicate: ", jk$refused, call. = FALSE)
       warning("bias_correct = \"jackknife\" REFUSED: ", jk$refused,
               ". Returning the uncorrected maximum-likelihood estimates.")
       bias_correct <- "none"
@@ -276,12 +271,34 @@ cpb_fe <- function(formula, data, fe, truncated = FALSE, se = c("none", "bootstr
                                       as.integer(max.support), truncated, as.integer(inner_it), .cpb_fl(support))
       lam <- as.numeric(exp(off + fe_hat[as.integer(uf)] + X %*% beta))
       fitted <- .cpb_mean(lam, alpha, truncated, support)
-      if (!is.null(ci.beta)) {                        # recenter the normal-approx interval
-        z <- stats::qnorm(0.975)
-        ci.beta <- cbind(lower = beta - z * se.beta, upper = beta + z * se.beta)
-        rownames(ci.beta) <- keep
-      }
     }
+  }
+
+  ## pairs/cluster bootstrap for the covariate coefficients: resample whole
+  ## clusters (default = the fixed-effects unit) and relabel each sampled block
+  ## so the concentration treats duplicated draws as distinct units. After the
+  ## jackknife, so that a corrected fit's replicates are corrected too (King's
+  ## support; the floor support's replicates stay uncorrected, as before 0.2.0).
+  se.beta <- setNames(rep(NA_real_, p), keep); ci.beta <- NULL; boot <- NULL
+  clab <- NULL
+  if (se == "bootstrap") {
+    jack_boot <- bias_correct == "jackknife" && !.cpb_fl(support)
+    fev  <- as.character(data[[fe]][rows]); dest <- data[rows, , drop = FALSE]
+    cval <- if (is.null(cluster)) fev else .ud_cluster_values(cluster, data, rows)
+    clab <- if (is.null(cluster)) fe else cl_label
+    boot <- .ud_boot(length(Y), cval, function(idx, blk) {
+      bd <- dest[idx, , drop = FALSE]; bd[[".bootunit"]] <- paste0(blk, "_", fev[idx])
+      fb <- .ud_quiet_guard(.ud_replicate(cpb_fe(formula, data = bd, fe = ".bootunit", truncated = truncated,
+                                   se = "none", offset = offset, weights = weights, max.support = max.support,
+                                   inner_it = inner_it, maxit = maxit, reltol = reltol, support = support,
+                                   bias_correct = if (jack_boot) "jackknife" else "none", time = if (jack_boot) time)))
+      if (isTRUE(fb$converged)) c(fb$coefficients[keep], fb$alpha, fb$fe_ref) else NULL
+    }, c(keep, "alpha", "fe_ref"), B, cores, label = clab)
+    ## normal-approximation interval centered on the point estimate: FE bootstrap
+    ## replicates share the incidental-parameters bias, so a percentile interval
+    ## is off-center; the bootstrap SD is the robust quantity to keep.
+    bs <- .ud_boot_stats(boot, keep, beta, normal = TRUE)
+    se.beta <- bs$se; ci.beta <- bs$ci
   }
 
   fe_id <- .fe_identified(Y, as.integer(uf), nu, truncated, support)      # the units the reference unit averages

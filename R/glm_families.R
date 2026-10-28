@@ -121,9 +121,48 @@
 ## the last support point of each fitted observation of a count family (its `kmax` rule, one per mean)
 .count_ends <- function(fam, mu, theta) vapply(mu, function(m) as.integer(fam$kmax(m, theta)), integer(1))
 
-## core estimator shared by count_reg() and the intensity of hurdle/zi.
+## The distinct rows of a count fit: the rows with the same response, covariates, offset and (for a clustered
+## covariance) cluster, as one row carrying the group's total weight. The log-likelihood, the information and the
+## score sums over them are those of the full data up to the order of summation, so a design with repeated rows (an
+## intercept-only fit, a few categorical covariates, tabulated data) is evaluated once per distinct row: the EWP's
+## intercept-only fit to 5,414 rows of seven distinct counts takes about a second instead of minutes. NULL when every
+## row is distinct. Rows are compared exactly, after sorting.
+.count_collapse <- function(X, Y, off, w, cl = NULL) {
+  n <- length(Y)
+  if (n < 2L) return(NULL)
+  cols <- c(list(as.numeric(Y), rep_len(as.numeric(off), n)), lapply(seq_len(ncol(X)), function(j) X[, j]),
+            if (!is.null(cl)) list(as.character(cl)))
+  o <- do.call(order, unname(cols))
+  new <- c(TRUE, rep(FALSE, n - 1L))
+  for (v in cols) { s <- v[o]; new[-1L] <- new[-1L] | (s[-1L] != s[-n]) }
+  if (all(new)) return(NULL)
+  id <- integer(n); id[o] <- cumsum(new)
+  list(first = o[new], w = as.numeric(rowsum(.ud_w1(w, n), id, reorder = TRUE)))
+}
+
+## The saturated log-likelihood: the empirical distribution of the counts within each covariate pattern (the same
+## covariates and offset, compared exactly), an upper bound of any count model's log-likelihood on these rows
+.count_saturated <- function(X, Y, off, w) {
+  n <- length(Y); w <- .ud_w1(w, n); off <- rep_len(as.numeric(off), n)
+  grp <- function(cols) {                                    # group ids of the rows, by exact comparison after sorting
+    o <- do.call(order, unname(cols)); new <- c(TRUE, rep(FALSE, n - 1L))
+    for (v in cols) { s <- v[o]; new[-1L] <- new[-1L] | (s[-1L] != s[-n]) }
+    id <- integer(n); id[o] <- cumsum(new); id
+  }
+  xc <- c(list(off), lapply(seq_len(ncol(X)), function(j) X[, j]))
+  pat <- grp(xc); cell <- grp(c(xc, list(as.numeric(Y))))
+  wc <- as.numeric(rowsum(w, cell, reorder = TRUE)); pc <- pat[match(seq_along(wc), cell)]
+  wp <- as.numeric(rowsum(w, pat, reorder = TRUE))
+  sum(wc[wc > 0] * log(wc[wc > 0] / wp[pc[wc > 0]]))
+}
+
+## core estimator shared by count_reg() and the intensity of hurdle/zi; optimized over the distinct rows
+## (.count_collapse()), with the fitted means of every row.
 .count_fit <- function(X, Y, fam, truncated, offset = 0, start = NULL, w = NULL) {
   p <- ncol(X); off <- rep_len(offset, nrow(X)); w <- .ud_w1(w, nrow(X))
+  Xall <- X; off_all <- off
+  cc <- .count_collapse(X, Y, off, w)
+  if (!is.null(cc)) { X <- X[cc$first, , drop = FALSE]; Y <- Y[cc$first]; off <- off[cc$first]; w <- cc$w }
   s <- .ud_colscale(X, w); Xs <- sweep(X, 2, s, "/")           # optimize on unit-SD (weighted) columns
   sc <- c(s, rep(1, fam$nshape))
   if (!is.null(start)) start <- start * sc
@@ -159,6 +198,13 @@
     o$par <- .shape_clamp_search(o$par, fam, idx)
     o <- .shape_limit_candidate(o, nll0, fam, idx)
   }
+  ## a fit at the saturated likelihood has nothing left to optimize, whatever the optimizers' stopping rules say (the
+  ## COM-Poisson's ridge on a two-valued series approaches it as nu grows without bound, where neither BFGS nor the
+  ## polish meets its relative tolerance)
+  if (o$convergence != 0 && is.finite(o$value) && o$value < 1e9) {
+    sat <- .count_saturated(X, Y, off, w)
+    if (-o$value >= sat - 1e-6 * max(1, abs(sat))) o$convergence <- 0L
+  }
   if (!is.finite(o$value) || o$value >= 1e9) {            # never left the infeasible plateau
     warning("the optimizer found no finite likelihood: a fitted mean lies outside [1e-12, 1e8] at every ",
             "point it visited. The fit did not converge; the coefficients are its last iterate.", call. = FALSE)
@@ -167,8 +213,8 @@
   par <- o$par / sc                                          # back to the original scale
   beta <- par[seq_len(p)]; names(beta) <- colnames(X)
   theta <- if (fam$nshape) unname(fam$shape_inv(par[p + seq_len(fam$nshape)])) else NA_real_
-  list(par = par, beta = beta, theta = theta, loglik = -o$value, offset = off, scale = sc,
-       mu = as.numeric(exp(off + X %*% beta)), converged = o$convergence == 0)
+  list(par = par, beta = beta, theta = theta, loglik = -o$value, offset = off_all, scale = sc,
+       mu = as.numeric(exp(off_all + Xall %*% beta)), converged = o$convergence == 0)
 }
 
 ## resolve `cluster` to the estimation rows; NULL stays NULL
@@ -247,10 +293,16 @@
 #'
 #' Runtime: the Poisson, negative binomial, gamma-count, and double Poisson and
 #' generalized Poisson families fit in under a second at a few hundred rows; the
-#' COM-Poisson families evaluate a normalizing sum per observation (and the
-#' mean parameterization solves a root per observation), so they take seconds
-#' at a few hundred rows and minutes at several thousand; `se = "robust"` and
-#' `"cluster"` add numerical scores at the same cost per parameter.
+#' COM-Poisson families, the hyper-Poisson and the EWP evaluate a normalizing
+#' sum per observation (and the mean parameterizations solve a root per
+#' observation), so they take seconds at a few hundred rows and minutes at
+#' several thousand. The EWP's sum lengthens with a heavy upper tail (a
+#' negative upper weight), and its standard errors sum over each observation's
+#' support. Rows that repeat (the same count, covariates and offset) are
+#' evaluated once with their total weight, so an intercept-only or
+#' few-category design costs as many evaluations as it has distinct rows.
+#' `se = "robust"` and `"cluster"` add numerical scores at the same cost per
+#' parameter.
 #'
 #' @param formula A model formula.
 #' @param data A data frame.
@@ -391,13 +443,16 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
   se.beta <- setNames(rep(NA_real_, p), colnames(X)); vcv <- NULL; vcv_full <- NULL; se_model <- NULL
   if (se != "none") {
     nm <- c(colnames(X), if (fam$nshape) fam$shape_name)
-    info <- if (isTRUE(fam$kinked)) {
-      offn <- rep_len(off, n)
-      .count_expected_info(ft$par, function(p, idx, y) .count_llik_i(p, X[idx, , drop = FALSE], y, fam, truncated, offn[idx]),
-                           .count_ends(fam, ft$mu, ft$theta), if (truncated) 1L else 0L, w, ft$scale)
-    }
-    V <- tryCatch(.count_vcov(ft$par, function(th) .count_llik_i(th, X, Y, fam, truncated, off),
-                              se, clid, nm, w = w, scale = ft$scale, info = info), error = function(e) .count_vcov_failed(e))
+    ## over the distinct rows (within clusters for a clustered covariance; see .count_collapse())
+    offn <- rep_len(off, n); cc <- .count_collapse(X, Y, offn, w, clid)
+    r <- if (is.null(cc)) seq_len(n) else cc$first
+    Xv <- X[r, , drop = FALSE]; Yv <- Y[r]; offv <- offn[r]; clv <- clid[r]
+    wv <- if (is.null(cc)) w else cc$w
+    info <- if (isTRUE(fam$kinked))
+      .count_expected_info(ft$par, function(p, idx, y) .count_llik_i(p, Xv[idx, , drop = FALSE], y, fam, truncated, offv[idx]),
+                           .count_ends(fam, ft$mu[r], ft$theta), if (truncated) 1L else 0L, wv, ft$scale)
+    V <- tryCatch(.count_vcov(ft$par, function(th) .count_llik_i(th, Xv, Yv, fam, truncated, offv),
+                              se, clv, nm, w = wv, scale = ft$scale, info = info), error = function(e) .count_vcov_failed(e))
     if (!is.null(V)) {
       vm <- attr(V, "model"); attr(V, "model") <- NULL
       vcv_full <- V
@@ -465,7 +520,9 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
 #' @param participation Optional one-sided formula for the participation model;
 #'   defaults to the intensity right-hand side.
 #' @param fe,part_fe Optional fixed-effects column names for the intensity and
-#'   participation models (entered as factor dummies).
+#'   participation models (entered as factor dummies). The participation
+#'   slopes carry the dummy logit's incidental-parameters bias in short panels
+#'   (see [hurdle_cpb()]).
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`. Positive participation coefficients raise the probability of
 #'   a *positive count* (participation).
@@ -763,11 +820,10 @@ print.count_reg <- function(x, ...) {
   }
   cat("Call:  ", deparse(x$call), "\n\nCoefficients:\n", sep = ""); print(round(cf, 4))
   if (!is.null(x$fe) && nd > 0) cat("(", nd, " fixed-effect dummies not shown; see coef())\n", sep = "")
-  scale <- switch(x$family, compois = "the log-rate scale", ewp3 = , ewp2 = "the log-centrality scale",
-                  gammacount = "the scale of the log long-run event rate", doublepois = "the log-location scale", NULL)
-  if (!is.null(scale))
-    cat("\nCoefficients are on ", scale, ", not the log mean; predict(type = 'response') and ame() are on the mean ",
-        "scale.\n", sep = "")
+  sc <- .coef_scale(x)$scale
+  if (sc != "log mean")
+    cat("\nCoefficients are on the ", sc, " scale, not the log mean; predict(type = 'response') and ame() are on the ",
+        "mean scale.\n", sep = "")
   cat(.shape_line(x$family, x$theta))
   if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
   invisible(x)
@@ -938,7 +994,6 @@ print.hurdle_count <- function(x, ...) {
 #' @method irr count_reg
 #' @export
 irr.count_reg <- function(object, level = 0.95, ...) {
-  .irr_drop_fe(.ud_irr_wald(object$coefficients,
-                            if (!is.null(object$vcov)) sqrt(pmax(diag(object$vcov), 0)) else NULL,
-                            level, "count", "IRR"), object$fe)
+  .irr_drop_fe(.count_irr_rows(object, object$coefficients,
+                               if (!is.null(object$vcov)) sqrt(pmax(diag(object$vcov), 0)) else NULL, level), object$fe)
 }

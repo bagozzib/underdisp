@@ -71,6 +71,48 @@ print.ud_fd <- function(x, digits = 3, ...) {
   out
 }
 
+## The scale of a fit's count-equation coefficients and the ratio irr() names exp(beta): the log mean and "IRR" for
+## the mean-parameterized families; the log rate for the CPB and GEC (whose mean is their rate renormalized over a
+## finite support; "IRR", with ?irr.count's caveat); otherwise the parameter exp(beta) multiplies, whose ratio is
+## not a ratio of means (ame() and first_difference() give those)
+.coef_scale <- function(x) {
+  if (inherits(x, c("cpb", "cpb_fe", "hurdle_cpb", "zi_cpb", "gec", "hurdle_gec", "zi_gec")))
+    return(list(scale = "log rate", ratio = "IRR"))
+  fam <- if (is.character(x$family)) x$family else ""
+  switch(fam,
+         compois = list(scale = "log lambda", ratio = "lambda ratio"),
+         ewp3 = , ewp2 = list(scale = "log centrality", ratio = "centrality ratio"),
+         gammacount = list(scale = "log long-run rate", ratio = "long-run rate ratio"),
+         doublepois = list(scale = "log location", ratio = "location ratio"),
+         genpois = if (isTRUE(x$theta < 0)) list(scale = "log mu", ratio = "mu ratio")
+                   else list(scale = .mean_scale(x), ratio = "IRR"),
+         list(scale = .mean_scale(x), ratio = "IRR"))
+}
+## a zero-truncated fit's or a hurdle intensity's coefficients are on the log of the untruncated mean
+.mean_scale <- function(x) if (isTRUE(x$truncated) || inherits(x, "hurdle_count")) "log untruncated mean" else "log mean"
+## a short name of a fit's model, for a table column
+.model_short <- function(x) {
+  fams <- c(poisson = "Poisson", negbin = "NB", compois = "COM-Poisson", mpcmp = "MP COM-Poisson", genpois = "GP",
+            gammacount = "Gamma count", doublepois = "Double Poisson", hyperpois = "Hyper-Poisson", ewp3 = "EWP3",
+            ewp2 = "EWP2")
+  k <- intersect(class(x), c("cpb_fe", "gec_fe", "cpb", "gec", "count_reg", "hurdle_cpb", "hurdle_gec", "hurdle_count",
+                             "zi_cpb", "zi_gec", "zi_count"))[1L]
+  f <- if (is.character(x$family) && x$family %in% names(fams)) fams[[x$family]] else ""
+  switch(k, cpb = if (isTRUE(x$truncated)) "ZT CPB" else "CPB", cpb_fe = "CPB FE", gec = "GEC", gec_fe = "GEC FE",
+         hurdle_cpb = "Hurdle CPB", hurdle_gec = "Hurdle GEC", zi_cpb = "ZI CPB", zi_gec = "ZI GEC",
+         count_reg = paste0(if (isTRUE(x$truncated)) "ZT ", f, if (!is.null(x$fe)) " FE"),
+         hurdle_count = paste("Hurdle", f), zi_count = paste("ZI", f), "")
+}
+## irr()'s count rows of a count family, under the ratio .coef_scale() names, with a message where it is not a ratio
+## of means
+.count_irr_rows <- function(object, b, se, level) {
+  r <- .coef_scale(object)$ratio
+  if (r != "IRR")
+    message("irr(): exp(coefficient) of the ", .count_fam(object$family)$label, " count equation is a ", r,
+            ", not a ratio of means; ame() and first_difference() give the mean contrasts.")
+  .ud_irr_wald(b, se, level, "count", r)
+}
+
 ## Wald rows on the ratio scale from coefficients + SEs (NULL se -> no interval; a non-finite se -> none for its row)
 .ud_irr_wald <- function(b, se, level, equation, ratio, method = "wald") {
   if (is.null(se)) return(.ud_irr(names(b), equation, ratio, exp(unname(b))))
@@ -430,10 +472,12 @@ print.ud_irr <- function(x, digits = 3, ...) {
 ## replicate's first difference comes from its own specification, and the interval is the percentile one.
 .fd_refit_boot <- function(pt, refit, spec_of, data, B, level, cores, cl = NULL, relabel = NULL) {
   a <- (1 - level) / 2
-  D <- .ud_boot(nrow(data), if (is.null(cl)) NULL else data[[cl]], function(idx, blk) {
+  clv <- if (is.null(cl)) NULL else data[[cl]]
+  if (is.factor(clv)) clv <- droplevels(clv)                 # an unused level would be drawn as an empty cluster
+  D <- .ud_boot(nrow(data), clv, function(idx, blk) {
     d <- data[idx, , drop = FALSE]
     if (!is.null(blk)) for (v in relabel) d[[v]] <- paste0(blk, "_", d[[v]])
-    f2 <- .ud_quiet_guard(refit(d))
+    f2 <- .ud_quiet_guard(.ud_replicate(refit(d)))
     if (!isTRUE(f2$converged)) return(NULL)
     s2 <- spec_of(f2); L <- s2$lev(s2$theta); L$to - L$from
   }, pt$component, B, cores, label = if (is.null(cl)) "obs" else cl)

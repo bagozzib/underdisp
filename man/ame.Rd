@@ -14,7 +14,9 @@ ame(
   eps = NULL,
   level = 0.95,
   offset = NULL,
-  weights = NULL
+  weights = NULL,
+  B = 0,
+  cores = 1L
 )
 }
 \arguments{
@@ -44,6 +46,11 @@ two-part models also give their equation-specific quantities.}
 vector or the name of a column of \code{newdata}, such as the frequency weights
 of a fit to tabulated data (the average then equals the one over the
 expanded rows). By default the rows count equally.}
+
+\item{B}{Refit-bootstrap replicates for a percentile interval; \code{0}
+(default) uses the fit's own inference (see Details).}
+
+\item{cores}{Worker processes for the refits; see \code{\link[=cpb]{cpb()}}.}
 }
 \value{
 A data frame of class \code{"ud_ame"} with \code{term}, \code{contrast} (\code{"dY/dx"},
@@ -70,7 +77,7 @@ interval is taken. Otherwise it uses the delta method over the fit's
 covariance, and otherwise there is none. A row at a fixed-effects unit's own
 effect, or at its own zero-equation dummy, depends on a parameter the draws
 do not carry, so an average over such rows, the sample's average partial
-effect, has no interval. Without the unit column in \code{newdata} every row
+effect, has no interval of this kind (\code{B} below gives it one). Without the unit column in \code{newdata} every row
 enters at the reference unit, the mean of the identified units' effects on
 the log scale (a typical, geometric-mean unit), whose draws the fit carries:
 that is the average effect for such a unit over the rows' covariates, not
@@ -81,6 +88,24 @@ A fixed-effects count family (\code{\link[=count_reg]{count_reg()}} with \code{f
 dummies in its covariance, so its average partial effect has a delta-method
 interval. The slope of a fit on the floor support (\code{support = "floor"}) is
 refused, since its mean jumps at integer ceilings; a contrast is available.
+
+\code{B > 0} gives the average a refit-bootstrap interval instead, for any class:
+the model is refit on \code{B} resampled copies of \code{newdata}, which must then be
+the data the model was fit to, resampling whole clusters of the fit's
+\code{cluster}, else whole units of its first fixed-effects column, else rows (a
+unit drawn twice becomes two units). Each replicate averages over its
+own rows at its own unit effects, and the percentile interval is taken.
+Resampling the units treats them as a sample, so this is an interval for a
+fixed-effects fit's average partial effect in the population of units they
+represent, which carries the variability of which units are drawn: with few
+units, or a few with large effects, it is wide and asymmetric. Each refit is the fit's own call with its
+data replaced and its standard errors off (on King's support, every
+replicate of a jackknife-corrected fit is corrected without re-running the
+validity gate, as in \code{\link[=cpb_fe]{cpb_fe()}}'s own bootstrap, and none is when the gate
+refused the fit's correction); the call's other arguments
+are evaluated where \code{ame()} is called, as \code{\link[=update]{update()}} does, and an offset or
+weights given to the fit as one value per row follow the resampled rows.
+The run takes about \code{B} times one fit (see \code{cores}).
 }
 \examples{
 \donttest{
@@ -89,6 +114,13 @@ d <- data.frame(y = rcpb(n, exp(1 + 0.4 * x + 0.3 * (g == "b")), 0.5), x = x, g 
 fit <- cpb(y ~ x * g, data = d, truncated = FALSE, se = "bootstrap", B = 100)
 ame(fit, "x", d)
 ame(fit, "g", d, from = "a", to = "b")
+
+## a fixed-effects fit's average partial effect over its own units
+pd <- do.call(rbind, lapply(1:30, function(i) {
+  x <- rnorm(8); data.frame(unit = i, x = x, y = rcpb(8, exp(rnorm(1, 0, 0.5) + 0.4 * x), 0.5))
+}))
+ffit <- cpb_fe(y ~ x, data = pd, fe = "unit")
+ame(ffit, "x", pd, B = 50)
 }
 }
 \seealso{

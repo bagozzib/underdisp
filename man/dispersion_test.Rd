@@ -93,7 +93,12 @@ it too far: to first order they move the signed root toward
 underdispersion by \eqn{p/\sqrt{2n}} standard deviations for \eqn{p} mean
 parameters on \eqn{n} observations (the weight total), the bias Dean and
 Lawless (1989) remove from the score test, and the bootstrap takes over when
-that shift pushes the first-order size of a 5\% test above 6\%. The bootstrap
+that shift pushes the first-order size of a 5\% test above 6\%. The shift is
+derived for one tested parameter, so the EWP3's joint test of its two tails
+takes the bootstrap by default: in the package's simulations from the
+Poisson its asymptotic \eqn{\chi^2_2} rejected 5.6 to 7.3 percent of 5\%
+tests with one or two mean parameters on 200 to 500 observations, and 10.7
+percent with ten on 400. The bootstrap
 simulates responses from the Poisson (zero-truncated Poisson) fitted to the
 same design, offset, weights, and unit effects, refits both models to each,
 and reports the share of simulated statistics at least as extreme as the

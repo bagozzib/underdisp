@@ -110,21 +110,24 @@ predict.zi_count <- function(object, newdata = NULL, type = c("response", "count
 #'   `"participation"` for a hurdle's binary stage, or `"inflation"` for a
 #'   zero-inflated model's structural-zero stage; the two point in opposite
 #'   directions, an odds ratio above one raising P(Y > 0) in the first and
-#'   P(structural zero) in the second), `ratio` (`"IRR"` or `"OR"`),
-#'   `estimate`, `lower`, `upper`, and `method` (the interval source; `"none"`
-#'   with `NA` bounds when no covariance is available). Two-part models stack
-#'   both equations. The `IRR` rows are \eqn{\exp(\beta)}, the ratio of the
-#'   family's natural parameter. That is a ratio of means for the Poisson, the
-#'   negative binomial, the mean-parameterized COM-Poisson (`"mpcmp"`), the
-#'   hyper-Poisson, and the generalized Poisson with \eqn{\lambda \ge 0}. It is
-#'   not for the others: the CPB and the underdispersed GEC (their rate,
-#'   renormalized over a finite support), the rate-parameterized COM-Poisson
-#'   (`"compois"`, whose mean moves roughly as the rate to the power
-#'   \eqn{1/\nu}, so that \eqn{\exp(\beta)} is roughly the mean ratio to the
-#'   power \eqn{\nu}), the
-#'   EWP (its centrality), the gamma count (its long-run rate) and the double
-#'   Poisson (its location), and the generalized Poisson below zero. For those,
-#'   [first_difference()] and [ame()] report the exact mean contrast.
+#'   P(structural zero) in the second), `ratio` (`"IRR"`, `"OR"`, or the
+#'   parameter's ratio named below), `estimate`, `lower`, `upper`, and `method`
+#'   (the interval source; `"none"` with `NA` bounds when no covariance is
+#'   available). Two-part models stack both equations. The count rows are
+#'   \eqn{\exp(\beta)}, the ratio of the family's natural parameter. That is a
+#'   ratio of means for the Poisson, the negative binomial, the
+#'   mean-parameterized COM-Poisson (`"mpcmp"`), the hyper-Poisson, and the
+#'   generalized Poisson with \eqn{\lambda \ge 0} (`"IRR"`). It is not for the
+#'   others, whose rows name what it is, with a message: the rate-parameterized
+#'   COM-Poisson (`"compois"`, `"lambda ratio"`; its mean moves roughly as the
+#'   rate to the power \eqn{1/\nu}, so that \eqn{\exp(\beta)} is roughly the
+#'   mean ratio to the power \eqn{\nu}), the EWP (`"centrality ratio"`), the
+#'   gamma count (`"long-run rate ratio"`), the double Poisson
+#'   (`"location ratio"`) and the generalized Poisson below zero
+#'   (`"mu ratio"`). The CPB and the underdispersed GEC keep `"IRR"`, a ratio of
+#'   their rate, which their mean follows only approximately (the rate
+#'   renormalized over a finite support). For all of these, [first_difference()]
+#'   and [ame()] report the exact mean contrast.
 #' @name irr.count
 NULL
 
@@ -159,8 +162,8 @@ irr.hurdle_count <- function(object, level = 0.95, ...)
 irr.zi_count <- function(object, level = 0.95, ...) {
   g <- object$zero.coefficients; keep <- !.is_fe_col(names(g), object$zero_fe)
   se <- if (!is.null(object$se.zero)) unname(object$se.zero)[keep]        # named count:/zero: by the covariance
-  rbind(.irr_drop_fe(.ud_irr_wald(object$coefficients, if (!is.null(object$vcov)) sqrt(pmax(diag(object$vcov), 0)),
-                                  level, "count", "IRR"), object$fe),
+  rbind(.irr_drop_fe(.count_irr_rows(object, object$coefficients,
+                                     if (!is.null(object$vcov)) sqrt(pmax(diag(object$vcov), 0)), level), object$fe),
         .irr_mask(.binary_ratio_rows(g[keep], se, level, "inflation", object$link),
                   object$separation$diverging, "inflation"))
 }

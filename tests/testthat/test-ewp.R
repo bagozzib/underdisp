@@ -97,3 +97,12 @@ test_that("the two-parameter EWP is the three-parameter one with equal tails", {
   dt <- dispersion_test(m2)
   expect_equal(unname(dt$parameter), 1); expect_true(dt$p.value < 0.05)
 })
+
+test_that("dispersion_test() of the EWP3's two tails bootstraps by default; B = 0 gives the chi-square(2)", {
+  set.seed(1); d <- data.frame(y = rpois(200, 3))
+  f <- suppressWarnings(count_reg(y ~ 1, d, family = "ewp3", se = "none"))
+  dt <- dispersion_test(f, B = 0)
+  expect_false(dt$asymptotic_ok)
+  expect_identical(dt$calibration, "asymptotic")
+  expect_equal(dt$p.value, stats::pchisq(unname(dt$statistic), 2, lower.tail = FALSE))
+})

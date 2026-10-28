@@ -28,7 +28,8 @@ hurdle_gec(
 to the intensity's right-hand side.}
 
 \item{part_fe}{Optional column name for fixed effects in the participation
-model (added as factor dummies).}
+model (added as factor dummies), whose slopes carry the dummy logit's
+incidental-parameters bias in short panels (see \code{\link[=hurdle_cpb]{hurdle_cpb()}}).}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}.}

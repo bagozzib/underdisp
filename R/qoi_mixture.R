@@ -102,6 +102,10 @@ first_difference.hurdle_cpb <- function(object, variable, from, to, B = 0, level
     if (is.null(data)) stop("Bootstrap (B > 0) requires the original 'data'.")
     ra <- .fd_refit_args(object, c("fe", "part_fe", "link"))
     ra$dots$support <- .cpb_support(object)
+    ## a refit replicate skips the jackknife's gate (King's support), so it follows the fit's own outcome: no
+    ## correction when the gate refused it
+    if (!.cpb_fl(ra$dots$support) && !is.null(ra$dots$bias_correct) && inherits(object$intensity, "cpb_fe"))
+      ra$dots$bias_correct <- object$intensity$bias_correct
     refit <- function(d) do.call(hurdle_cpb, c(list(object$formula, data = d, participation = object$part_formula,
                                                     se = "none", fe = ra$fe, part_fe = ra$part_fe, link = ra$link,
                                                     offset = ra$offset, weights = ra$weights), ra$dots))

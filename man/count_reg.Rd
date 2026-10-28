@@ -144,10 +144,16 @@ against the data.
 
 Runtime: the Poisson, negative binomial, gamma-count, and double Poisson and
 generalized Poisson families fit in under a second at a few hundred rows; the
-COM-Poisson families evaluate a normalizing sum per observation (and the
-mean parameterization solves a root per observation), so they take seconds
-at a few hundred rows and minutes at several thousand; \code{se = "robust"} and
-\code{"cluster"} add numerical scores at the same cost per parameter.
+COM-Poisson families, the hyper-Poisson and the EWP evaluate a normalizing
+sum per observation (and the mean parameterizations solve a root per
+observation), so they take seconds at a few hundred rows and minutes at
+several thousand. The EWP's sum lengthens with a heavy upper tail (a
+negative upper weight), and its standard errors sum over each observation's
+support. Rows that repeat (the same count, covariates and offset) are
+evaluated once with their total weight, so an intercept-only or
+few-category design costs as many evaluations as it has distinct rows.
+\code{se = "robust"} and \code{"cluster"} add numerical scores at the same cost per
+parameter.
 }
 
 \examples{

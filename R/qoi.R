@@ -117,6 +117,15 @@ predict.cpb <- function(object, newdata = NULL,
 #' that largest feasible count is returned as `max_count`. Whether held-out
 #' counts respect the bound is tested by [ceiling_exceedance()].
 #'
+#' The ceiling is the fitted distribution's support end. With the rate and
+#' `alpha` it is fixed by the CPB's variance-mean link, so it is a bound on the
+#' counts only when the CPB is the data's process. On counts with a common
+#' hard bound from another process (binomial counts out of six trials, say),
+#' the fitted ceiling follows the mean and the dispersion instead: in the
+#' package's check it ran from 3 where the mean was low to 12 where it was
+#' high, below the true bound in the first case and well above it in the
+#' second.
+#'
 #' @param object A `"cpb"` object.
 #' @param newdata Optional covariate profiles.
 #' @param level Confidence level (default 0.95).
@@ -162,9 +171,13 @@ implied_ceiling.cpb_fe <- function(object, newdata = NULL, level = 0.95, ...) {
 
 #' Held-out ceiling exceedance of a CPB fit
 #'
-#' The CPB's ceiling is a testable claim, but not in sample: its likelihood is
-#' minus infinity for any count above the bound, so every feasible fit respects
-#' the bound on the data it was fit to. `ceiling_exceedance()` takes held-out
+#' Whether counts respect the CPB's ceiling can be checked, but not in sample:
+#' its likelihood is minus infinity for any count above the bound, so every
+#' feasible fit respects the bound on the data it was fit to. The check is
+#' one-sided: it detects a ceiling that is too low, where held-out counts reach
+#' it, and has no power against one that is too high (a fitted ceiling above a
+#' true bound is never exceeded), nor where counts stay well below the ceiling
+#' (see [implied_ceiling()]). `ceiling_exceedance()` takes held-out
 #' observations and reports how many of their counts exceed the largest count
 #' the fitted model allows at their covariates (`max_count` of
 #' [implied_ceiling()]); for a two-part model the bound is the count

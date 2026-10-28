@@ -139,6 +139,28 @@ predict(fit_b, newdata = data.frame(x = c(-1, 1)), interval = "confidence")
 ame(fit_b, "x", newdata = d)   # the average marginal effect over the sample
 ```
 
+## Mean effects and the robust Poisson
+
+For the conditional mean alone, the Poisson with robust standard errors is the
+benchmark: its coefficients are consistent whenever the mean is
+`exp(x'b)`, whatever the distribution (Gourieroux, Monfort and Trognon 1984;
+Wooldridge 1999), and its robust intervals hold under underdispersion as under
+overdispersion. The CPB's mean effects are consistent only when the CPB is the
+data's process. On underdispersed counts from another process (binomial counts
+with varying trials, a COM-Poisson) its average marginal effects can be off by
+several percent at any sample size, while the robust Poisson's stay on target;
+when the CPB is the process, its effects are consistent, and the Poisson's are a
+little off, since the CPB's mean is not exactly log-linear. What the CPB adds
+is the distribution: predicted probabilities, the ceiling, the share of zeros,
+intervals for a count. The two average marginal effects side by side are a
+check worth reporting.
+
+```{r pml}
+pml <- count_reg(y ~ x, data = d, family = "poisson", se = "robust")
+ame(pml, "x", newdata = d)     # robust Poisson
+ame(fit_b, "x", newdata = d)   # CPB
+```
+
 ## The free-dispersion GEC
 
 `gec()` fits King's generalized event count (Katz) model, whose dispersion

@@ -321,7 +321,10 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
 #' the maximum-likelihood fit (uncorrected estimates in `$uncorrected`). The
 #' same time-homogeneity validity gate applies: on panels where the two halves
 #' do not estimate a common parameter the correction is REFUSED with a warning
-#' and the maximum-likelihood fit is returned (see [cpb_fe()], Details).
+#' and the maximum-likelihood fit is returned (see [cpb_fe()], Details). As
+#' there, the covariate coefficients are corrected too, and with
+#' `se = "bootstrap"` each replicate is corrected the same way, so the standard
+#' errors include the correction's own variance.
 #'
 #' @param formula A model formula for the covariates only (no unit factor, no
 #'   intercept; the fixed effects absorb it).
@@ -433,22 +436,6 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
   fitted <- gec_mean_cpp(rate, delta, ms)
   support_binding <- .gec_guard_binding(rate, delta, ms)
 
-  se.beta <- setNames(rep(NA_real_, p), keep); ci.beta <- NULL; boot <- NULL; clab <- NULL
-  if (se == "bootstrap") {
-    fev  <- as.character(data[[fe]][rows]); dest <- data[rows, , drop = FALSE]
-    cval <- if (is.null(cluster)) fev else .ud_cluster_values(cluster, data, rows)
-    clab <- if (is.null(cluster)) fe else cl_label
-    boot <- .ud_boot(length(Y), cval, function(idx, blk) {
-      bd <- dest[idx, , drop = FALSE]; bd[[".bootunit"]] <- paste0(blk, "_", fev[idx])
-      fb <- .ud_quiet_guard(gec_fe(formula, data = bd, fe = ".bootunit", se = "none", offset = offset,
-                                   weights = weights, max.support = max.support, inner_it = inner_it,
-                                   maxit = maxit, reltol = reltol))
-      if (isTRUE(fb$converged)) c(fb$coefficients[keep], fb$delta, fb$fe_ref) else NULL
-    }, c(keep, "delta", "fe_ref"), B, cores, label = clab)
-    bs <- .ud_boot_stats(boot, keep, beta, normal = TRUE)          # normal approximation, as for cpb_fe()
-    se.beta <- bs$se; ci.beta <- bs$ci
-  }
-
   ## split-panel jackknife: refit on each unit's temporal halves and remove the
   ## leading 1/T incidental-parameters bias term (see .fe_jackknife)
   uncorrected <- NULL
@@ -464,6 +451,7 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
                         torder = stats::ave(seq_along(Y), as.integer(uf), FUN = seq_along),
                         disp_lower = 0.01, disp_upper = Inf)
     if (!is.null(jk$refused)) {
+      if (.fe_jack_replicate()) stop("bias_correct = \"jackknife\" in a bootstrap replicate: ", jk$refused, call. = FALSE)
       warning("bias_correct = \"jackknife\" REFUSED: ", jk$refused,
               ". Returning the uncorrected maximum-likelihood estimates.")
       bias_correct <- "none"
@@ -476,12 +464,26 @@ gec_fe <- function(formula, data, fe, se = c("none", "bootstrap"), B = 500, clus
       rate   <- as.numeric(exp(off + fe_hat[as.integer(uf)] + X %*% beta))
       fitted <- gec_mean_cpp(rate, delta, ms)
       support_binding <- .gec_guard_binding(rate, delta, ms)
-      if (!is.null(ci.beta)) {                        # recenter the normal-approx interval
-        z <- stats::qnorm(0.975)
-        ci.beta <- cbind(lower = beta - z * se.beta, upper = beta + z * se.beta)
-        rownames(ci.beta) <- keep
-      }
     }
+  }
+
+  ## the bootstrap after the jackknife, so that a corrected fit's replicates are corrected too (as for cpb_fe())
+  se.beta <- setNames(rep(NA_real_, p), keep); ci.beta <- NULL; boot <- NULL; clab <- NULL
+  if (se == "bootstrap") {
+    jack_boot <- bias_correct == "jackknife"
+    fev  <- as.character(data[[fe]][rows]); dest <- data[rows, , drop = FALSE]
+    cval <- if (is.null(cluster)) fev else .ud_cluster_values(cluster, data, rows)
+    clab <- if (is.null(cluster)) fe else cl_label
+    boot <- .ud_boot(length(Y), cval, function(idx, blk) {
+      bd <- dest[idx, , drop = FALSE]; bd[[".bootunit"]] <- paste0(blk, "_", fev[idx])
+      fb <- .ud_quiet_guard(.ud_replicate(gec_fe(formula, data = bd, fe = ".bootunit", se = "none", offset = offset,
+                                   weights = weights, max.support = max.support, inner_it = inner_it,
+                                   maxit = maxit, reltol = reltol,
+                                   bias_correct = if (jack_boot) "jackknife" else "none", time = if (jack_boot) time)))
+      if (isTRUE(fb$converged)) c(fb$coefficients[keep], fb$delta, fb$fe_ref) else NULL
+    }, c(keep, "delta", "fe_ref"), B, cores, label = clab)
+    bs <- .ud_boot_stats(boot, keep, beta, normal = TRUE)          # normal approximation, as for cpb_fe()
+    se.beta <- bs$se; ci.beta <- bs$ci
   }
 
   fe_id <- .fe_identified(Y, as.integer(uf), nu)                   # the units the reference unit averages

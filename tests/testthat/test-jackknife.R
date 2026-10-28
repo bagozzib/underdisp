@@ -116,3 +116,25 @@ test_that("the jackknife needs `time`, and splits each unit's series in time ord
   expect_equal(unname(fitted(a2)), unname(fitted(a1))[match(rownames(sh2), rownames(d2))], tolerance = 1e-8)
   expect_error(cpb_fe(y ~ x, data = d2, fe = "unit", time = "nope"), "'time' must name a column")
 })
+
+test_that("a jackknife fit's bootstrap corrects every replicate on King's support, not on the floor's", {
+  skip_on_cran()
+  d <- make_panel(101, N = 30, TT = 8)
+  set.seed(5); f0 <- suppressMessages(cpb_fe(y ~ x, data = d, fe = "unit", se = "bootstrap", B = 12))
+  set.seed(5); f1 <- suppressMessages(cpb_fe(y ~ x, data = d, fe = "unit", se = "bootstrap", B = 12,
+                                             bias_correct = "jackknife", time = "tt"))
+  expect_identical(f1$bias_correct, "jackknife")
+  expect_null(getOption("underdisp.jackknife_replicate"))            # the replicate mode does not leak
+  ok <- stats::complete.cases(f0$boot) & stats::complete.cases(f1$boot)
+  expect_gt(sum(ok), 8)
+  expect_gt(mean(f1$boot[ok, "alpha"]), mean(f0$boot[ok, "alpha"]))  # the same resamples, corrected
+  expect_false(isTRUE(all.equal(f1$se.beta, f0$se.beta)))
+  expect_equal(unname(f1$ci.beta[, "lower"]), unname(f1$coefficients - stats::qnorm(0.975) * f1$se.beta))
+  ## the floor support keeps uncorrected replicates, the interval recentred on the corrected estimate
+  set.seed(7); g0 <- suppressWarnings(suppressMessages(cpb_fe(y ~ x, data = d, fe = "unit", se = "bootstrap", B = 8,
+                                                              support = "floor")))
+  set.seed(7); g1 <- suppressWarnings(suppressMessages(cpb_fe(y ~ x, data = d, fe = "unit", se = "bootstrap", B = 8,
+                                                              support = "floor", bias_correct = "jackknife", time = "tt")))
+  expect_equal(g1$boot, g0$boot)
+  expect_equal(g1$se.beta, g0$se.beta)
+})

@@ -34,8 +34,8 @@ footing.
   (a hard ceiling's, regular event timing's, a soft tail's); a fitted
   distribution does not by itself identify the process that generated them.
 - **The hard-ceiling family** — `cpb()` fits King's continuous parameter
-  binomial and its zero-truncated variant, with an interpretable
-  observation-specific bound; `cpb_fe()` absorbs high-dimensional unit fixed
+  binomial and its zero-truncated variant, whose support ends at an
+  observation-specific ceiling set by its variance-mean link; `cpb_fe()` absorbs high-dimensional unit fixed
   effects by a concentrated likelihood that scales to thousands of units.
   (`support = "floor"` gives the package's definition before version 0.2.0.)
 - **The free-dispersion family** — `gec()` fits the generalized event count

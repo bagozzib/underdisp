@@ -147,7 +147,23 @@ of it. With correction on, \code{coefficients} and \code{alpha}
 are the corrected estimates (the maximum-likelihood values are kept in
 \verb{$uncorrected}), the unit effects and fitted values are re-concentrated at the
 corrected parameters, and \code{logLik}/\code{AIC} continue to refer to the
-maximum-likelihood fit.
+maximum-likelihood fit. The covariate coefficients are corrected too: unlike
+the Poisson's, whose slopes carry no first-order bias, the CPB's can carry one
+(see Short panels above). The correction leaves the estimator's asymptotic
+variance unchanged (Dhaene and Jochmans 2015) but adds variance in short
+panels. In the package's simulations (40 units, alpha = 0.5, a slope with no
+bias to remove) the corrected slope's standard deviation was 28 percent above
+the uncorrected slope's at T = 6 and 14 percent at T = 12, while alpha's bias
+fell from -0.13 and -0.06 to under 0.01; where the slopes' own bias is small
+next to their standard error, the uncorrected fit (\code{bias_correct = "none"})
+estimates them more precisely. With \code{se = "bootstrap"} each replicate is
+corrected the same way (its two half-panel refits; the validity gate below is
+a check on the data, made once), so the standard errors include that variance
+and the bootstrap takes about three times as long. In the same simulations the
+corrected slope's 95\% interval covered 0.88 at T = 6 and 0.94 at T = 12 (0.81
+and 0.89 with uncorrected replicates). On the floor support the replicates stay
+uncorrected and the interval is centered on the corrected estimate, as before
+version 0.2.0.
 
 Validity gate: the split-panel identity requires the two half-panels to
 estimate the same pseudo-true parameter (time-homogeneity; Dhaene & Jochmans

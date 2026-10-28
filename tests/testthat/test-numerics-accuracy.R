@@ -51,3 +51,17 @@ test_that("units with no positive count stay at rates near zero under an uncentr
   zf <- suppressMessages(zi_cpb(y ~ x + year, pf, zero = ~ 1, fe = "unit"))
   expect_lt(max(zf$lambda_full[zr]), 1e-10); expect_false(anyNA(fitted(zf)))
 })
+
+test_that("count_reg's distinct-row evaluation gives the full data's fit and covariances", {
+  set.seed(6); n <- 300; g <- factor(sample(letters[1:3], n, TRUE)); cl <- sample(1:30, n, TRUE)
+  d <- data.frame(y = rpois(n, exp(0.5 + 0.3 * (g == "b"))), g = g, cl = cl)
+  f <- count_reg(y ~ g, d, family = "poisson", se = "robust")
+  gl <- glm(y ~ g, poisson, d)
+  expect_equal(unname(coef(f)), unname(coef(gl)), tolerance = 1e-7)
+  X <- model.matrix(gl); r <- d$y - fitted(gl); Bm <- solve(crossprod(X * sqrt(fitted(gl))))
+  expect_equal(unname(f$vcov), unname(Bm %*% crossprod(X * r) %*% Bm), tolerance = 1e-5)
+  fc <- count_reg(y ~ g, d, family = "poisson", se = "cluster", cluster = "cl")
+  S <- rowsum(X * r, d$cl)
+  expect_equal(unname(fc$vcov), unname(30 / 29 * Bm %*% crossprod(S) %*% Bm), tolerance = 1e-5)
+  expect_length(f$fitted.values, n)
+})

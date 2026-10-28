@@ -49,16 +49,37 @@
 ## extra half-sample fits.
 ## ---------------------------------------------------------------------------
 
+## A bootstrap replicate's refit runs inside .ud_replicate(). The validity gate is a check on the data, made once
+## on the original fit, so a replicate applies the correction without it (its standard errors then carry the
+## correction's variance). A replicate whose half fits fail fails (a missing replicate) instead of falling back to
+## the uncorrected fit; one whose corrected dispersion leaves its space is held at the space's edge, since dropping
+## it would censor one tail of the replicates. The floor support keeps its earlier replicates (cpb_fe() passes
+## `replicate = FALSE` there).
+.ud_replicate <- function(expr) {
+  op <- options(underdisp.jackknife_replicate = TRUE); on.exit(options(op))
+  expr
+}
+.fe_jack_replicate <- function() isTRUE(getOption("underdisp.jackknife_replicate"))
+
 ## refit(half_data) returns the c(coefficients, dispersion) vector of a half
 ## fit (dispersion LAST), or NULL on failure. `resid` and `torder` are the full
 ## fit's Pearson residuals and the (per-unit centered) time order, for R2b.
 ## Returns list(par = corrected vector, warn = character()) on success, or
 ## list(refused = "<reason>").
 .fe_jackknife <- function(data_est, unit, refit, full_par, resid, torder,
-                          disp_lower = 1e-3, disp_upper = Inf, kappa = 2.5) {
+                          disp_lower = 1e-3, disp_upper = Inf, kappa = 2.5, replicate = .fe_jack_replicate()) {
   iu  <- as.integer(factor(unit))
   ord <- stats::ave(seq_along(iu), iu, FUN = seq_along)
   len <- stats::ave(seq_along(iu), iu, FUN = length)
+  if (replicate) {                            # a bootstrap replicate: the correction without the gate
+    h <- ord <= len / 2; k <- length(full_par)
+    q1 <- refit(data_est[h, , drop = FALSE]); q2 <- refit(data_est[!h, , drop = FALSE])
+    if (is.null(q1) || is.null(q2)) return(list(refused = "a half-panel refit failed"))
+    jk <- 2 * full_par - (q1 + q2) / 2
+    eps <- 1e-6 * max(1, abs(disp_lower))
+    jk[k] <- min(max(jk[k], disp_lower + eps), if (is.finite(disp_upper)) disp_upper - eps else Inf)
+    return(list(par = jk, warn = character()))
+  }
   warn <- character()
   if (stats::median(tabulate(iu)) < 6)
     warn <- c(warn, "median panel length is below 6; half-panel fits are short and the correction may be unreliable")

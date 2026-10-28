@@ -55,3 +55,14 @@ for multi-equation models) and the term prefixed by its component, so that
 a zero-inflation or participation equation that the data do not bound
 (separation; see \code{\link[=zi_cpb]{zi_cpb()}}) has no standard error.
 }
+\details{
+The \code{scale} column names what each coefficient multiplies: \code{"log mean"}
+for the mean-parameterized count families (\code{"log untruncated mean"} for a
+zero-truncated fit or a hurdle's intensity), the binary equation's link for a
+participation or zero-inflation row, and otherwise the family's own
+parameter (\code{"log rate"} for the CPB and GEC, \code{"log lambda"} for the
+rate-parameterized COM-Poisson, \code{"log centrality"} for the EWP, and so on;
+see \link{irr.count}). Coefficients on different scales are not comparable
+across the columns of a table; \code{\link[=ame]{ame()}} puts every model's effect on the
+mean.
+}

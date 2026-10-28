@@ -275,3 +275,47 @@ test_that("ame() weights its average, and refuses the floor support's slope", {
   expect_error(ame(ff, "x", data.frame(x = xx)), "jumps at integer ceilings")
   expect_s3_class(ame(ff, "x", data.frame(x = xx), from = 0, to = 1), "ud_ame")
 })
+
+test_that("ame(B =) refits on resampled units and averages each replicate over its own units", {
+  skip_on_cran()
+  set.seed(3)
+  pd <- do.call(rbind, lapply(1:30, function(i) {
+    x <- rnorm(6); data.frame(unit = i, x = x, y = rcpb(6, exp(rnorm(1, 0, 0.5) + 0.4 * x), 0.5))
+  }))
+  ff <- cpb_fe(y ~ x, data = pd, fe = "unit")
+  expect_message(a0 <- ame(ff, "x", pd), "ame\\(B = \\)")
+  expect_identical(a0$method, "none")
+  set.seed(1); a1 <- suppressMessages(ame(ff, "x", pd, B = 20))
+  expect_identical(a1$method, "bootstrap (refit, B=20)")
+  expect_equal(a1$estimate, a0$estimate)
+  expect_true(a1$lower < a1$estimate && a1$estimate < a1$upper)
+  expect_error(ame(ff, "x", pd[, c("unit", "x")], B = 5), "lacks 'y'")
+  expect_error(ame(ff, "x", pd, B = 1), "at least 2")
+  ## a weights vector given to the fit follows the resampled rows
+  set.seed(4); x <- rnorm(150); w <- rep(1:3, 50); dd <- data.frame(y = rpois(150, exp(0.5 + 0.3 * x)), x = x)
+  cr <- count_reg(y ~ x, dd, family = "poisson", se = "robust", weights = w)
+  set.seed(2); a2 <- suppressMessages(ame(cr, "x", dd, weights = w, B = 30))
+  expect_identical(a2$method, "bootstrap (refit, B=30)")
+  expect_true(a2$lower < a2$estimate && a2$estimate < a2$upper)
+})
+
+test_that("ame(B =) follows the fit's own jackknife outcome, and ignores a factor's unused levels", {
+  skip_on_cran()
+  set.seed(202)
+  d <- do.call(rbind, lapply(1:20, function(i) {             # a dispersion regime change: the gate refuses
+    x <- rnorm(12); lam <- exp(1.0 + rnorm(1, 0, 0.4) + 0.3 * x); a <- ifelse(1:12 <= 6, 0.3, 0.7)
+    data.frame(unit = i, tt = 1:12, x = x, y = vapply(1:12, function(t) rcpb(1, lam[t], a[t]), integer(1)))
+  }))
+  jk <- suppressWarnings(cpb_fe(y ~ x, data = d, fe = "unit", bias_correct = "jackknife", time = "tt"))
+  expect_identical(jk$bias_correct, "none")
+  raw <- cpb_fe(y ~ x, data = d, fe = "unit")
+  set.seed(11); a1 <- suppressMessages(ame(jk, "x", d, from = -1, to = 1, B = 6))
+  set.seed(11); a2 <- suppressMessages(ame(raw, "x", d, from = -1, to = 1, B = 6))
+  expect_equal(c(a1$lower, a1$upper), c(a2$lower, a2$upper))
+  expect_error(ame(jk, "x", d[, c("unit", "x", "y")], B = 2), "lacks 'tt'")
+  d2 <- d; d2$unit <- factor(d2$unit, levels = 1:30)        # ten unused levels
+  set.seed(2); b1 <- suppressMessages(ame(raw, "x", d2, B = 6))
+  d3 <- d2; d3$unit <- droplevels(d3$unit)
+  set.seed(2); b2 <- suppressMessages(ame(raw, "x", d3, B = 6))
+  expect_equal(c(b1$lower, b1$upper), c(b2$lower, b2$upper))
+})

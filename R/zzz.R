@@ -9,13 +9,14 @@
 
 .extract_underdisp <- function(names, coef, se, ll, df, nobs,
                                extra_names = character(0), extra = numeric(0),
-                               extra_dec = logical(0)) {
+                               extra_dec = logical(0), model.name = character(0)) {
   texreg::createTexreg(
     coef.names  = names, coef = coef, se = se,
     pvalues     = 2 * stats::pnorm(-abs(coef / se)),
     gof.names   = c("AIC", "Log Likelihood", "Num. obs.", extra_names),
     gof         = c(-2 * ll + 2 * df, ll, nobs, extra),
-    gof.decimal = c(TRUE, TRUE, FALSE, extra_dec))
+    gof.decimal = c(TRUE, TRUE, FALSE, extra_dec),
+    model.name  = model.name)
 }
 
 ## The dispersion rows of a table: the parameter under its own name, with the side of its Poisson value that is
@@ -30,11 +31,13 @@
 }
 
 ## A table column from the model's tidy() rows (the same standard errors, and the same blank standard errors for
-## separated terms) with the fit statistics and the dispersion rows
+## separated terms) with the fit statistics and the dispersion rows; the column is named by its model and its count
+## equation's coefficient scale (a table's custom.model.names replace it)
 .tex <- function(model, tab, extra_names = character(0), extra = numeric(0), extra_dec = logical(0)) {
   ll <- stats::logLik(model); d <- .tex_disp(model)
   .extract_underdisp(tab$term, tab$estimate, tab$std.error, as.numeric(ll), attr(ll, "df"), stats::nobs(model),
-                     c(d$name, extra_names), c(d$value, extra), c(d$decimal, extra_dec))
+                     c(d$name, extra_names), c(d$value, extra), c(d$decimal, extra_dec),
+                     model.name = paste0(.model_short(model), ": ", .coef_scale(model)$scale))
 }
 
 utils::globalVariables(c(".w", ".d"))   # columns built for the participation glm() calls
