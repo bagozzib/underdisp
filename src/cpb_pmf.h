@@ -117,10 +117,13 @@ static inline bool cpb_dlogpmf(int y, double lam, double alpha, double la, doubl
 // here forms n or Gamma(n + 1), so the pmf stays exact as alpha approaches one
 // and n diverges: the Poisson limit is approached continuously rather than
 // refused, and max_support only bounds the width of the pmf's body. Each side
-// is summed until its term falls 36 log units below t_m, and is continued in
-// log space past that point when the observed count lies beyond it, for at most
-// TAIL_WALK further steps; a count farther out (or a zero the walk does not
-// reach) takes its term in closed form,
+// is summed until its term falls 36 log units below t_m. The terms fall
+// monotonically away from the mode, so inside that body they lie in
+// [exp(-36), 1] and are stepped as a running product of the ratios, with no log
+// or exp per term (as on the floor support); past it the walk is continued in
+// log space when the observed count lies beyond it, for at most TAIL_WALK
+// further steps; a count farther out (or a zero the walk does not reach) takes
+// its term in closed form,
 //     log(t_k / t_m) = lgamma(m+1) + lgamma(n-m+1) - lgamma(k+1) - lgamma(n-k+1)
 //                      + (k - m) log((1-alpha)/alpha),
 // with each lgamma difference evaluated as a log Pochhammer symbol,
@@ -156,7 +159,7 @@ static inline double cpb_psidiff(double a, double d) {
 }
 static inline bool cpb_norm_ceil(int y, double lam, double alpha, int max_support, bool moments, CpbCeil& r) {
   if (!(lam > 0.0) || !R_finite(lam) || !(alpha > 1e-12) || !(alpha < 1.0 - 1e-12)) return false;
-  const double om = 1.0 - alpha, tol = 1e-9 * om, cut = -36.0;
+  const double om = 1.0 - alpha, tol = 1e-9 * om, ecut = 2.3195228302435696e-16;   // exp(-36)
   if (y < 0 || (y > 0 && !(lam - (y - 1.0) * om > tol))) return false;   // y above ceiling(n)
   if (!(lam < 1e9)) return false;                                     // the mode must fit an int
   int m = (lam > alpha) ? (int)std::floor(lam - alpha) + 1 : 0;        // the terms rise while k <= lambda - alpha
@@ -164,31 +167,47 @@ static inline bool cpb_norm_ceil(int y, double lam, double alpha, int max_suppor
   double S = 1.0, ek = (double)m, eps = 0.0, ly = 0.0, l0 = 0.0, psy = 0.0, ps0 = 0.0;
   bool got_y = (y == m), got_0 = (m == 0);
   int body = 1, out = 0;
-  double lt = 0.0, ps = 0.0;
+  double t = 1.0, lt = 0.0, ps = 0.0;                                  // t in the body, lt = log t past it
+  bool tail = false;
   for (int k = m; ; k++) {                                             // upward
     double num = lam - k * om;
     if (!(num > tol)) break;                                           // k + 1 lies outside the support
-    lt += std::log(num / (alpha * (k + 1.0)));
+    double q = num / (alpha * (k + 1.0));
     if (moments) ps -= om / num;                                       // psi_{k+1} = psi_k - 1/(n - k)
+    if (!tail) {
+      double t1 = t * q;
+      if (t1 >= ecut) {
+        t = t1; S += t;
+        if (k + 1 == y) { ly = std::log(t); psy = ps; got_y = true; }
+        if (moments) { ek += t * (k + 1.0); eps += t * ps; }
+        if (++body > max_support) return false;                        // a body wider than the guard
+        continue;
+      }
+      lt = std::log(t) + std::log(q); tail = true;
+    } else lt += std::log(q);
     if (k + 1 == y) { ly = lt; psy = ps; got_y = true; }
-    if (lt >= cut) {
-      double t = std::exp(lt); S += t;
-      if (moments) { ek += t * (k + 1.0); eps += t * ps; }
-      if (++body > max_support) return false;                          // a body wider than the guard
-    } else if (k + 1 >= y || ++out > TAIL_WALK) break;
+    if (k + 1 >= y || ++out > TAIL_WALK) break;
   }
-  lt = 0.0; ps = 0.0; out = 0;
+  t = 1.0; lt = 0.0; ps = 0.0; out = 0; tail = false;
   for (int k = m; k > 0; k--) {                                        // downward
     double den = lam - (k - 1.0) * om;                                 // positive: k - 1 < m lies in the support
-    lt += std::log(alpha * k / den);
+    double q = alpha * k / den;
     if (moments) ps += om / den;                                       // psi_{k-1} = psi_k + 1/(n - k + 1)
+    if (!tail) {
+      double t1 = t * q;
+      if (t1 >= ecut) {
+        t = t1; S += t;
+        if (k - 1 == y) { ly = std::log(t); psy = ps; got_y = true; }
+        if (k - 1 == 0) { l0 = std::log(t); ps0 = ps; got_0 = true; }
+        if (moments) { ek += t * (k - 1.0); eps += t * ps; }
+        if (++body > max_support) return false;
+        continue;
+      }
+      lt = std::log(t) + std::log(q); tail = true;
+    } else lt += std::log(q);
     if (k - 1 == y) { ly = lt; psy = ps; got_y = true; }
     if (k - 1 == 0) { l0 = lt; ps0 = ps; got_0 = true; }
-    if (lt >= cut) {
-      double t = std::exp(lt); S += t;
-      if (moments) { ek += t * (k - 1.0); eps += t * ps; }
-      if (++body > max_support) return false;
-    } else if (k - 1 <= y || ++out > TAIL_WALK) break;
+    if (k - 1 <= y || ++out > TAIL_WALK) break;
   }
   r.n = lam / om;
   if (!got_y || !got_0) {                                              // terms the walks left: closed form

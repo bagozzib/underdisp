@@ -209,10 +209,11 @@
 #' jumps; and ceilings above `max.support` are infeasible, so `alpha` can be
 #' bounded by that guard rather than by the data.
 #'
-#' Runtime: a fit with `se = "none"` takes about three seconds at 500 rows and
-#' twelve at 2,000 on one core, the multistart and the profile trace included.
+#' Runtime: a fit with `se = "none"` takes about a second at 500 rows and four
+#' at 2,000 on one core, the multistart and the profile trace included (about
+#' four and fifteen on the floor support).
 #' The bootstrap replicates are maximized by the multistart without the profile
-#' trace (about 0.3 seconds each at 500 rows; on the floor support a
+#' trace (about 0.1 seconds each at 500 rows; on the floor support a
 #' replicate can therefore sit on a different tooth from the point estimate, by
 #' the order of the jumps); `cores` runs them in parallel.
 #'
