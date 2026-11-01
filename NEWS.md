@@ -27,9 +27,9 @@
   remains available for either support. The documentation now presents it as
   the remedy for floor-support fits and as an optional refinement on King's.
 * On King's support the pairs bootstrap's 95% percentile interval for a slope
-  covers 0.92 at `alpha` = 0.3 and 0.94 at 0.5 and 0.7, in simulations at
-  n = 300. Neither a parametric bootstrap (0.922) nor 999 replicates (0.932)
-  brings it to the nominal level.
+  covers 0.91 at `alpha` = 0.3, 0.95 at 0.5 and 0.94 at 0.7, in simulations at
+  n = 300 (0.92 at 0.3 with n = 1,000). Neither a parametric bootstrap (0.918)
+  nor 999 replicates (0.924) brings it to the nominal level.
   The documentation reports these rates in place of "validated to nominal
   coverage", which held on the floor support (0.95).
 * In the fixed-effects bias simulations (150 units, `alpha` = 0.5) the bias of

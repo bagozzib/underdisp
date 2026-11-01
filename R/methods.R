@@ -122,8 +122,8 @@ print.summary.cpb <- function(x, ...) {
 #' Confidence intervals for a CPB fit
 #'
 #' Coefficient intervals use the cold-multistart bootstrap percentile method. In
-#' simulations from King's CPB (n = 300) the 95% interval for a slope covers 0.92
-#' at alpha 0.3 and 0.94 at 0.5 and 0.7, and on the floor support 0.95. The
+#' simulations from King's CPB (n = 300) the 95% interval for a slope covers 0.91
+#' at alpha 0.3, 0.95 at 0.5 and 0.94 at 0.7, and on the floor support 0.95. The
 #' interval for `alpha` is a
 #' profile-likelihood interval. It is first-order by default: on King's support
 #' it covers close to its level in simulations from the CPB, and on the floor

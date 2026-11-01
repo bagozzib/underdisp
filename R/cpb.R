@@ -193,8 +193,9 @@
 #' sampling variability of the estimates), and inference uses a
 #' cold-multistart bootstrap for the coefficients and a profile-likelihood
 #' interval for \eqn{\alpha}. In simulations from King's CPB at n = 300, the
-#' bootstrap's 95% interval for a slope covers 0.92 at alpha 0.3 and 0.94 at
-#' 0.5 and 0.7; on the floor support it covers 0.95. The interval for
+#' bootstrap's 95% interval for a slope covers 0.91 at alpha 0.3, 0.95 at 0.5
+#' and 0.94 at 0.7 (0.92 at alpha 0.3 with n = 1,000); on the floor support it
+#' covers 0.95. The interval for
 #' \eqn{\alpha} is first-order by default and calibrated by parametric bootstrap
 #' after [calibrate_alpha()] (see [alpha_confint()]).
 #'
