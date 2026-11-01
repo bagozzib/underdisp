@@ -57,7 +57,9 @@ floor support such units keep the fill values of versions before 0.2.0
 effect under \code{"em"}).}
 
 \item{zero_fe}{Optional column name for fixed effects in the zero-inflation
-equation, entered as factor dummies (opt-in).}
+equation, entered as factor dummies (opt-in). On King's support the dummy
+of a unit with no positive count is not counted in the degrees of freedom
+(see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
 
 \item{method}{Estimation method: \code{"ml"} (default) is robust direct joint
 maximum likelihood seeded from separate fits; \code{"em"} is expectation-

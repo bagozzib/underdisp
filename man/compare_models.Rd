@@ -33,6 +33,24 @@ non-nested hurdle-versus-mixture choice. Passing an object that is not a
 fitted model from this package is an error, and models fit on different data
 raise a warning.
 }
+\section{Degrees of freedom}{
+
+Each model's \code{df} is its own (\code{logLik()}'s). The hurdle and zero-inflated
+fits do not count the parameters of a unit with no positive count: with unit
+fixed effects in the participation or zero equation (\code{part_fe}, \code{zero_fe})
+or in the count equation (\code{fe}; dummies written into a formula are
+covariates to the fit and are counted), such a unit's dummy and its count effect sit
+at their limits, where every one of its rows has probability one, so it adds
+nothing to the likelihood. As fixest leaves such units out of a
+fixed-effects fit, these parameters are left out of \code{df}, so that a hurdle
+and a zero-inflated model fit to the same panel are charged alike. The fits
+record the units (\code{part_zero_units} in the hurdles; \code{zero_units} and
+\code{zero_fe_zero_units} in \code{\link[=zi_cpb]{zi_cpb()}}; \code{fe_zero_units} and \code{zero_fe_zero_units}
+in \code{\link[=zi_count]{zi_count()}}; \code{zero_fe_zero_units} in \code{\link[=zi_gec]{zi_gec()}}), and their print
+methods give the number. CPB fits on the floor support (\code{support = "floor"})
+count these parameters as versions before 0.2.0 did.
+}
+
 \examples{
 \donttest{
 set.seed(1); n <- 400; x <- rnorm(n); z <- rnorm(n)

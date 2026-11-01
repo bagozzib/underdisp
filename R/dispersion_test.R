@@ -94,8 +94,8 @@
 #' that shift pushes the first-order size of a 5% test above 6%. The shift is
 #' derived for one tested parameter, so the EWP3's joint test of its two tails
 #' takes the bootstrap by default: in the package's simulations from the
-#' Poisson its asymptotic \eqn{\chi^2_2} rejected 5.6 to 7.3 percent of 5%
-#' tests with one or two mean parameters on 200 to 500 observations, and 10.7
+#' Poisson its asymptotic \eqn{\chi^2_2} rejected 6.4 to 7.5 percent of 5%
+#' tests with one or two mean parameters on 200 to 500 observations, and 8.0
 #' percent with ten on 400. The bootstrap
 #' simulates responses from the Poisson (zero-truncated Poisson) fitted to the
 #' same design, offset, weights, and unit effects, refits both models to each,
@@ -388,8 +388,8 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
   size1 <- .disp_first_order_size(des$p, des$n, alternative)
   ## the first-order size correction is derived for one tested parameter; with
   ## several the parametric bootstrap calibrates by default (for the EWP3's two
-  ## tails the asymptotic chi-square(2) rejected 5.6% to 7.3% of 5% tests with one
-  ## or two mean parameters on 200 to 500 observations, and 10.7% with ten on 400,
+  ## tails the asymptotic chi-square(2) rejected 6.4% to 7.5% of 5% tests with one
+  ## or two mean parameters on 200 to 500 observations, and 8.0% with ten on 400,
   ## in the package's simulations)
   asym_ok <- !fam$boundary && !des$fe && size1 <= .disp_size_tol && df == 1L
   ll1 <- object$loglik

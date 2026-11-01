@@ -22,7 +22,7 @@
   method reads it; an object saved by an earlier version is treated as a
   floor-support fit.
 * On King's support the first-order profile interval for `alpha` covers
-  between 0.935 and 0.956 in simulations from the CPB. On the floor support it
+  between 0.940 and 0.956 in simulations from the CPB. On the floor support it
   covers 0.90 to 0.94, with most misses on the upper side. `calibrate_alpha()`
   remains available for either support. The documentation now presents it as
   the remedy for floor-support fits and as an optional refinement on King's.
@@ -194,8 +194,8 @@
   on the data, so the standard errors include the correction's own variance.
   The replicates used to be uncorrected fits whose interval was recentred on
   the corrected estimate. On the floor support they still are. In the
-  package's simulations (40 units) the slope interval's coverage rose from 0.81
-  to 0.88 at T = 6 and from 0.89 to 0.94 at T = 12; `?cpb_fe` also reports
+  package's simulations (40 units) the slope interval's coverage rose from 0.85
+  to 0.91 at T = 6 and from 0.89 to 0.94 at T = 12; `?cpb_fe` also reports
   what the correction costs in the slopes' variance.
 * `cpb_fe()` and `gec_fe()` sort a `cluster` given as a vector together with
   the data. It was not reordered when the rows were sorted by unit, which put
@@ -218,6 +218,18 @@
   minus 2 under `method = "ml"`, the mean effect under `method = "em"`), whose
   zeros then shaped the inflation estimates, and the two methods filled it
   differently. On the floor support the fill is kept, as before 0.2.0.
+* The hurdle and zero-inflated fits (`hurdle_cpb()`, `hurdle_gec()`,
+  `hurdle_count()`, `zi_cpb()`, `zi_gec()`, `zi_count()`) do not count the
+  parameters of a unit with no positive count in their degrees of freedom,
+  whichever equation carries them: the participation dummy of a unit that
+  never participates, and the zero-equation dummy and count effect of a unit
+  whose counts are all zero, sit at their limits and add nothing to the
+  likelihood. Before, `zi_cpb(fe =)` left such units out (above) while the
+  hurdles counted their participation dummies, which tilted AIC toward the
+  mixture by two points per unit, and `zi_count()` counted two parameters per
+  unit where the hurdles counted one. The fits record the units and their
+  print methods give the number (`?compare_models`, Degrees of freedom). CPB
+  fits on the floor support count as before.
 * The participation equation of `hurdle_cpb()`, `hurdle_gec()` and
   `hurdle_count()` is checked for separation by the zero-inflated fits' rule.
   With `cluster` its standard errors are cluster-robust (`hurdle_count()`

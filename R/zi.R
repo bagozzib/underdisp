@@ -74,7 +74,9 @@ rzicpb <- function(n, lambda, alpha, pi, support = c("ceiling", "floor")) {
 #'   (the rate at the smallest estimated effect minus 2 under `"ml"`, the mean
 #'   effect under `"em"`).
 #' @param zero_fe Optional column name for fixed effects in the zero-inflation
-#'   equation, entered as factor dummies (opt-in).
+#'   equation, entered as factor dummies (opt-in). On King's support the dummy
+#'   of a unit with no positive count is not counted in the degrees of freedom
+#'   (see [compare_models()], Degrees of freedom).
 #' @param method Estimation method: `"ml"` (default) is robust direct joint
 #'   maximum likelihood seeded from separate fits; `"em"` is expectation-
 #'   maximization, retained for comparison but prone to a degenerate
@@ -257,6 +259,10 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
                                                       estimated = f$fe_estimated, iterations = f$iterations)),
     loglik = function(f) f$loglik)
   res <- chk$fit; res$separation <- chk$separation
+  ## on King's support, a zero_fe level with no positive count among the rows fitted has its dummy at the limit: not
+  ## counted (.ud_zero_levels); the units left out above have no rows here, so none is counted twice
+  zl <- if (is.null(zero_fe) || .cpb_fl(support)) character(0) else .ud_zero_levels(res$y, res$zero_group)
+  res$df <- res$df - length(zl); res$zero_fe_zero_units <- zl
   res
 }
 
@@ -908,6 +914,7 @@ print.zi_cpb <- function(x, ...) {
   print(round(x$zero_coef, 4))
   cat("Mean structural-zero probability:", round(mean(x$pi_full, na.rm = TRUE), 3), "\n")
   if (isTRUE(x$n_zero_units > 0L)) cat(.zi_zero_note(x), "\n")
+  .ud_zero_df_note(x$zero_fe_zero_units, "zero-equation dummy", "zero-equation dummies")
   if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
   .zi_separation_note(x)
   invisible(x)

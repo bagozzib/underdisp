@@ -112,7 +112,7 @@ support). Neither a parametric bootstrap (0.922) nor 999 replicates (0.932)
 brings it to the nominal level. The
 dispersion parameter carries a profile-likelihood interval. That interval is
 first-order by default. On King's support it covers close to its level in
-simulations (0.935 to 0.956). On the floor support it does not: the estimate of
+simulations (0.940 to 0.956). On the floor support it does not: the estimate of
 `alpha` is biased toward zero there (the log-ceiling coefficients behave like
 endpoint parameters), so it covers about 0.90 to 0.94, with most misses on the
 upper side. `calibrate_alpha()` is the opt-in remedy for floor-support fits and

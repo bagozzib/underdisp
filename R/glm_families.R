@@ -522,7 +522,9 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
 #' @param fe,part_fe Optional fixed-effects column names for the intensity and
 #'   participation models (entered as factor dummies). The participation
 #'   slopes carry the dummy logit's incidental-parameters bias in short panels
-#'   (see [hurdle_cpb()]).
+#'   (see [hurdle_cpb()]). The participation dummy of a unit that never
+#'   participates is not counted in the degrees of freedom (see
+#'   [compare_models()], Degrees of freedom).
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`. Positive participation coefficients raise the probability of
 #'   a *positive count* (participation).
@@ -588,11 +590,12 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
   off_all <- if (is.null(offset)) 0 else if (is.character(offset)) as.numeric(data[[offset]]) else as.numeric(offset)
   lambda_full <- exp(off_all + as.numeric(mm[, common, drop = FALSE] %*% beta[common]))
   llh <- as.numeric(stats::logLik(pfit)) + ifit$loglik
-  dfh <- length(stats::coef(pfit)) + ifit$df
+  zl <- .ud_zero_levels(y, if (!is.null(part_fe)) data[[part_fe]])   # never participate: not counted (.ud_zero_levels)
+  dfh <- length(stats::coef(pfit)) - length(zl) + ifit$df
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), y = as.integer(y),
                  p_full = as.numeric(stats::fitted(pfit)), lambda_full = lambda_full,
-                 theta = ifit$theta, family = family, loglik = llh, df = dfh, link = link,
+                 theta = ifit$theta, family = family, loglik = llh, df = dfh, part_zero_units = zl, link = link,
                  int_fe_ref = mean(off_all),
                  int_beta = beta,
                  int_xref = .fe_dummy_ref(colMeans(mm[, common, drop = FALSE]), mm[, common, drop = FALSE], y, fe,
@@ -640,7 +643,9 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
 #'   model; defaults to the count right-hand side.
 #' @param fe Optional fixed-effects column for the count equation (factor dummies).
 #' @param zero_fe Optional fixed-effects column for the inflation equation
-#'   (factor dummies); zero-equation fixed effects are opt-in.
+#'   (factor dummies); zero-equation fixed effects are opt-in. In either
+#'   equation the dummy of a unit with no positive count is not counted in the
+#'   degrees of freedom (see [compare_models()], Degrees of freedom).
 #' @param link Link for the inflation probability: `"logit"` (default),
 #'   `"probit"`, or `"cloglog"`. Positive inflation coefficients raise the
 #'   probability of a *structural zero*.
@@ -769,7 +774,11 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
   beta <- o$par[seq_len(pc)]; names(beta) <- colnames(Xc)
   gamma <- o$par[pc + seq_len(pz)]; names(gamma) <- colnames(Zz)
   theta <- if (fam$nshape) unname(fam$shape_inv(o$par[pc + pz + seq_len(fam$nshape)])) else NA_real_
-  df <- pc + pz + fam$nshape
+  ## the count effects and zero-equation dummies of units with no positive count are at their limits; not counted
+  ## (.ud_zero_levels)
+  zl_fe <- unlist(lapply(fe, function(f) .ud_zero_levels(Y, data[[f]][rows])))
+  zl_zero <- .ud_zero_levels(Y, if (!is.null(zero_fe)) data[[zero_fe]][rows])
+  df <- pc + pz + fam$nshape - length(zl_fe) - length(zl_zero)
   se.beta <- setNames(rep(NA_real_, pc), colnames(Xc)); se.zero <- setNames(rep(NA_real_, pz), colnames(Zz))
   vcv <- NULL; vcv_full <- NULL
   if (se != "none") {
@@ -791,7 +800,8 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
   }
   structure(list(coefficients = beta, zero.coefficients = gamma, zero_coef = gamma, theta = theta, family = family,
                  se.beta = se.beta, se.zero = se.zero, vcov = vcv, vcov_full = vcv_full,
-                 loglik = -o$value, df = df, n = n, nobs_weighted = if (is.null(w)) n else sum(w),
+                 loglik = -o$value, df = df, fe_zero_units = zl_fe, zero_fe_zero_units = zl_zero, n = n,
+                 nobs_weighted = if (is.null(w)) n else sum(w),
                  weights = w, link = link,
                  pi_full = as.numeric(linkinv(Zz %*% gamma)), separation = sep,
                  lambda_full = as.numeric(exp(rep_len(off, n) + Xc %*% beta)), y = as.integer(Y),
@@ -964,6 +974,12 @@ print.zi_count <- function(x, ...) {
   cat(sprintf("\nZero-inflation (%s link) -- positive coefficients raise P(structural zero), i.e. lower the\nchance of a positive count (the opposite direction from a hurdle participation model):\n",
               x$link)); print(round(x$zero.coefficients, 4))
   cat(.shape_line(x$family, x$theta))
+  if (length(x$fe_zero_units) && identical(sort(x$fe_zero_units), sort(x$zero_fe_zero_units))) {
+    .ud_zero_df_note(x$fe_zero_units, "count effect and zero-equation dummy", "count effects and zero-equation dummies")
+  } else {
+    .ud_zero_df_note(x$fe_zero_units, "count effect", "count effects")
+    .ud_zero_df_note(x$zero_fe_zero_units, "zero-equation dummy", "zero-equation dummies")
+  }
   if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
   .zi_separation_note(x)
   invisible(x)
@@ -988,6 +1004,7 @@ print.hurdle_count <- function(x, ...) {
   print(round(x$intensity$coefficients, 4))
   cat(.shape_line(x$family, x$theta))
   for (nt in .sep_note(x$part_separation, "participation")) cat(nt, "\n")
+  .ud_zero_df_note(x$part_zero_units, "participation dummy", "participation dummies")
   invisible(x)
 }
 

@@ -425,7 +425,7 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
 ## Profile-likelihood interval for alpha: invert the LR test by fixing alpha and
 ## re-optimizing beta (on the column-scaled design). The interval is first-order
 ## and model-based. On King's support the probabilities are continuous in the
-## parameters and the chi-square cut covers 0.935 to 0.956 in simulations from
+## parameters and the chi-square cut covers 0.940 to 0.956 in simulations from
 ## the CPB. On the floor support, floor(lambda_i/(1-alpha)) moves with the
 ## parameters, so the log-ceiling coefficients (the intercept less log(1-alpha),
 ## and the slopes) are endpoint-type parameters: the likelihood gains whenever an

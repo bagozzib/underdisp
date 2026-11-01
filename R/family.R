@@ -128,7 +128,7 @@ compare_dispersion <- function(formula, data, max.support = NULL, hurdle = FALSE
     hc <- tryCatch(.ud_quiet_guard(hurdle_cpb(formula, data = data, se = "none", support = support)),
                    error = function(e) NULL)
     if (!is.null(hc)) {
-      dfh <- length(stats::coef(hc$participation)) + hc$intensity$df
+      dfh <- .ud_twopart_df(hc)
       llh <- as.numeric(stats::logLik(hc$participation)) + hc$intensity$loglik
       Ph  <- .pmf_and_y(hc, kmax)$P
       rows$`Hurdle-CPB` <- c(df = dfh, logLik = llh, AIC = aic(llh, dfh), BIC = bic(llh, dfh), scr(Ph),
@@ -174,6 +174,21 @@ compare_dispersion <- function(formula, data, max.support = NULL, hurdle = FALSE
 #'   function warns when the models mix truncated and untruncated likelihoods,
 #'   whose log-likelihoods are of different events, or when a model is
 #'   separated.
+#' @section Degrees of freedom:
+#' Each model's `df` is its own (`logLik()`'s). The hurdle and zero-inflated
+#' fits do not count the parameters of a unit with no positive count: with unit
+#' fixed effects in the participation or zero equation (`part_fe`, `zero_fe`)
+#' or in the count equation (`fe`; dummies written into a formula are
+#' covariates to the fit and are counted), such a unit's dummy and its count effect sit
+#' at their limits, where every one of its rows has probability one, so it adds
+#' nothing to the likelihood. As fixest leaves such units out of a
+#' fixed-effects fit, these parameters are left out of `df`, so that a hurdle
+#' and a zero-inflated model fit to the same panel are charged alike. The fits
+#' record the units (`part_zero_units` in the hurdles; `zero_units` and
+#' `zero_fe_zero_units` in [zi_cpb()]; `fe_zero_units` and `zero_fe_zero_units`
+#' in [zi_count()]; `zero_fe_zero_units` in [zi_gec()]), and their print
+#' methods give the number. CPB fits on the floor support (`support = "floor"`)
+#' count these parameters as versions before 0.2.0 did.
 #' @seealso [zi_test()], [compare_dispersion()]
 #' @examples
 #' \donttest{
@@ -208,8 +223,7 @@ compare_models <- function(...) {
     warning("Models were fit to different responses; AIC/BIC and scores are only comparable on the same data.")
   info <- function(m) {
     if (inherits(m, c("hurdle_cpb", "hurdle_gec"))) {
-      idf <- if (!is.null(m$intensity$df)) m$intensity$df else length(m$intensity$coefficients) + 1L
-      df  <- length(stats::coef(m$participation)) + idf
+      df  <- .ud_twopart_df(m)
       ll  <- as.numeric(stats::logLik(m$participation)) + m$intensity$loglik
     } else { df <- m$df; ll <- m$loglik }
     n  <- getn(m)

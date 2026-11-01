@@ -103,7 +103,10 @@ rhurdle_cpb <- function(n, lambda, alpha, p, support = c("ceiling", "floor")) {
 #'   (\code{survival::clogit()}) gives participation slopes free of that bias,
 #'   and an analytical correction (the \pkg{bife} package, for the logit and
 #'   the probit) reduces it to second order; the hurdle's predictions and
-#'   quantities of interest use the dummy logit's unit effects.
+#'   quantities of interest use the dummy logit's unit effects. On King's
+#'   support the dummy of a unit that never participates, at minus infinity, is
+#'   not counted in the degrees of freedom (see [compare_models()], Degrees of
+#'   freedom).
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`. Positive participation coefficients raise the probability of
 #'   a positive count.
@@ -202,6 +205,8 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
     lambda_full <- as.numeric(exp(off_all + fe_i + Xcov %*% beta))
     int_xref <- colMeans(Xcov)
   }
+  ## a unit that never participates has its participation dummy at minus infinity; not counted (.ud_zero_levels)
+  zl <- if (is.null(part_fe) || .cpb_fl(.cpb_support(ifit))) character(0) else .ud_zero_levels(y, data[[part_fe]])
 
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), Zpart = stats::model.matrix(pfit),
@@ -215,7 +220,7 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
                  weights = w_all, nobs_weighted = if (is.null(w_all)) length(y) else sum(w_all),
                  cluster = if (is.character(cluster)) cluster else NULL,
                  loglik = as.numeric(stats::logLik(pfit)) + ifit$loglik,
-                 df = length(stats::coef(pfit)) + ifit$df, se.type = se,
+                 df = length(stats::coef(pfit)) - length(zl) + ifit$df, part_zero_units = zl, se.type = se,
                  formula = formula, part_formula = participation, refit_args = refit_args, call = match.call()), pf),
             class = "hurdle_cpb")
 }
@@ -237,6 +242,7 @@ print.hurdle_cpb <- function(x, ...) {
   cat("Intensity alpha (shape):", round(x$intensity$alpha, 4), "\n")
   .cpb_lower_note(x$intensity$alpha)
   for (nt in .sep_note(x$part_separation, "participation")) cat(nt, "\n")
+  .ud_zero_df_note(x$part_zero_units, "participation dummy", "participation dummies")
   invisible(x)
 }
 

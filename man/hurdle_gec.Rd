@@ -29,7 +29,9 @@ to the intensity's right-hand side.}
 
 \item{part_fe}{Optional column name for fixed effects in the participation
 model (added as factor dummies), whose slopes carry the dummy logit's
-incidental-parameters bias in short panels (see \code{\link[=hurdle_cpb]{hurdle_cpb()}}).}
+incidental-parameters bias in short panels (see \code{\link[=hurdle_cpb]{hurdle_cpb()}}). The dummy
+of a unit that never participates is not counted in the degrees of freedom
+(see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}.}

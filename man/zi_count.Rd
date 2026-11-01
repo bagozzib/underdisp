@@ -32,7 +32,9 @@ model; defaults to the count right-hand side.}
 \item{fe}{Optional fixed-effects column for the count equation (factor dummies).}
 
 \item{zero_fe}{Optional fixed-effects column for the inflation equation
-(factor dummies); zero-equation fixed effects are opt-in.}
+(factor dummies); zero-equation fixed effects are opt-in. In either
+equation the dummy of a unit with no positive count is not counted in the
+degrees of freedom (see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
 
 \item{link}{Link for the inflation probability: \code{"logit"} (default),
 \code{"probit"}, or \code{"cloglog"}. Positive inflation coefficients raise the

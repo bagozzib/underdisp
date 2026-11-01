@@ -61,8 +61,8 @@
 #' correction requires) and the corrected estimate is
 #' `2 * full - mean(halves)`. In the package's fixed-effects bias Monte Carlo
 #' (150 units, alpha = 0.5) the alpha bias at T = 6/10/20/40 falls from
-#' -0.122/-0.071/-0.036/-0.018 (T times the bias is about -0.71 throughout) to
-#' +0.009/+0.005/+0.000/-0.000. On the floor support the bias is larger
+#' -0.122/-0.071/-0.036/-0.018 (T times the bias is -0.71 to -0.73 throughout) to
+#' +0.008/+0.004/+0.000/-0.001. On the floor support the bias is larger
 #' (-0.153/-0.100/-0.057/-0.033), and the correction leaves 23 to 30 percent
 #' of it. With correction on, `coefficients` and `alpha`
 #' are the corrected estimates (the maximum-likelihood values are kept in
@@ -73,15 +73,15 @@
 #' (see Short panels above). The correction leaves the estimator's asymptotic
 #' variance unchanged (Dhaene and Jochmans 2015) but adds variance in short
 #' panels. In the package's simulations (40 units, alpha = 0.5, a slope with no
-#' bias to remove) the corrected slope's standard deviation was 28 percent above
-#' the uncorrected slope's at T = 6 and 14 percent at T = 12, while alpha's bias
-#' fell from -0.13 and -0.06 to under 0.01; where the slopes' own bias is small
-#' next to their standard error, the uncorrected fit (`bias_correct = "none"`)
-#' estimates them more precisely. With `se = "bootstrap"` each replicate is
+#' bias to remove) the corrected slope's standard deviation was 19 percent above
+#' the uncorrected slope's at T = 6 and 13 percent at T = 12, while alpha's bias
+#' fell from -0.13 and -0.06 to +0.011 and +0.004; where the slopes' own bias is
+#' small next to their standard error, the uncorrected fit
+#' (`bias_correct = "none"`) estimates them more precisely. With `se = "bootstrap"` each replicate is
 #' corrected the same way (its two half-panel refits; the validity gate below is
 #' a check on the data, made once), so the standard errors include that variance
 #' and the bootstrap takes about three times as long. In the same simulations the
-#' corrected slope's 95% interval covered 0.88 at T = 6 and 0.94 at T = 12 (0.81
+#' corrected slope's 95% interval covered 0.91 at T = 6 and 0.94 at T = 12 (0.85
 #' and 0.89 with uncorrected replicates). On the floor support the replicates stay
 #' uncorrected and the interval is centered on the corrected estimate, as before
 #' version 0.2.0.

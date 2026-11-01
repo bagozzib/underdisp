@@ -47,9 +47,9 @@ below its maximum on both sides. On King's support that cut is close to
 calibrated, because the probabilities change continuously with the parameters.
 The simulations from the CPB cover nine designs (n from 200 to 1,000, true
 \code{alpha} 0.3, 0.5 and 0.7). There the first-order 95\% interval covers between
-0.935 and 0.956, 0.946 on average, and more of its misses fall above the upper
+0.940 and 0.956, 0.947 on average, and more of its misses fall above the upper
 limit than below the lower one. With \code{B = 39} replicates, the calibrated
-interval covers 0.950 on average in the same simulations. It is about 12\%
+interval covers 0.948 on average in the same simulations. It is about 12\%
 longer, and its misses are more nearly balanced.
 
 On the floor support the cut is not calibrated. The support

@@ -20,11 +20,8 @@ coef.cpb_fe <- function(object, ...) object$coefficients
 #' @method logLik hurdle_cpb
 #' @export
 logLik.hurdle_cpb <- function(object, ...) {
-  idf <- if (!is.null(object$intensity$df)) object$intensity$df
-         else length(object$intensity$coefficients) + 1L
-  df <- length(stats::coef(object$participation)) + idf
   ll <- as.numeric(stats::logLik(object$participation)) + object$intensity$loglik
-  structure(ll, df = df, nobs = nobs(object), class = "logLik")
+  structure(ll, df = .ud_twopart_df(object), nobs = nobs(object), class = "logLik")
 }
 #' @method nobs hurdle_cpb
 #' @export

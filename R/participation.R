@@ -20,6 +20,34 @@
 ## participates has its dummy at infinity, as in any fixed-effects logit).
 ## ---------------------------------------------------------------------------
 
+## The levels of a two-part fit's fixed-effects column whose rows have no positive count (none when no row has one:
+## the fits then warn that every count is zero). Such a unit adds nothing to the likelihood: its dummy in the
+## participation or zero equation, and its count effect, sit at their limits, where every one of its rows has
+## probability one. As fixest leaves such units out of a fixed-effects fit, the hurdle and zero-inflated fits do not
+## count those parameters in their degrees of freedom, whichever equation carries them, so that the two kinds of
+## model are charged alike on the same data (CPB fits on the floor support keep the count of versions before 0.2.0).
+.ud_zero_levels <- function(y, unit) {
+  if (is.null(unit)) return(character(0))
+  pos <- tapply(y > 0, as.character(unit), any)
+  if (!any(pos)) character(0) else names(pos)[!pos]
+}
+
+## a hurdle's degrees of freedom: the stored count, or for an object without one the count of its two parts
+.ud_twopart_df <- function(m) {
+  if (!is.null(m$df)) return(m$df)
+  idf <- if (!is.null(m$intensity$df)) m$intensity$df else length(m$intensity$coefficients) + 1L
+  length(stats::coef(m$participation)) + idf
+}
+
+## the print methods' note on the units .ud_zero_levels() found (`one`, `many`: the parameters, singular and plural)
+.ud_zero_df_note <- function(units, one, many) {
+  k <- length(units)
+  if (!k) return(invisible(NULL))
+  cat(if (k == 1L) sprintf("Note: 1 unit has no positive count. Its %s is at the limit", one)
+      else sprintf("Note: %d units have no positive count. Their %s are at the limit", k, many),
+      " and not counted in the degrees of freedom.\n", sep = "")
+}
+
 .part_fit_vcov <- function(pfit, type = "model", cluster = NULL) {
   V <- tryCatch(stats::vcov(pfit), error = function(e) NULL)
   if (is.null(V) || type == "model") return(V)

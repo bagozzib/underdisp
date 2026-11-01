@@ -21,7 +21,7 @@ that is smaller).
 \description{
 The interval inverts the likelihood-ratio test of \code{alpha}, re-maximizing the
 coefficients at each value. By default the cut is the chi-square one (a
-first-order interval). On King's support it covers between 0.935 and 0.956 in
+first-order interval). On King's support it covers between 0.940 and 0.956 in
 simulations from the CPB. On the floor support it covers about 0.90 to 0.94,
 with most misses on the upper side, because the estimate of \code{alpha} is biased
 toward zero there (\code{\link[=calibrate_alpha]{calibrate_alpha()}} explains the mechanism).

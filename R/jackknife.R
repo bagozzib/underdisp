@@ -10,7 +10,7 @@
 ## which removes the leading 1/T bias term. In the package's fixed-effects bias
 ## Monte Carlo (150 units, alpha 0.5):
 ## on King's support the alpha bias -0.122/-0.071/-0.036/-0.018 at
-## T = 6/10/20/40 falls to +0.009/+0.005/+0.000/-0.000; on the floor support
+## T = 6/10/20/40 falls to +0.008/+0.004/+0.000/-0.001; on the floor support
 ## -0.153/-0.100/-0.057/-0.033 falls to -0.046/-0.024/-0.013/-0.009. Within each
 ## unit, rows are split in time order (the fits' `time` argument, which the
 ## correction requires).

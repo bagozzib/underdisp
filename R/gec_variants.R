@@ -18,7 +18,9 @@
 #'   to the intensity's right-hand side.
 #' @param part_fe Optional column name for fixed effects in the participation
 #'   model (added as factor dummies), whose slopes carry the dummy logit's
-#'   incidental-parameters bias in short panels (see [hurdle_cpb()]).
+#'   incidental-parameters bias in short panels (see [hurdle_cpb()]). The dummy
+#'   of a unit that never participates is not counted in the degrees of freedom
+#'   (see [compare_models()], Degrees of freedom).
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`.
 #' @param offset Optional offset (log scale) for the intensity: a numeric vector
@@ -96,6 +98,7 @@ hurdle_gec <- function(formula, data, participation = NULL, part_fe = NULL,
   beta <- ifit$coefficients
   off_all <- if (is.null(offset)) 0 else if (is.character(offset)) as.numeric(data[[offset]]) else as.numeric(offset)
   lambda_full <- as.numeric(exp(off_all + Xall %*% beta))
+  zl <- .ud_zero_levels(y, if (!is.null(part_fe)) data[[part_fe]])   # never participate: not counted (.ud_zero_levels)
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), Zpart = stats::model.matrix(pfit),
                  y = as.integer(y), p_full = as.numeric(stats::fitted(pfit)),
@@ -105,7 +108,7 @@ hurdle_gec <- function(formula, data, participation = NULL, part_fe = NULL,
                  part_xref = .fe_dummy_ref(colMeans(stats::model.matrix(pfit)), stats::model.matrix(pfit), d, part_fe,
                                            .ident_binary),
                  loglik = as.numeric(stats::logLik(pfit)) + ifit$loglik,
-                 df = length(stats::coef(pfit)) + ifit$df, se.type = se,
+                 df = length(stats::coef(pfit)) - length(zl) + ifit$df, part_zero_units = zl, se.type = se,
                  cluster = if (is.character(cluster)) cluster else NULL, max.support = ifit$max.support,
                  link = link, part_fe = part_fe,
                  weights = w_all, nobs_weighted = if (is.null(w_all)) length(y) else sum(w_all),
@@ -126,6 +129,7 @@ print.hurdle_gec <- function(x, ...) {
   cat("\nIntensity (zero-truncated GEC) coefficients:\n"); print(round(x$intensity$coefficients, 4))
   cat(sprintf("Intensity dispersion delta: %.3f  [%s]\n", x$delta, disp))
   for (nt in .sep_note(x$part_separation, "participation")) cat(nt, "\n")
+  .ud_zero_df_note(x$part_zero_units, "participation dummy", "participation dummies")
   invisible(x)
 }
 
@@ -173,8 +177,7 @@ predict.hurdle_gec <- function(object, newdata = NULL,
 #' @export
 logLik.hurdle_gec <- function(object, ...) {
   ll <- as.numeric(stats::logLik(object$participation)) + object$intensity$loglik
-  df <- length(stats::coef(object$participation)) + object$intensity$df
-  attr(ll, "df") <- df; attr(ll, "nobs") <- nobs(object); class(ll) <- "logLik"; ll
+  attr(ll, "df") <- .ud_twopart_df(object); attr(ll, "nobs") <- nobs(object); class(ll) <- "logLik"; ll
 }
 
 #' @method nobs hurdle_gec
@@ -196,7 +199,9 @@ nobs.hurdle_gec <- function(object, ...) if (is.null(object$nobs_weighted)) obje
 #' @param zero One-sided formula for the structural-zero logit; defaults to the
 #'   count formula's right-hand side.
 #' @param zero_fe Optional column name for fixed effects in the zero-inflation
-#'   equation, entered as factor dummies (opt-in).
+#'   equation, entered as factor dummies (opt-in). The dummy of a unit with no
+#'   positive count is not counted in the degrees of freedom (see
+#'   [compare_models()], Degrees of freedom).
 #' @param se Coefficient inference: `"none"` (default) or `"bootstrap"`.
 #' @param B Bootstrap resamples.
 #' @param cluster Optional cluster (column name or vector) for the bootstrap.
@@ -347,8 +352,10 @@ zi_gec <- function(formula, data, zero = NULL, zero_fe = NULL, se = c("none", "b
     se.zero[zcov] <- .ud_boot_stats(boot, paste0("zero:", zcov), r$g[zcov], normal = TRUE)$se
   }
   Ti0 <- stats::delete.response(stats::terms(formula))
+  zl <- .ud_zero_levels(r$y, if (!is.null(zero_fe)) data[[zero_fe]])   # their zero dummies at the limit: not counted
   structure(list(coefficients = r$b, delta = r$delta, dispersion = r$delta, zero_coef = r$g, zero.coefficients = r$g,
-                 loglik = r$ll, iterations = r$it, df = r$pb + 1L + r$pg, n = r$n, y = r$y,
+                 loglik = r$ll, iterations = r$it, df = r$pb + 1L + r$pg - length(zl), zero_fe_zero_units = zl,
+                 n = r$n, y = r$y,
                  offset = r$off, offset_name = offset_name,
                  pi_full = as.numeric(stats::plogis(r$Z %*% r$g)), lambda_full = lambda_full, p0_full = p0_full,
                  separation = sep,
@@ -378,6 +385,7 @@ print.zi_gec <- function(x, ...) {
   cat("\nZero-inflation (logit link) -- positive coefficients raise P(structural zero), i.e. lower the\nchance of a positive count (the opposite direction from a hurdle participation model):\n")
   print(round(x$zero_coef, 4))
   cat("Mean structural-zero probability:", round(mean(x$pi_full), 3), "\n")
+  .ud_zero_df_note(x$zero_fe_zero_units, "zero-equation dummy", "zero-equation dummies")
   if (isFALSE(x$converged)) cat("Note: the optimizer did not report convergence.\n")
   .zi_separation_note(x)
   invisible(x)

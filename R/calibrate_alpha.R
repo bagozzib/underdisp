@@ -4,7 +4,7 @@
 ## On King's support, 0..ceiling(lambda_i/(1-alpha)), the probabilities are
 ## continuous in the parameters (the support point that enters as a ceiling
 ## crosses an integer carries mass that grows from zero), and in simulations
-## the first-order interval covers 0.935 to 0.956. On the floor support,
+## the first-order interval covers 0.940 to 0.956. On the floor support,
 ## 0..floor(lambda_i/(1-alpha)), the support moves with the parameters in
 ## jumps, and it does so only through the log-ceiling coefficients (the
 ## intercept less log(1-alpha), and the slopes). Those are endpoint-type
@@ -35,9 +35,9 @@
 #' calibrated, because the probabilities change continuously with the parameters.
 #' The simulations from the CPB cover nine designs (n from 200 to 1,000, true
 #' `alpha` 0.3, 0.5 and 0.7). There the first-order 95% interval covers between
-#' 0.935 and 0.956, 0.946 on average, and more of its misses fall above the upper
+#' 0.940 and 0.956, 0.947 on average, and more of its misses fall above the upper
 #' limit than below the lower one. With `B = 39` replicates, the calibrated
-#' interval covers 0.950 on average in the same simulations. It is about 12%
+#' interval covers 0.948 on average in the same simulations. It is about 12%
 #' longer, and its misses are more nearly balanced.
 #'
 #' On the floor support the cut is not calibrated. The support

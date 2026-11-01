@@ -43,7 +43,10 @@ logit link a conditional logit on the same data
 (\code{survival::clogit()}) gives participation slopes free of that bias,
 and an analytical correction (the \pkg{bife} package, for the logit and
 the probit) reduces it to second order; the hurdle's predictions and
-quantities of interest use the dummy logit's unit effects.}
+quantities of interest use the dummy logit's unit effects. On King's
+support the dummy of a unit that never participates, at minus infinity, is
+not counted in the degrees of freedom (see \code{\link[=compare_models]{compare_models()}}, Degrees of
+freedom).}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}. Positive participation coefficients raise the probability of
