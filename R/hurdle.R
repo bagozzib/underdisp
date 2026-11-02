@@ -278,7 +278,7 @@ predict.hurdle_cpb <- function(object, newdata = NULL,
     need <- setdiff(all.vars(stats::delete.response(stats::terms(object$participation))), names(newdata))
     if (length(need)) stop("'newdata' is missing participation variable(s): ", paste(need, collapse = ", "), ".")
   }
-  p <- .ud_glm_predict(object$participation, newdata)
+  p <- .part_at_limit(.ud_glm_predict(object$participation, newdata), object, newdata)
   if (type == "participation") return(as.numeric(p))
   ## newdata = NULL: use the stored FULL-length intensity (lambda_full, one per
   ## observation), NOT predict(intensity) which returns only the positives-only

@@ -159,7 +159,7 @@ predict.hurdle_gec <- function(object, newdata = NULL,
   if (isTRUE(se.fit) || match.arg(interval) != "none")
     return(.ud_predict_ci(object, newdata, type, se.fit, match.arg(interval), level, offset = offset))
   if (is.null(newdata)) { p <- object$p_full; lam <- object$lambda_full } else {
-    p <- .ud_glm_predict(object$participation, newdata)
+    p <- .part_at_limit(.ud_glm_predict(object$participation, newdata), object, newdata)
     Terms <- stats::delete.response(stats::terms(object$formula))
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")

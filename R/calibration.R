@@ -215,7 +215,7 @@
     pg   <- fit$participation
     peta <- .binary_eta_newdata(stats::delete.response(stats::terms(pg)), pg$xlevels,
                                 stats::coef(pg), newdata, contrasts = pg$contrasts)
-    p    <- as.numeric(stats::family(pg)$linkinv(peta))
+    p    <- .part_at_limit(as.numeric(stats::family(pg)$linkinv(peta)), fit, newdata)
     b    <- fit$int_beta
     Xb   <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts, names(b)) %*% b
     Xb   <- Xb + off(fit$intensity)
@@ -248,7 +248,7 @@
     y <- yof(fit$terms)
   } else if (inherits(fit, "hurdle_count")) {
     fam  <- .count_fam(fit$family)
-    p    <- .ud_glm_predict(fit$participation, newdata)
+    p    <- .part_at_limit(.ud_glm_predict(fit$participation, newdata), fit, newdata)
     lam  <- exp(as.numeric(predict(fit$intensity, newdata = newdata, type = "link", offset = offset)))   # natural parameter
     P <- t(mapply(function(pi, li) { zt <- fam$pvec(li, fit$theta, kmax); zt[1] <- 0
                                      zt <- zt / max(1 - fam$p0(li, fit$theta), 1e-12)
@@ -276,7 +276,7 @@
     if (isTRUE(fit$truncated)) P <- .zt_rows(P)
     y   <- yof(fit$terms)
   } else if (inherits(fit, "hurdle_gec")) {
-    p    <- .ud_glm_predict(fit$participation, newdata)
+    p    <- .part_at_limit(.ud_glm_predict(fit$participation, newdata), fit, newdata)
     Xall <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts)
     lam  <- as.numeric(exp(off(fit$intensity) + Xall[, names(fit$int_beta), drop = FALSE] %*% fit$int_beta))
     U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support); p0 <- U[, 1]; U[, 1] <- 0; U <- U / pmax(1 - p0, 1e-12)

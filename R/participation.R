@@ -32,6 +32,17 @@
   if (!any(pos)) character(0) else names(pos)[!pos]
 }
 
+## The participation probability of a hurdle in new data, at the limit for the units .ud_zero_levels() found. The
+## dummy of a unit with no positive count is at minus infinity, but the glm stops at a finite value there, and that
+## value plus the covariates can give the unit's new rows any probability; the limit gives them zero, whatever the
+## covariates, as the zero-inflated fits' count effect at its limit does.
+.part_at_limit <- function(p, object, newdata) {
+  zl <- object$part_zero_units; pf <- object$part_fe
+  if (is.null(newdata) || !length(zl) || length(pf) != 1L || is.null(newdata[[pf]])) return(p)
+  p[as.character(newdata[[pf]]) %in% zl] <- 0
+  p
+}
+
 ## a hurdle's degrees of freedom: the stored count, or for an object without one the count of its two parts
 .ud_twopart_df <- function(m) {
   if (!is.null(m$df)) return(m$df)

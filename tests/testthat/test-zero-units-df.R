@@ -40,12 +40,39 @@ test_that("the hurdles do not count the participation dummies of units that neve
   expect_setequal(hc$part_zero_units, p$zu)
 })
 
+test_that("in new data the hurdles give such a unit's rows the participation probability at the limit", {
+  p <- zero_df_panel()
+  ## a covariate far out: glm's finite dummy for a zero unit plus a large slope term would give such a row a
+  ## probability near one
+  nd <- p$full[p$full$t == 1, ]; nd$x <- 100; nd$y <- 1L
+  zu <- nd$unit %in% p$zu
+  h <- hurdle_cpb(y ~ x, p$full, participation = ~ x, fe = "unit", part_fe = "unit", se = "none")
+  ph <- predict(h, newdata = nd, type = "participation")
+  expect_identical(ph[zu], rep(0, sum(zu)))
+  expect_true(all(ph[!zu] > 0.5))
+  ## the held-out scorers read the same probability: a positive count of such a unit is impossible
+  P <- underdisp:::.pmf_and_y_newdata(h, nd, kmax = 5L)$P
+  expect_identical(P[zu, 1], rep(1, sum(zu)))
+  ## fitted values are unchanged (the glm's), and the floor support predicts as before 0.2.0
+  expect_identical(h$p_full, as.numeric(fitted(h$participation)))
+  hf <- hurdle_cpb(y ~ x, p$full, participation = ~ x, fe = "unit", part_fe = "unit", se = "none", support = "floor")
+  expect_identical(predict(hf, newdata = nd, type = "participation"),
+                   as.numeric(predict(hf$participation, newdata = nd, type = "response")))
+  ## (hurdle_count's intensity dummies cannot predict a unit it never saw positive, so its intensity is pooled here)
+  hc <- hurdle_count(y ~ x, p$full, family = "poisson", participation = ~ x, part_fe = "unit", se = "none")
+  expect_identical(predict(hc, newdata = nd, type = "participation")[zu], rep(0, sum(zu)))
+  expect_identical(underdisp:::.pmf_and_y_newdata(hc, nd, kmax = 5L)$P[zu, 1], rep(1, sum(zu)))
+})
+
 test_that("hurdle_gec, zi_gec, zi_count and zi_cpb(zero_fe) do not count them either", {
   skip_on_cran()
   p <- zero_df_panel()
   g <- hurdle_gec(y ~ x, p$full, participation = ~ x, part_fe = "unit")
   gs <- hurdle_gec(y ~ x, p$sub, participation = ~ x, part_fe = "unit")
   expect_identical(g$df, gs$df); expect_setequal(g$part_zero_units, p$zu)
+  nd <- p$full[p$full$t == 1, ]; nd$x <- 100; nd$y <- 1L; zu <- nd$unit %in% p$zu
+  expect_identical(predict(g, newdata = nd, type = "participation")[zu], rep(0, sum(zu)))
+  expect_identical(underdisp:::.pmf_and_y_newdata(g, nd, kmax = 5L)$P[zu, 1], rep(1, sum(zu)))
   zg <- suppressWarnings(zi_gec(y ~ x, p$full, zero = ~ 1, zero_fe = "unit"))
   zgs <- suppressWarnings(zi_gec(y ~ x, p$sub, zero = ~ 1, zero_fe = "unit"))
   expect_identical(zg$df, zgs$df); expect_setequal(zg$zero_fe_zero_units, p$zu)

@@ -36,7 +36,7 @@ predict.hurdle_count <- function(object, newdata = NULL,
     return(.ud_predict_ci(object, newdata, type, se.fit, match.arg(interval), level, offset = offset))
   if (is.null(newdata)) { p <- object$p_full; mu <- object$lambda_full }
   else {
-    p  <- .ud_glm_predict(object$participation, newdata)
+    p  <- .part_at_limit(.ud_glm_predict(object$participation, newdata), object, newdata)
     mu <- exp(predict(object$intensity, newdata = newdata, type = "link", offset = offset))   # natural parameter
   }
   bad <- is.na(mu) | is.na(p); mu[bad] <- 1                    # a missing covariate predicts NA

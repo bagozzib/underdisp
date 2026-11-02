@@ -230,6 +230,15 @@
   unit where the hurdles counted one. The fits record the units and their
   print methods give the number (`?compare_models`, Degrees of freedom). CPB
   fits on the floor support count as before.
+* In new data, the hurdles (`hurdle_cpb()`, `hurdle_gec()`, `hurdle_count()`)
+  give the rows of such a unit the participation probability at the limit,
+  zero, in `predict()`, `score()`, `cv_score()` and the intervals built on them.
+  The participation glm stops at a finite value for the unit's dummy, and
+  before, that value plus the covariates set the unit's probability in new
+  rows: with a strong covariate (last year's participation, say) it could be
+  near one, where the zero-inflated fits gave the same rows zero. Fitted values,
+  likelihoods and degrees of freedom are unchanged. CPB fits on the floor
+  support predict as before.
 * The participation equation of `hurdle_cpb()`, `hurdle_gec()` and
   `hurdle_count()` is checked for separation by the zero-inflated fits' rule.
   With `cluster` its standard errors are cluster-robust (`hurdle_count()`

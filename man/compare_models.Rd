@@ -47,8 +47,11 @@ and a zero-inflated model fit to the same panel are charged alike. The fits
 record the units (\code{part_zero_units} in the hurdles; \code{zero_units} and
 \code{zero_fe_zero_units} in \code{\link[=zi_cpb]{zi_cpb()}}; \code{fe_zero_units} and \code{zero_fe_zero_units}
 in \code{\link[=zi_count]{zi_count()}}; \code{zero_fe_zero_units} in \code{\link[=zi_gec]{zi_gec()}}), and their print
-methods give the number. CPB fits on the floor support (\code{support = "floor"})
-count these parameters as versions before 0.2.0 did.
+methods give the number. In new data (\code{predict()}, \code{\link[=score]{score()}}, \code{\link[=cv_score]{cv_score()}})
+the hurdles give such a unit's rows the participation probability at that
+limit, zero, as the zero-inflated fits give them a count effect at its limit.
+CPB fits on the floor support (\code{support = "floor"}) count these parameters,
+and predict, as versions before 0.2.0 did.
 }
 
 \examples{
