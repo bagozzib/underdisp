@@ -84,10 +84,14 @@ statistic means the optimizer fell short, and no p-value is reported.
 \strong{Calibration.} Where the Poisson value is on the boundary of the family's
 parameter space (the CPB, the negative binomial), or the fit has unit fixed
 effects, the p-value is by default a parametric bootstrap with 199
-replicates. The one-sided boundary statistic is skewed toward rejection in
-finite samples, and unit intercepts bias the dispersion estimate toward
-underdispersion by an amount of order 1/T; in both cases the asymptotic
-distribution over-rejects. Where the Poisson value is interior, the
+replicates, which does not depend on the direction in which the asymptotic
+reference errs. For the CPB it errs toward rejection: in the package's
+simulations from the Poisson the asymptotic boundary mixture rejected 7 to
+10 percent of 5\% tests with 60 to 200 observations, and 54 to 92 percent
+with unit fixed effects, whose intercepts bias the dispersion estimate toward
+underdispersion by an amount of order 1/T. The package has not simulated the
+negative binomial's boundary test, whose p-value the same rule bootstraps.
+Where the Poisson value is interior, the
 asymptotic distribution is used unless the estimated mean parameters shift
 it too far: to first order they move the signed root toward
 underdispersion by \eqn{p/\sqrt{2n}} standard deviations for \eqn{p} mean

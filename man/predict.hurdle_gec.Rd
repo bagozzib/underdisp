@@ -18,7 +18,10 @@
 \arguments{
 \item{object}{A \code{"hurdle_gec"} object.}
 
-\item{newdata}{Optional covariate profiles (intensity and participation).}
+\item{newdata}{Optional covariate profiles (intensity and participation). A
+\code{part_fe} unit the fit has not seen, or every row when that column is
+absent, enters at the reference unit, and a unit at a limit at that limit
+(see \code{part_fe} in \code{\link[=hurdle_gec]{hurdle_gec()}}).}
 
 \item{type}{\code{"response"} (marginal E(Y)), \code{"participation"} (P(Y>0)), or
 \code{"intensity"} (E(Y | Y>0)).}

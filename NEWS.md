@@ -17,10 +17,13 @@
 * The earlier definition remains available through `support = "floor"` in
   `cpb()`, `cpb_fe()`, `hurdle_cpb()`, `zi_cpb()`, `dcpb()`, `pcpb()`, `qcpb()`,
   `rcpb()`, `rhurdle_cpb()`, `rzicpb()`, `compare_dispersion()`, and
-  `ud_screen()`, and reproduces 0.1.x results bit for bit (the zero-inflated fits
-  can reach higher maxima; see below). A fit stores its `support` and every
-  method reads it; an object saved by an earlier version is treated as a
-  floor-support fit.
+  `ud_screen()`, and reproduces the estimates, log-likelihoods and degrees of
+  freedom of 0.1.x bit for bit (the zero-inflated fits can reach higher maxima;
+  see below). The corrections below that are not tied to King's support apply
+  to floor-support fits too: their intervals, the reference unit of a
+  fixed-effects fit, and its predictions for the units it estimated. A fit
+  stores its `support` and every method reads it; an object saved by an
+  earlier version is treated as a floor-support fit.
 * On King's support the first-order profile interval for `alpha` covers
   between 0.940 and 0.956 in simulations from the CPB. On the floor support it
   covers 0.90 to 0.94, with most misses on the upper side. `calibrate_alpha()`
@@ -35,9 +38,10 @@
 * In the fixed-effects bias simulations (150 units, `alpha` = 0.5) the bias of
   `cpb_fe()`'s `alpha` under King's definition is -0.122 at T = 6 and -0.018 at
   T = 40 (floor support: -0.153 and -0.033), and `bias_correct = "jackknife"`
-  removes it to within 0.009 (on the floor support it leaves 23 to 30 percent).
-  The jackknife's validity gate refuses 9 to 13 percent of time-homogeneous
-  panels (floor support: about 7 percent).
+  removes it to +0.008 at T = 6 and to within 0.004 at T = 10 to 40 (on the
+  floor support it leaves 23 to 30 percent). The jackknife's validity gate
+  refuses 9 to 13 percent of time-homogeneous panels (floor support: 5.5 to 9
+  percent).
 * A King's-support fit whose `alpha` reaches the equidispersed limit (above
   0.999) warns that the data show no underdispersion, in place of the support
   guard's warning, and `dispersion_test()` and `summary()` report the boundary
@@ -247,6 +251,30 @@
   The fits record the units
   (`part_one_units`); their dummies are counted in the degrees of freedom as
   before.
+* The zero-inflated fits treat their zero equation's units the same way in new
+  data: a `zero_fe` unit with no positive count gets the structural-zero
+  probability one, and one whose every count is positive zero
+  (`zero_fe_one_units`), in `zi_cpb()` on King's support, `zi_gec()` and
+  `zi_count()`; a count-equation unit with no positive count (`zi_cpb(fe =)`
+  on King's support, `zi_count(fe =)`) predicts a count mean of zero, its
+  zeros certain. They used the optimizer's finite stopping values, which a
+  covariate far from its fitted range could move anywhere.
+* A fixed-effects unit the fit has not seen, or `newdata` without the unit
+  column, now enters the binary equations (`part_fe`, `zero_fe`) and the
+  dummy-coded count equations (`count_reg(fe =)`, `hurdle_count(fe =)`,
+  `zi_count(fe =)`) at the reference unit of the units the data identify, the
+  reference `first_difference()` uses, in `predict()`, `score()`, `cv_score()`
+  and the intervals built on them; held-out scoring does the same for an unseen
+  level of any factor (a held-out block's own units or years). Before,
+  `predict()` stopped at such a unit in every class but the concentrated
+  fixed-effects fits, `score()` stopped in `hurdle_gec()`, `hurdle_count()`,
+  `zi_gec()` and `zi_count()`, `hurdle_count(fe =)` could not score any row of
+  a unit with no positive count (its intensity never sees one), and the
+  held-out scores of `hurdle_cpb()` and `zi_cpb()` placed an unseen unit at the
+  mean of every dummy, which the diverging dummies of the units at a limit
+  pulled toward probabilities of zero or one. On the floor support those two
+  keep that rule, as before 0.2.0. Rows of units the fit has seen are computed
+  as before.
 * The participation equation of `hurdle_cpb()`, `hurdle_gec()` and
   `hurdle_count()` is checked for separation by the zero-inflated fits' rule.
   With `cluster` its standard errors are cluster-robust (`hurdle_count()`
@@ -535,6 +563,38 @@
   identify, as the other two-part classes do.
 * `print()` of a CPB fit shows the median largest feasible count, in place of
   the continuous ceiling. The help pages lose no text to escaped percent signs.
+* Several fixed-effects columns in a binary equation (`part_fe = c("unit",
+  "period")` in `hurdle_count()`, `zero_fe` in `zi_count()`, `zi_cpb()` and
+  `zi_gec()`, and the same in `hurdle_cpb()` and `hurdle_gec()`) fit again, as
+  in 0.1.x; 0.2.0's bookkeeping of the units at a limit read only one column
+  and stopped. A level of any of the columns with no positive count is left out
+  of the degrees of freedom.
+* `dispersion_test()` of a `cpb_fe()` or `gec_fe()` fit puts a unit with no
+  positive count 30 log units below its own largest linear predictor in the
+  Poisson null, as the fits do. The absolute sentinel it kept made the
+  statistic depend on the centring of a covariate (with a year trend, an LR of
+  2e10 in place of 52). Floor-support `cpb_fe()` fits keep the earlier null,
+  as their own fit does.
+* On the floor support, `zi_cpb(fe =, method = "ml")` again counts every unit
+  in its degrees of freedom, as before 0.2.0; and on King's support its
+  reference unit averages every unit with a positive count, as `method = "em"`
+  does, rather than only those with a count of two or more.
+* `ame(B > 0)` refits on the fit's own CPB support, so an object saved before
+  0.2.0 is refit on the floor support.
+* `first_difference(B > 0)` of `hurdle_cpb()` and `zi_cpb()` resamples the
+  fit's `cluster` when it has one, as the fits' bootstraps and `ame()` do, and
+  a jackknife-corrected hurdle intensity's replicates follow the fit's gate on
+  either support.
+* On King's support, `predict(type = "prob")` and `simulate()` return `NA`, with
+  a warning, for a rate past the 1e5-term cap, as the distribution functions
+  do, and so do the draws of `calibrate_alpha()` (the replicate is then
+  dropped). They returned zero and a point mass.
+* `compare_models()` says in a message when a single-equation fixed-effects
+  fit (`cpb_fe()`, `gec_fe()`, `count_reg(fe =)`), which counts the effect of
+  every unit, sits beside a two-part fit that leaves the units with no positive
+  count out of its degrees of freedom (`?compare_models`, Degrees of freedom).
+* The truncated means of `hurdle_gec()` and `hurdle_count()` share one floor
+  on `1 - P(0)`, 1e-12, in `predict()`, `fitted()` and the first differences.
 
 # underdisp 0.1.2
 

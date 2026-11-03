@@ -82,10 +82,14 @@
 #' **Calibration.** Where the Poisson value is on the boundary of the family's
 #' parameter space (the CPB, the negative binomial), or the fit has unit fixed
 #' effects, the p-value is by default a parametric bootstrap with 199
-#' replicates. The one-sided boundary statistic is skewed toward rejection in
-#' finite samples, and unit intercepts bias the dispersion estimate toward
-#' underdispersion by an amount of order 1/T; in both cases the asymptotic
-#' distribution over-rejects. Where the Poisson value is interior, the
+#' replicates, which does not depend on the direction in which the asymptotic
+#' reference errs. For the CPB it errs toward rejection: in the package's
+#' simulations from the Poisson the asymptotic boundary mixture rejected 7 to
+#' 10 percent of 5% tests with 60 to 200 observations, and 54 to 92 percent
+#' with unit fixed effects, whose intercepts bias the dispersion estimate toward
+#' underdispersion by an amount of order 1/T. The package has not simulated the
+#' negative binomial's boundary test, whose p-value the same rule bootstraps.
+#' Where the Poisson value is interior, the
 #' asymptotic distribution is used unless the estimated mean parameters shift
 #' it too far: to first order they move the signed root toward
 #' underdispersion by \eqn{p/\sqrt{2n}} standard deviations for \eqn{p} mean
@@ -262,10 +266,15 @@ dispersion_test <- function(object, alternative = c("two.sided", "under", "over"
   trunc <- isTRUE(object$truncated)
   s <- .ud_colscale(X, w); Xs <- sweep(X, 2, s, "/")
   sy <- as.numeric(rowsum(w * Y, u)[, 1])
+  ## a unit with no positive count sits 30 log units below its own largest linear predictor, as in the fits
+  ## (an absolute -30 put the rates of a unit with an uncentred covariate anywhere); the floor support's cpb_fe()
+  ## keeps the absolute sentinel of versions before 0.2.0, as its fit does
+  rel <- !(inherits(object, "cpb_fe") && .cpb_fl(.cpb_support(object)))
+  ug <- factor(u, levels = sort(unique(u)))                    # the units in rowsum()'s order
   conc <- function(b) {
     eta <- off + as.numeric(Xs %*% b)
     a <- log(pmax(sy, 1e-300)) - log(as.numeric(rowsum(w * exp(eta), u)[, 1]))
-    a[sy <= 0] <- -30
+    a[sy <= 0] <- if (rel) (-30 - as.numeric(tapply(eta, ug, max)))[sy <= 0] else -30
     if (!trunc) { lam <- exp(a[u] + eta); return(list(ll = sum(w * stats::dpois(Y, lam, log = TRUE)), lam = lam)) }
     ## a unit whose counts are all one has its zero-truncated Poisson supremum
     ## at lambda -> 0 (log-likelihood 0): it is held at the floor and skipped

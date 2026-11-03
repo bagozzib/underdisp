@@ -34,7 +34,11 @@ model; defaults to the count right-hand side.}
 \item{zero_fe}{Optional fixed-effects column for the inflation equation
 (factor dummies); zero-equation fixed effects are opt-in. In either
 equation the dummy of a unit with no positive count is not counted in the
-degrees of freedom (see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
+degrees of freedom (see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom). In new
+data (with one column each) such a unit gets the structural-zero
+probability one through \code{zero_fe} and a count mean of zero through \code{fe},
+and a unit whose every count is positive the structural-zero probability
+zero.}
 
 \item{link}{Link for the inflation probability: \code{"logit"} (default),
 \code{"probit"}, or \code{"cloglog"}. Positive inflation coefficients raise the

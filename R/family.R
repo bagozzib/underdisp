@@ -5,9 +5,10 @@
 
 #' Compare count-model dispersion across the model family
 #'
-#' Fits the Poisson and negative binomial defaults alongside the two underdispersed
-#' workhorses---the soft-tail Conway--Maxwell--Poisson (fit natively, no external
-#' dependency) and the hard-ceiling CPB---and returns a comparison on both fit
+#' Fits the Poisson and negative binomial defaults alongside the underdispersed
+#' models---the soft-tail Conway--Maxwell--Poisson (fit natively, no external
+#' dependency), the hard-ceiling CPB, and the GEC, which spans both
+#' directions---and returns a comparison on both fit
 #' (log-likelihood, AIC, BIC) and calibration (mean logarithmic score and ranked
 #' probability score, lower is better, plus the fitted share of zeros against the
 #' observed share). Whether the tail is better described by an accelerated decay
@@ -36,9 +37,10 @@
 #' @param support The CPB's support for the CPB-family fits, `"ceiling"` (King's
 #'   CPB, the default) or `"floor"`; see [cpb()].
 #' @return A list with `table` (a data frame of `df`, `logLik`, `AIC`, `BIC`,
-#'   `logscore`, `rps`, and `zero_fit` per model), `obs_zero` (the observed zero
-#'   share), `nu` (the COM-Poisson dispersion, `>1` = underdispersion, `NA` if the
-#'   COM-Poisson fit failed), `alpha` (the CPB shape parameter), and
+#'   `logscore`, `rps`, `zero_fit`, and `converged` per model), `obs_zero` (the
+#'   observed zero share), `nu` (the COM-Poisson dispersion, `>1` =
+#'   underdispersion, `NA` if the COM-Poisson fit failed), `alpha` (the CPB shape
+#'   parameter), `gec_delta` (the GEC's dispersion, `NA` if its fit failed), and
 #'   `cpb_ok` (`FALSE` if the single-equation CPB could not satisfy its feasibility
 #'   constraint on the data, e.g. under heavy zero-inflation with a wide count
 #'   range: the CPB's support cannot hold the counts, which another family, or
@@ -194,9 +196,19 @@ compare_dispersion <- function(formula, data, max.support = NULL, hurdle = FALSE
 #' the other limit, plus infinity; that dummy is counted, as the zero-inflated
 #' fits count their zero-equation dummy for the unit, and in new data the
 #' hurdles give the unit's rows the participation probability one (the fits
-#' record these units in `part_one_units`). CPB fits on the floor support
+#' record these units in `part_one_units`). The zero-inflated fits give a
+#' `zero_fe` unit's rows the structural-zero probability at its limit in the
+#' same way: one for a unit with no positive count, zero for a unit whose every
+#' count is positive (`zero_fe_one_units`). CPB fits on the floor support
 #' (`support = "floor"`) count these parameters, and predict, as versions before
 #' 0.2.0 did.
+#'
+#' The rule is the two-part fits'. The single-equation fixed-effects fits
+#' ([cpb_fe()], [gec_fe()], `count_reg(fe = )`) count every unit's effect, a
+#' unit with no positive count included, as their estimators have always done;
+#' set beside a two-part fit to the same panel, such a fit is charged two AIC
+#' points per unit with no positive count that the two-part fit is not, and
+#' `compare_models()` says so in a message.
 #' @seealso [zi_test()], [compare_dispersion()]
 #' @examples
 #' \donttest{
@@ -254,5 +266,33 @@ compare_models <- function(...) {
     warning("The zero-inflation or participation equation of ", paste(rownames(out)[out$separated], collapse = ", "),
             " is separated: its log-likelihood is a supremum along a divergent ridge, so its rank on AIC/BIC rests on ",
             "terms the data do not bound (see ?zi_cpb, Separation).", call. = FALSE)
+  ## a single-equation fixed-effects fit counts every unit's effect, a two-part fit not those of a unit with no
+  ## positive count (Degrees of freedom): say so where the two kinds meet on such units
+  k1 <- vapply(models, .ud_single_zero_units, numeric(1))
+  two <- vapply(models, function(m) length(c(m$part_zero_units, m$zero_units, m$zero_fe_zero_units,
+                                              m$fe_zero_units)) > 0L, logical(1))
+  if (any(k1 > 0) && any(two))
+    message("compare_models(): ", paste(rownames(out)[k1 > 0], collapse = ", "), " count", if (sum(k1 > 0) == 1L) "s",
+            " the effect of each fixed-effects unit with no positive count (", paste(unique(k1[k1 > 0]), collapse = ", "),
+            " units), which the two-part fits leave out of their degrees of freedom, so ", if (sum(k1 > 0) == 1L) "its" else "their",
+            " AIC carries two points per such unit that theirs does not (see ?compare_models, Degrees of freedom).")
   out[order(tab[, "AIC"]), , drop = FALSE]
+}
+
+## the number of fixed-effects units with no positive count whose effect a single-equation, untruncated
+## fixed-effects fit counts in its degrees of freedom (cpb_fe(), gec_fe(), count_reg(fe = )); 0 for other fits
+.ud_single_zero_units <- function(m) {
+  if (isTRUE(m$truncated)) return(0)
+  if (inherits(m, c("cpb_fe", "gec_fe")) && !is.null(m$fe_identified)) return(sum(!m$fe_identified))
+  if (inherits(m, "count_reg") && !is.null(m$fe) && !is.null(m$X)) {
+    k <- 0
+    for (v in m$fe) {
+      cols <- colnames(m$X)[startsWith(colnames(m$X), paste0("factor(", v, ")"))]
+      if (!length(cols)) next
+      lev <- as.integer(m$X[, cols, drop = FALSE] %*% seq_along(cols))
+      k <- k + sum(!tapply(m$Y > 0, lev, any))
+    }
+    return(k)
+  }
+  0
 }

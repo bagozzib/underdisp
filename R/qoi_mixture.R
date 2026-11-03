@@ -102,14 +102,16 @@ first_difference.hurdle_cpb <- function(object, variable, from, to, B = 0, level
     if (is.null(data)) stop("Bootstrap (B > 0) requires the original 'data'.")
     ra <- .fd_refit_args(object, c("fe", "part_fe", "link"))
     ra$dots$support <- .cpb_support(object)
-    ## a refit replicate skips the jackknife's gate (King's support), so it follows the fit's own outcome: no
-    ## correction when the gate refused it
-    if (!.cpb_fl(ra$dots$support) && !is.null(ra$dots$bias_correct) && inherits(object$intensity, "cpb_fe"))
+    ## a refit replicate follows the fit's own jackknife outcome, as ame(B > 0) does: no correction when the gate
+    ## refused it on the data (on King's support a replicate skips the gate)
+    if (!is.null(ra$dots$bias_correct) && inherits(object$intensity, "cpb_fe"))
       ra$dots$bias_correct <- object$intensity$bias_correct
     refit <- function(d) do.call(hurdle_cpb, c(list(object$formula, data = d, participation = object$part_formula,
                                                     se = "none", fe = ra$fe, part_fe = ra$part_fe, link = ra$link,
                                                     offset = ra$offset, weights = ra$weights), ra$dots))
-    pt <- .fd_refit_boot(pt, refit, spec_of, data, B, level, cores, cl = if (!is.null(ra$fe)) ra$fe else ra$cluster,
+    ## the fit's cluster when it has one, else its fixed-effects units (relabelled within each drawn block), as the
+    ## fits' own bootstraps and ame(B > 0) resample
+    pt <- .fd_refit_boot(pt, refit, spec_of, data, B, level, cores, cl = if (!is.null(ra$cluster)) ra$cluster else ra$fe,
                          relabel = if (!is.null(ra$fe)) unique(c(ra$fe, if (identical(ra$part_fe, ra$fe)) ra$part_fe)))
   }
   pt
@@ -131,7 +133,7 @@ first_difference.zi_cpb <- function(object, variable, from, to, B = 0, level = 0
     args <- ra[intersect(names(ra), c("fe", "zero_fe", "method", "max.support", "maxit", "tol", "offset", "weights",
                                        "support"))]
     refit <- function(d) do.call(zi_cpb, c(list(object$formula, data = d, zero = object$zero_formula, se = "none"), args))
-    pt <- .fd_refit_boot(pt, refit, spec_of, data, B, level, cores, cl = if (!is.null(ra$fe)) ra$fe else ra$cluster,
+    pt <- .fd_refit_boot(pt, refit, spec_of, data, B, level, cores, cl = if (!is.null(ra$cluster)) ra$cluster else ra$fe,
                          relabel = if (!is.null(ra$fe)) unique(c(ra$fe, if (identical(ra$zero_fe, ra$fe)) ra$zero_fe)))
   }
   pt
@@ -166,14 +168,16 @@ first_difference.zi_cpb <- function(object, variable, from, to, B = 0, level = 0
 #' single-parameter boundary test. Given two fitted models it refuses the cases
 #' where that reference distribution does not hold: a covariate-dependent
 #' structural-zero probability (several parameters on their boundary), a
-#' fixed-effects `zi_cpb()` (whose unit effects are a first-stage plug-in or a
-#' fill value, so its log-likelihood is not the joint maximum), a separated zero
-#' equation, models fit to different data, a zero-truncated nest, and CPB
-#' models on different supports. Compare those with [compare_models()].
+#' fixed-effects `zi_cpb()` (one count effect per unit, whose number grows with
+#' the panel, so the statistic has no fixed-dimension boundary reference), a
+#' separated zero equation, models fit to different data, a zero-truncated
+#' nest, and CPB models on different supports. It is not a test of a hurdle
+#' against a mixture, which are not nested. Compare those with
+#' [compare_models()].
 #'
 #' @param object Either a model formula --- then `data` is required and the
-#'   nested pair is fit internally --- or a fitted model (`cpb`, `cpb_fe`, or
-#'   `zi_cpb`).
+#'   nested pair is fit internally --- or a fitted model (`cpb`, `gec`,
+#'   `zi_cpb`, or `zi_gec`).
 #' @param object2 The second argument: the data frame when `object` is a formula
 #'   (so `zi_test(y ~ x, mydata)` works), or the second fitted model when
 #'   `object` is a fit. In the model interface exactly one of the two models must

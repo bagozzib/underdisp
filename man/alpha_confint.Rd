@@ -14,9 +14,10 @@ alpha_confint(object, level = 0.95)
 \value{
 A length-2 numeric vector (\code{lower}, \code{upper}) with attributes \code{alpha} (the
 point estimate), \code{method} (first-order or calibrated) and \code{boundary} (\code{TRUE}
-when the profile has not fallen to the cut by \code{alpha = 0.005}, so that the
-lower limit is the parameter bound; on King's support, the estimate when
-that is smaller).
+when the profile does not fall to the cut on the lower side: on King's
+support, whose trace runs down to \code{alpha = 1e-6}, the lower limit is then
+0; on the floor support, whose trace stops at \code{alpha = 0.005}, it is that
+bound).
 }
 \description{
 The interval inverts the likelihood-ratio test of \code{alpha}, re-maximizing the

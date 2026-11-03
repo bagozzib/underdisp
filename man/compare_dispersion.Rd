@@ -34,18 +34,20 @@ CPB, the default) or \code{"floor"}; see \code{\link[=cpb]{cpb()}}.}
 }
 \value{
 A list with \code{table} (a data frame of \code{df}, \code{logLik}, \code{AIC}, \code{BIC},
-\code{logscore}, \code{rps}, and \code{zero_fit} per model), \code{obs_zero} (the observed zero
-share), \code{nu} (the COM-Poisson dispersion, \verb{>1} = underdispersion, \code{NA} if the
-COM-Poisson fit failed), \code{alpha} (the CPB shape parameter), and
+\code{logscore}, \code{rps}, \code{zero_fit}, and \code{converged} per model), \code{obs_zero} (the
+observed zero share), \code{nu} (the COM-Poisson dispersion, \verb{>1} =
+underdispersion, \code{NA} if the COM-Poisson fit failed), \code{alpha} (the CPB shape
+parameter), \code{gec_delta} (the GEC's dispersion, \code{NA} if its fit failed), and
 \code{cpb_ok} (\code{FALSE} if the single-equation CPB could not satisfy its feasibility
 constraint on the data, e.g. under heavy zero-inflation with a wide count
 range: the CPB's support cannot hold the counts, which another family, or
 a hurdle or zero-inflated model, may fit).
 }
 \description{
-Fits the Poisson and negative binomial defaults alongside the two underdispersed
-workhorses---the soft-tail Conway--Maxwell--Poisson (fit natively, no external
-dependency) and the hard-ceiling CPB---and returns a comparison on both fit
+Fits the Poisson and negative binomial defaults alongside the underdispersed
+models---the soft-tail Conway--Maxwell--Poisson (fit natively, no external
+dependency), the hard-ceiling CPB, and the GEC, which spans both
+directions---and returns a comparison on both fit
 (log-likelihood, AIC, BIC) and calibration (mean logarithmic score and ranked
 probability score, lower is better, plus the fitted share of zeros against the
 observed share). Whether the tail is better described by an accelerated decay

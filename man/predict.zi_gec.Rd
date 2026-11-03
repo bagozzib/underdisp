@@ -18,7 +18,11 @@
 \arguments{
 \item{object}{A \code{"zi_gec"} object.}
 
-\item{newdata}{Optional covariate profiles.}
+\item{newdata}{Optional covariate profiles. A \code{zero_fe} unit the fit has not
+seen, or every row when that column is absent, enters at the zero
+equation's reference unit; a unit with no positive count gets the
+structural-zero probability one, and one whose every count is positive
+zero (see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
 
 \item{type}{\code{"response"} (marginal E(Y)), \code{"zero"} (structural-zero
 probability), or \code{"intensity"} (the count mean E of the GEC component).}

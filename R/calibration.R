@@ -69,7 +69,7 @@
 ## Exact moments of the (possibly zero-truncated) CPB at rate lambda from its
 ## normalized pmf. The CPB is a binomial with non-integer N = lambda/(1-alpha)
 ## renormalized over its support, so its mean equals lambda and its variance
-## alpha*lambda only when N is an integer (on King's support the mean is then
+## alpha*lambda only when N is an integer (otherwise, on King's support the mean is
 ## above lambda, on the floor support below it); the fitted mean, the
 ## residuals, the first differences, and the dispersion profile all use the
 ## exact values.
@@ -164,9 +164,11 @@
 
 ## internal: linear predictor for a dummy-coded binary equation that tolerates
 ## factor levels unseen in training (e.g. fixed-effect units present only in a
-## held-out fold): unseen levels are scored at the AVERAGE estimated effect of
-## that factor's levels (reference level included at zero) -- the binary-equation
-## analogue of the mean-fixed-effect fallback the intensity side already uses.
+## held-out fold), scoring them at the average estimated effect of that factor's
+## levels (reference level included at zero). This is the rule of versions before
+## 0.2.0, kept for CPB fits on the floor support; every other fit scores such a
+## level at the identified units' reference (.ud_dummy_eta()), which leaves out
+## the units whose dummies sit at a limit.
 .binary_eta_newdata <- function(terms_obj, xlev, coefs, newdata, contrasts = NULL) {
   coefs[is.na(coefs)] <- 0
   extra <- rep(0, nrow(newdata))
@@ -189,11 +191,14 @@
 ## on NEW data (held-out scoring). The dispersion (alpha / theta / delta) is taken
 ## from the fit; the per-observation rate lambda and, for two-part models, the
 ## participation/inflation probability, are recomputed from the fitted coefficients
-## applied to newdata's design matrices. Fixed-effect units unseen in training fall
-## back to the mean fixed effect (intensity) and to the average estimated unit
-## effect (participation/inflation dummies). The rows' offset is `offset` when
-## given, and otherwise a fit made with an offset reads it from the same column
-## of newdata (.ud_newdata_offset).
+## applied to newdata's design matrices. A fixed-effects unit unseen in training,
+## or a level of any factor the training rows lack, enters at the reference unit:
+## the effect, or the dummies' average, of the units the data identify (on the
+## floor support, the hurdle's and mixture's binary equations keep the mean dummy
+## of versions before 0.2.0). The hurdles' and mixtures' units at a limit (no
+## positive count, or no zero) are scored at that limit. The rows' offset is
+## `offset` when given, and otherwise a fit made with an offset reads it from the
+## same column of newdata (.ud_newdata_offset).
 .pmf_and_y_newdata <- function(fit, newdata, kmax, offset = NULL) {
   sup <- .cpb_support(fit)
   off <- function(obj) .ud_newdata_offset(obj, newdata, offset)
@@ -213,8 +218,12 @@
     y  <- yof(fit$formula)
   } else if (inherits(fit, "hurdle_cpb")) {
     pg   <- fit$participation
-    peta <- .binary_eta_newdata(stats::delete.response(stats::terms(pg)), pg$xlevels,
-                                stats::coef(pg), newdata, contrasts = pg$contrasts)
+    ## a unit unseen in training: the identified units' reference (floor support: the mean dummy, as before 0.2.0)
+    peta <- if (.cpb_fl(sup) || !.ud_has_unseen(pg$xlevels, newdata, fit$part_fe, TRUE))
+              .binary_eta_newdata(stats::delete.response(stats::terms(pg)), pg$xlevels,
+                                  stats::coef(pg), newdata, contrasts = pg$contrasts)
+            else .ud_dummy_eta(stats::delete.response(stats::terms(pg)), pg$xlevels, stats::coef(pg), newdata,
+                               pg$contrasts, fit$part_xref, fit$part_fe, TRUE)
     p    <- .part_at_limit(as.numeric(stats::family(pg)$linkinv(peta)), fit, newdata)
     b    <- fit$int_beta
     Xb   <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts, names(b)) %*% b
@@ -232,36 +241,43 @@
     lam <- if (is.null(fit$fe)) as.numeric(exp(off(fit) + Xb))
            else { fe <- fit$fe_hat[as.character(newdata[[fit$fe]])]; fe[is.na(fe)] <- fit$int_fe_ref
                   as.numeric(exp(fe + Xb)) }
-    pit <- as.numeric(stats::plogis(.binary_eta_newdata(fit$zero_terms, fit$zero_xlev,
+    pit <- if (.cpb_fl(sup)) as.numeric(stats::plogis(.binary_eta_newdata(fit$zero_terms, fit$zero_xlev,
                                                         fit$zero_coef, newdata, contrasts = fit$zero_contrasts)))
+           else .zero_at_limit(as.numeric(stats::plogis(.zi_cpb_newdata_zero(fit, newdata, TRUE)$eta)), fit, newdata)
     a <- fit$alpha
     P <- t(mapply(function(pi, li) { c0 <- .cpb_pmf1(li, a, kmax, truncated = FALSE, support = sup)
                                      row <- (1 - pi) * c0; row[1] <- pi + (1 - pi) * c0[1]; row }, pit, lam))
+    at0 <- .count_at_limit(fit, newdata)                 # a unit left out for having no positive count: P(0) = 1
+    if (any(at0)) P[at0, ] <- rep(c(1, numeric(kmax)), each = sum(at0))
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "count_reg")) {
     fam <- .count_fam(fit$family)
-    X   <- .ud_newdata_matrix(fit$terms, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
-    lam <- as.numeric(exp(off(fit) + X %*% fit$coefficients))
+    lam <- if (!.ud_has_unseen(fit$levels, newdata, fit$fe, TRUE)) {
+             X <- .ud_newdata_matrix(fit$terms, newdata, fit$levels, fit$contrasts, names(fit$coefficients))
+             as.numeric(exp(off(fit) + X %*% fit$coefficients))
+           } else as.numeric(exp(.count_reg_eta(fit, newdata, offset, all_factors = TRUE)))
     P   <- t(vapply(lam, function(mu) { v <- fam$pvec(mu, fit$theta, kmax)
                                         if (isTRUE(fit$truncated)) { v[1] <- 0; v <- v / max(1 - fam$p0(mu, fit$theta), 1e-12) }; v },
                     numeric(kmax + 1)))
     y <- yof(fit$terms)
   } else if (inherits(fit, "hurdle_count")) {
     fam  <- .count_fam(fit$family)
-    p    <- .part_at_limit(.ud_glm_predict(fit$participation, newdata), fit, newdata)
-    lam  <- exp(as.numeric(predict(fit$intensity, newdata = newdata, type = "link", offset = offset)))   # natural parameter
+    p    <- .part_at_limit(.ud_part_prob(fit, newdata, TRUE), fit, newdata)
+    ## natural parameter; a unit the intensity never saw (one with no positive count, say) at its reference unit
+    lam  <- exp(as.numeric(.count_reg_eta(fit$intensity, newdata, offset, xref = fit$int_xref, all_factors = TRUE)))
     P <- t(mapply(function(pi, li) { zt <- fam$pvec(li, fit$theta, kmax); zt[1] <- 0
                                      zt <- zt / max(1 - fam$p0(li, fit$theta), 1e-12)
                                      row <- pi * zt; row[1] <- 1 - pi; row }, p, lam))
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "zi_count")) {
     fam <- .count_fam(fit$family); linkinv <- stats::make.link(fit$link)$linkinv
-    Xc  <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$levels, fit$contrasts)
-    Zz  <- .ud_newdata_matrix(if (!is.null(fit$zero_terms)) fit$zero_terms else stats::terms(fit$zero.formula), newdata, fit$levels, fit$zero_contrasts)
-    lam <- as.numeric(exp(off(fit) + Xc[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
-    pit <- as.numeric(linkinv(Zz[, names(fit$zero.coefficients), drop = FALSE] %*% fit$zero.coefficients))
+    ez  <- .zi_count_etas(fit, newdata, offset, all_factors = TRUE)
+    lam <- as.numeric(exp(ez$count))
+    pit <- .zero_at_limit(as.numeric(linkinv(ez$zero)), fit, newdata)
     P <- t(mapply(function(pi, li) { f0 <- fam$pvec(li, fit$theta, kmax)
                                      row <- (1 - pi) * f0; row[1] <- pi + (1 - pi) * f0[1]; row }, pit, lam))
+    at0 <- .count_at_limit(fit, newdata)                 # a count-equation unit with no positive count: P(0) = 1
+    if (any(at0)) P[at0, ] <- rep(c(1, numeric(kmax)), each = sum(at0))
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "gec_fe")) {                  # check before "gec": gec_fe inherits gec
     Tm  <- stats::delete.response(stats::terms(fit$formula))
@@ -276,18 +292,24 @@
     if (isTRUE(fit$truncated)) P <- .zt_rows(P)
     y   <- yof(fit$terms)
   } else if (inherits(fit, "hurdle_gec")) {
-    p    <- .part_at_limit(.ud_glm_predict(fit$participation, newdata), fit, newdata)
-    Xall <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts)
-    lam  <- as.numeric(exp(off(fit$intensity) + Xall[, names(fit$int_beta), drop = FALSE] %*% fit$int_beta))
+    p    <- .part_at_limit(.ud_part_prob(fit, newdata, TRUE), fit, newdata)
+    lam  <- if (!.ud_has_unseen(fit$intensity$levels, newdata, NULL, TRUE)) {
+              Xall <- .ud_newdata_matrix(stats::terms(fit$formula), newdata, fit$intensity$levels, fit$intensity$contrasts)
+              as.numeric(exp(off(fit$intensity) + Xall[, names(fit$int_beta), drop = FALSE] %*% fit$int_beta))
+            } else as.numeric(exp(off(fit$intensity) +
+                                  .ud_dummy_eta(stats::terms(fit$formula), fit$intensity$levels, fit$int_beta, newdata,
+                                                fit$intensity$contrasts, fit$int_xref, NULL, TRUE)))
     U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support); p0 <- U[, 1]; U[, 1] <- 0; U <- U / pmax(1 - p0, 1e-12)
     P <- U * p; P[, 1] <- 1 - p
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
   } else if (inherits(fit, "zi_gec")) {
     Ti  <- stats::delete.response(fit$int_terms)
-    Xn  <- .ud_newdata_matrix(Ti, newdata, fit$int_xlev, fit$int_contrasts, names(fit$coefficients))
-    Zn  <- .ud_newdata_matrix(fit$zero_terms, newdata, fit$zero_xlev, fit$zero_contrasts, names(fit$zero_coef))
-    lam <- as.numeric(exp(off(fit) + Xn[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
-    pit <- as.numeric(stats::plogis(Zn[, names(fit$zero_coef), drop = FALSE] %*% fit$zero_coef))
+    lam <- if (!.ud_has_unseen(fit$int_xlev, newdata, NULL, TRUE)) {
+             Xn <- .ud_newdata_matrix(Ti, newdata, fit$int_xlev, fit$int_contrasts, names(fit$coefficients))
+             as.numeric(exp(off(fit) + Xn[, names(fit$coefficients), drop = FALSE] %*% fit$coefficients))
+           } else as.numeric(exp(off(fit) + .ud_dummy_eta(Ti, fit$int_xlev, fit$coefficients, newdata, fit$int_contrasts,
+                                                          fit$xref, NULL, TRUE)))
+    pit <- .zero_at_limit(as.numeric(stats::plogis(.zi_gec_zero_eta(fit, newdata, TRUE))), fit, newdata)
     U <- gec_pmf_cpp(lam, fit$delta, kmax, fit$max.support)
     P <- U * (1 - pit); P[, 1] <- pit + (1 - pit) * U[, 1]
     y <- as.integer(stats::model.response(stats::model.frame(fit$formula, newdata)))
@@ -317,8 +339,17 @@
 #'   `hurdle_gec`, or `zi_gec`).
 #' @param newdata Optional data frame of held-out observations (including the
 #'   response). When supplied, the fitted model's predicted distribution is
-#'   evaluated on these rows; fixed-effect units unseen in training fall back to
-#'   the mean fixed effect. A fit made with an offset reads the rows' offset
+#'   evaluated on these rows. A fixed-effects unit the fit has not seen, or a
+#'   level of any factor its training rows lack (a held-out block's own units
+#'   or years), enters at the reference unit: the effect, or the dummies'
+#'   average, of the units the data identify, the reference that
+#'   [first_difference()] uses (on the floor support, the participation and
+#'   zero equations of [hurdle_cpb()] and [zi_cpb()] keep the mean dummy of
+#'   versions before 0.2.0). A unit the hurdles or mixtures hold at a limit is
+#'   scored at that limit: a positive count of a unit with no positive count in
+#'   the fitted data, and a hurdle's zero of a unit whose every count was
+#'   positive, are impossible (see [compare_models()], Degrees of freedom). A
+#'   fit made with an offset reads the rows' offset
 #'   from its own offset column in `newdata`, or from `offset`.
 #' @param kmax Highest count to evaluate; defaults to the maximum observed count
 #'   in the fitting data, raised to the maximum held-out count when `newdata`
@@ -377,7 +408,9 @@ score <- function(fit, newdata = NULL, kmax = NULL, weights = NULL, offset = NUL
 #' example a hurdle with per-unit participation fixed effects against a
 #' zero-inflated model). Per-observation held-out scores are returned so two
 #' models fit on the *same* folds can be compared with a paired, cluster-robust
-#' test.
+#' test. Each fold is scored as [score()] scores `newdata`: a unit, or a level
+#' of any factor, that the training folds lack enters at the reference unit,
+#' and a unit a two-part fit holds at a limit is scored at that limit.
 #'
 #' @param fitfun A function of one argument (a training data frame) returning a
 #'   fitted `underdisp` model, e.g.

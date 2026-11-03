@@ -13,8 +13,17 @@ score(fit, newdata = NULL, kmax = NULL, weights = NULL, offset = NULL)
 
 \item{newdata}{Optional data frame of held-out observations (including the
 response). When supplied, the fitted model's predicted distribution is
-evaluated on these rows; fixed-effect units unseen in training fall back to
-the mean fixed effect. A fit made with an offset reads the rows' offset
+evaluated on these rows. A fixed-effects unit the fit has not seen, or a
+level of any factor its training rows lack (a held-out block's own units
+or years), enters at the reference unit: the effect, or the dummies'
+average, of the units the data identify, the reference that
+\code{\link[=first_difference]{first_difference()}} uses (on the floor support, the participation and
+zero equations of \code{\link[=hurdle_cpb]{hurdle_cpb()}} and \code{\link[=zi_cpb]{zi_cpb()}} keep the mean dummy of
+versions before 0.2.0). A unit the hurdles or mixtures hold at a limit is
+scored at that limit: a positive count of a unit with no positive count in
+the fitted data, and a hurdle's zero of a unit whose every count was
+positive, are impossible (see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom). A
+fit made with an offset reads the rows' offset
 from its own offset column in \code{newdata}, or from \code{offset}.}
 
 \item{kmax}{Highest count to evaluate; defaults to the maximum observed count

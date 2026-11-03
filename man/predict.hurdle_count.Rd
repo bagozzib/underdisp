@@ -18,7 +18,10 @@
 \arguments{
 \item{object}{A \code{"hurdle_count"} object.}
 
-\item{newdata}{Optional data frame of covariate profiles.}
+\item{newdata}{Optional data frame of covariate profiles. A fixed-effects
+unit an equation has not seen, or every row when its column is absent,
+enters that equation at the reference unit, and a unit at a limit at that
+limit (see \verb{fe,part_fe} in \code{\link[=hurdle_count]{hurdle_count()}}).}
 
 \item{type}{\code{"response"} (marginal E(Y), zeros included), \code{"participation"}
 (P(Y > 0)), or \code{"intensity"} (E(Y | Y > 0)).}

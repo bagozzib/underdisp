@@ -43,7 +43,7 @@
 ## median panel length is below 6. KAPPA = 2.5 and the R2b threshold (p < .01)
 ## are calibrated by Monte Carlo: stationary
 ## panels should rarely refuse (on King's support 9 to 13 percent do, on the
-## floor support about 7); regime-change panels must refuse (98.5 percent); and
+## floor support 5.5 to 9); regime-change panels must refuse (98.5 percent); and
 ## on trending panels the corrections that survive must not be worse than the
 ## uncorrected fit (every trending panel refuses). The placebo splits cost ten
 ## extra half-sample fits.

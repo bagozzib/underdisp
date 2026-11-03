@@ -410,7 +410,7 @@ print.ud_irr <- function(x, digits = 3, ...) {
   pfun <- function(z, th) linkinv(.fd_index(z, th, "participation:"))
   mfun <- function(x, th) {
     tn <- if (fam$nshape) unname(fam$shape_inv(th[sh])) else NA_real_; lam <- exp(base + .fd_index(x, th, "intensity:"))
-    fam$meanfun(lam, tn) / (1 - fam$p0(lam, tn))                                    # E(Y | Y > 0)
+    fam$meanfun(lam, tn) / pmax(1 - fam$p0(lam, tn), 1e-12)                                    # E(Y | Y > 0)
   }
   c(list(component = c("participation", "intensity", "marginal"), lev = .fd_twopart_lev(P, pfun, mfun, `*`)),
     .qoi_unc(.qoi_par(object)))
@@ -446,7 +446,7 @@ print.ud_irr <- function(x, digits = 3, ...) {
   pfun <- function(z, th) linkinv(.fd_index(z, th, "participation:"))
   mfun <- function(x, th) {                                                        # E(Y | Y > 0)
     mu <- exp(object$int_fe_ref + .fd_index(x, th, "intensity:")); d <- th[["delta"]]
-    gec_mean_cpp(mu, d, ms) / (1 - gec_pmf_cpp(mu, d, 0L, ms)[, 1])
+    gec_mean_cpp(mu, d, ms) / pmax(1 - gec_pmf_cpp(mu, d, 0L, ms)[, 1], 1e-12)
   }
   c(list(component = c("participation", "intensity", "marginal"), lev = .fd_twopart_lev(P, pfun, mfun, `*`)),
     .qoi_unc(.qoi_par(object)))

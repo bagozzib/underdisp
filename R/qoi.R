@@ -16,12 +16,17 @@
 }
 
 ## P(Y = y) at given (lambda, alpha), vectorized over equal-length lambda and y.
+## A pmf refused at the 1e5-term support cap (a rate of order 1e5 on King's support) gives NA, with dcpb()'s warning.
 .cpb_prob_at <- function(lambda, alpha, y, truncated, max.support = 500, support) {
-  mapply(function(l, yy) {
+  out <- mapply(function(l, yy) {
     if (yy < 0 || yy != floor(yy)) return(0)
     pr <- .cpb_pmf_row(l, alpha, truncated, max.support, support = support)
-    if (yy + 1 > length(pr)) 0 else pr[yy + 1]
+    if (length(pr) == 1L && is.na(pr)) NA_real_ else if (yy + 1 > length(pr)) 0 else pr[yy + 1]
   }, lambda, y)
+  cap <- is.na(out) & is.finite(rep_len(lambda, length(out)))
+  if (any(cap)) warning("the CPB support reaches the 1e5-term cap for ", sum(cap), " value(s) (a rate of ",
+                        "order 1e5): NA returned.", call. = FALSE)
+  out
 }
 
 #' Predictions from a CPB fit
@@ -254,9 +259,10 @@ ceiling_exceedance <- function(fit, newdata, weights = NULL, offset = NULL) {
 #' @param level Confidence level (default 0.95).
 #' @return A length-2 numeric vector (`lower`, `upper`) with attributes `alpha` (the
 #'   point estimate), `method` (first-order or calibrated) and `boundary` (`TRUE`
-#'   when the profile has not fallen to the cut by `alpha = 0.005`, so that the
-#'   lower limit is the parameter bound; on King's support, the estimate when
-#'   that is smaller).
+#'   when the profile does not fall to the cut on the lower side: on King's
+#'   support, whose trace runs down to `alpha = 1e-6`, the lower limit is then
+#'   0; on the floor support, whose trace stops at `alpha = 0.005`, it is that
+#'   bound).
 #' @examples
 #' set.seed(7); x <- rnorm(200)
 #' N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(200, N, 0.5)

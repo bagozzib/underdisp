@@ -12,7 +12,10 @@
 #' Predict from a hurdle Poisson/NB fit
 #'
 #' @param object A `"hurdle_count"` object.
-#' @param newdata Optional data frame of covariate profiles.
+#' @param newdata Optional data frame of covariate profiles. A fixed-effects
+#'   unit an equation has not seen, or every row when its column is absent,
+#'   enters that equation at the reference unit, and a unit at a limit at that
+#'   limit (see `fe,part_fe` in [hurdle_count()]).
 #' @param type `"response"` (marginal E(Y), zeros included), `"participation"`
 #'   (P(Y > 0)), or `"intensity"` (E(Y | Y > 0)).
 #' @param offset Optional offset (log scale) for the intensity when predicting on
@@ -36,12 +39,12 @@ predict.hurdle_count <- function(object, newdata = NULL,
     return(.ud_predict_ci(object, newdata, type, se.fit, match.arg(interval), level, offset = offset))
   if (is.null(newdata)) { p <- object$p_full; mu <- object$lambda_full }
   else {
-    p  <- .part_at_limit(.ud_glm_predict(object$participation, newdata), object, newdata)
-    mu <- exp(predict(object$intensity, newdata = newdata, type = "link", offset = offset))   # natural parameter
+    p  <- .part_at_limit(.ud_part_prob(object, newdata), object, newdata)
+    mu <- exp(.count_reg_eta(object$intensity, newdata, offset, xref = object$int_xref))   # natural parameter
   }
   bad <- is.na(mu) | is.na(p); mu[bad] <- 1                    # a missing covariate predicts NA
   if (type == "participation") return(.ud_mask(as.numeric(p), bad))
-  ztmean <- .ud_mask(fam$meanfun(mu, object$theta) / (1 - fam$p0(mu, object$theta)), bad)   # E(Y | Y > 0)
+  ztmean <- .ud_mask(fam$meanfun(mu, object$theta) / pmax(1 - fam$p0(mu, object$theta), 1e-12), bad)   # E(Y | Y > 0)
   if (type == "intensity") return(ztmean)
   as.numeric(p) * ztmean                                 # marginal E(Y)
 }
@@ -49,7 +52,12 @@ predict.hurdle_count <- function(object, newdata = NULL,
 #' Predict from a zero-inflated Poisson/NB fit
 #'
 #' @param object A `"zi_count"` object.
-#' @param newdata Optional data frame of covariate profiles.
+#' @param newdata Optional data frame of covariate profiles. A fixed-effects
+#'   unit an equation has not seen, or every row when its column is absent,
+#'   enters that equation at the reference unit. A `zero_fe` unit with no
+#'   positive count gets the structural-zero probability one and one whose every
+#'   count is positive zero, and an `fe` unit with no positive count a count
+#'   mean of zero (see [compare_models()], Degrees of freedom).
 #' @param type `"response"` (marginal E(Y)), `"count"` (equivalently
 #'   `"intensity"`; the count component's mean E(Y) of that component), or
 #'   `"zero"` (structural-zero probability). `"intensity"` is accepted as a
@@ -73,23 +81,47 @@ predict.zi_count <- function(object, newdata = NULL, type = c("response", "count
   type <- match.arg(type); if (type == "intensity") type <- "count"
   if (isTRUE(se.fit) || match.arg(interval) != "none")
     return(.ud_predict_ci(object, newdata, type, se.fit, match.arg(interval), level, offset = offset))
-  fam <- .count_fam(object$family)
+  fam <- .count_fam(object$family); at0 <- FALSE
   if (is.null(newdata)) { pistar <- object$pi_full; lam <- object$lambda_full }
   else {
     linkinv <- stats::make.link(object$link)$linkinv
-    Xc <- .ud_newdata_matrix(stats::terms(object$formula), newdata, object$levels, object$contrasts, names(object$coefficients))
-    Zz <- .ud_newdata_matrix(if (!is.null(object$zero_terms)) object$zero_terms else stats::terms(object$zero.formula), newdata,
-                             object$levels, object$zero_contrasts, names(object$zero.coefficients))
-    eta <- .ud_newdata_offset(object, newdata, offset, nrow(Xc)) + as.numeric(Xc %*% object$coefficients)
-    lam    <- exp(eta)
-    pistar <- as.numeric(linkinv(Zz[, names(object$zero.coefficients), drop = FALSE] %*% object$zero.coefficients))
+    ez <- .zi_count_etas(object, newdata, offset)
+    lam    <- exp(ez$count)
+    pistar <- .zero_at_limit(as.numeric(linkinv(ez$zero)), object, newdata)
+    at0 <- .count_at_limit(object, newdata)                  # a unit with no positive count: its mean at zero
   }
   bad <- is.na(lam) | is.na(pistar); lam[bad] <- 1             # a missing covariate or offset predicts NA
   if (type == "zero") return(.ud_mask(pistar, bad))
   cmean <- fam$meanfun(lam, object$theta)                # E(Y) of the count component
+  cmean[at0] <- 0
   cmean <- .ud_mask(cmean, bad)
   if (type == "count") return(cmean)
   (1 - pistar) * cmean
+}
+
+## The count and zero equations' linear predictors of a zi_count() fit in new data (the count one with its offset).
+## A unit of an `fe` or `zero_fe` column the fit has not seen (or every row, when `newdata` lacks the column) enters
+## at that equation's reference unit (`xref`, `zref`), and with `all_factors` (held-out scoring) an unseen level of
+## any factor; the rows the fit can evaluate are computed as before.
+.zi_count_etas <- function(object, newdata, offset = NULL, all_factors = FALSE) {
+  Tc <- stats::terms(object$formula)
+  Tz <- if (!is.null(object$zero_terms)) object$zero_terms else stats::terms(object$zero.formula)
+  bc <- object$coefficients; gz <- object$zero.coefficients
+  eq <- function(Tm, coefs, contr, xref, fe) {
+    ## the fit's levels are shared by its two equations; each equation's model frame takes its own variables'
+    ## (another variable's levels make model.frame() warn that it is not a factor)
+    vars <- vapply(as.list(attr(stats::delete.response(Tm), "variables"))[-1L], function(v) paste(deparse(v), collapse = ""), "")
+    xl <- object$levels[intersect(names(object$levels), vars)]
+    if (!length(xl)) xl <- NULL
+    if (!.ud_has_unseen(xl, newdata, fe, all_factors)) {
+      X <- .ud_newdata_matrix(Tm, newdata, xl, contr, names(coefs))
+      return(as.numeric(X[, names(coefs), drop = FALSE] %*% coefs))
+    }
+    .ud_dummy_eta(stats::delete.response(Tm), xl, coefs, newdata, contr, xref, fe, all_factors)
+  }
+  ec <- eq(Tc, bc, object$contrasts, object$xref, object$fe)
+  list(count = .ud_newdata_offset(object, newdata, offset, nrow(newdata)) + ec,
+       zero = eq(Tz, gz, object$zero_contrasts, object$zref, object$zero_fe))
 }
 
 ## --- equation-specific rate/odds ratios -----------------------------------

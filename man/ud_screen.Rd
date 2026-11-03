@@ -73,7 +73,7 @@ under the fitted Poisson (\code{ztp_boot_B} replicates over \code{cores}), the
 package default at a boundary null (see \code{\link[=dispersion_test]{dispersion_test()}}). \code{NULL}
 (default) bootstraps it when \code{ztp_threshold = "bootstrap"} and the mean
 model is within \code{comp_max_par} and \code{comp_max_n}; otherwise the p-value is
-the asymptotic boundary mixture, which is conservative for this test. The
+the asymptotic boundary mixture, whose size for this test the package has not simulated. The
 bootstrap restores the random-number state, so every other result is the
 same with or without it.}
 
@@ -125,7 +125,8 @@ King, G. (1989). Variance specification in event count models:
 From restrictive assumptions to a generalized estimator.
 \emph{AJPS} 33(3):762-784.
 
-Bagozzi, B. E. (2026). Revisiting underdispersion in political science.
+Bagozzi, B. E. (2026). Revisiting Underdispersion in Political Science:
+Diagnostics and a Typology for Count Data.
 Companion manuscript.
 }
 \seealso{

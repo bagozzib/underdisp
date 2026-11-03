@@ -31,12 +31,17 @@
 }
 
 ## draw an n x nsim integer matrix; pmf_fun(i) returns observation i's raw pmf over 0..K_i
+## A pmf refused at the CPB's 1e5-term support cap (NA) draws NA, with dcpb()'s warning.
 .sim_from_pmf <- function(n, nsim, pmf_fun, truncated) {
-  out <- matrix(0L, n, nsim)
+  out <- matrix(0L, n, nsim); cap <- 0L
   for (i in seq_len(n)) {
-    pr <- .sim_norm(pmf_fun(i), truncated)
+    raw <- pmf_fun(i)
+    if (length(raw) == 1L && is.na(raw)) { out[i, ] <- NA_integer_; cap <- cap + 1L; next }   # .cpb_pmf_row's refusal
+    pr <- .sim_norm(raw, truncated)
     out[i, ] <- as.integer(sample.int(length(pr), nsim, replace = TRUE, prob = pr) - 1L)
   }
+  if (cap) warning("the CPB support reaches the 1e5-term cap for ", cap, " observation(s) (a rate of order 1e5): ",
+                   "their draws are NA.", call. = FALSE)
   out
 }
 
@@ -248,7 +253,7 @@ fitted.hurdle_cpb <- function(object, ...)
 #' @export
 fitted.hurdle_gec <- function(object, ...) {
   p0 <- gec_pmf_cpp(object$lambda_full, object$delta, 0L, object$max.support)[, 1]
-  object$p_full * gec_mean_cpp(object$lambda_full, object$delta, object$max.support) / pmax(1 - p0, 1e-8)   # exact E(Y | Y >= 1)
+  object$p_full * gec_mean_cpp(object$lambda_full, object$delta, object$max.support) / pmax(1 - p0, 1e-12)   # exact E(Y | Y >= 1)
 }
 
 #' @rdname fitted.underdisp
@@ -257,7 +262,7 @@ fitted.hurdle_gec <- function(object, ...) {
 fitted.hurdle_count <- function(object, ...) {
   fam <- .count_fam(object$family)
   object$p_full * fam$meanfun(object$lambda_full, object$theta) /
-    pmax(1 - fam$p0(object$lambda_full, object$theta), 1e-8)
+    pmax(1 - fam$p0(object$lambda_full, object$theta), 1e-12)
 }
 
 #' @rdname fitted.underdisp

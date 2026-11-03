@@ -136,7 +136,7 @@
 
 ## The zero design's zero_fe dummy columns
 .zi_fe_cols <- function(Z, zero_fe)
-  if (is.null(zero_fe)) character(0) else colnames(Z)[startsWith(colnames(Z), paste0("factor(", zero_fe, ")"))]
+  if (is.null(zero_fe)) character(0) else colnames(Z)[.is_fe_col(colnames(Z), zero_fe)]
 
 ## The fit's warning (the fit the user asked for, not a start or a bootstrap refit)
 .zi_warn_separation <- function(sep, fun) {

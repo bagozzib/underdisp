@@ -56,6 +56,108 @@
   p
 }
 
+## The mixtures' analogue for their zero equation (zi_cpb() on King's support, zi_gec(), zi_count()): a zero_fe
+## unit with no positive count has its dummy at plus infinity, so its rows in new data get the structural-zero
+## probability one, and a unit whose every count is positive has it at minus infinity, so they get zero. With the
+## count effect of the first kind of unit at its own limit as well, P(Y = 0) is one either way.
+.zero_at_limit <- function(p, object, newdata) {
+  zl <- object$zero_fe_zero_units; ol <- object$zero_fe_one_units; zf <- .ud_zero_fe(object)
+  if (is.null(newdata) || !(length(zl) || length(ol)) || length(zf) != 1L || is.null(newdata[[zf]])) return(p)
+  u <- as.character(newdata[[zf]])
+  p[u %in% zl] <- 1
+  p[u %in% ol] <- 0
+  p
+}
+.ud_zero_fe <- function(object) if (!is.null(object$zero_fe)) object$zero_fe else object$refit_args$zero_fe
+
+## The rows of new data whose count-equation fixed-effects unit has no positive count in the fitted data (its
+## effect at minus infinity: every count of the unit is zero), for the mixtures whose count component carries the
+## unit effect: zi_cpb(fe =) on King's support (`zero_units`) and zi_count() with one `fe` column (`fe_zero_units`).
+.count_at_limit <- function(object, newdata) {
+  if (is.null(newdata)) return(logical(0))
+  zu <- if (inherits(object, "zi_cpb")) object$zero_units else object$fe_zero_units
+  fv <- object$fe
+  if (!length(zu) || length(fv) != 1L || is.null(newdata[[fv]])) return(rep(FALSE, nrow(newdata)))
+  as.character(newdata[[fv]]) %in% zu
+}
+
+## --- new data: units the fit has not seen ---------------------------------------------------------------------
+## An equation whose fixed effects enter as factor dummies (a hurdle's participation glm, a mixture's zero equation,
+## the count equations of count_reg(), hurdle_count(), zi_count() and hurdle_gec()) cannot evaluate a dummy for a
+## unit the fit did not see. Such a row, or every row when `newdata` lacks the fixed-effects column, enters at the
+## reference profile `xref` of that factor: the average over the units whose effect the data identify
+## (.fe_dummy_ref()), the reference unit first_difference() uses. `fe` names the fixed-effects columns; with
+## `all_factors` an unseen level of any factor enters at its reference profile in the same way (held-out scoring,
+## where a held-out block can hold levels its training folds lack). An object without `xref` (saved before 0.2.0)
+## uses the mean of the factor's estimated effects, the reference level at zero, as held-out scoring did then.
+
+## the variable behind a model-frame factor name (`factor(iso3)` -> `iso3`)
+.ud_xlev_var <- function(fv) if (grepl("^factor\\(.*\\)$", fv)) sub("^factor\\((.*)\\)$", "\\1", fv) else fv
+
+## whether newdata holds a level (or lacks a fixed-effects column) that .ud_dummy_eta() has to place
+.ud_has_unseen <- function(xlev, newdata, fe = NULL, all_factors = FALSE) {
+  if (is.null(newdata)) return(FALSE)
+  for (fv in names(xlev)) {
+    v <- .ud_xlev_var(fv)
+    if (!(all_factors || v %in% fe)) next
+    if (!v %in% names(newdata)) { if (v %in% fe) return(TRUE); next }
+    vals <- as.character(newdata[[v]])
+    if (any(!is.na(vals) & !(vals %in% xlev[[fv]]))) return(TRUE)
+  }
+  FALSE
+}
+
+.ud_dummy_eta <- function(terms_obj, xlev, coefs, newdata, contrasts = NULL, xref = NULL, fe = NULL,
+                          all_factors = FALSE) {
+  coefs[is.na(coefs)] <- 0
+  extra <- numeric(nrow(newdata))
+  for (fv in names(xlev)) {
+    v <- .ud_xlev_var(fv)
+    if (!(all_factors || v %in% fe)) next
+    if (!v %in% names(newdata)) {
+      if (!v %in% fe) next                            # the design matrix then reports the missing variable
+      unseen <- rep(TRUE, nrow(newdata)); newdata[[v]] <- rep(xlev[[fv]][1L], nrow(newdata))
+    } else {
+      vals <- as.character(newdata[[v]])
+      unseen <- !is.na(vals) & !(vals %in% xlev[[fv]])
+      if (!any(unseen)) next
+      vals[unseen] <- xlev[[fv]][1L]; newdata[[v]] <- vals   # the reference level, whose dummies are zero
+    }
+    cols <- intersect(paste0(fv, xlev[[fv]]), names(coefs))
+    ref <- if (length(cols) && !is.null(xref) && all(cols %in% names(xref))) sum(xref[cols] * coefs[cols])
+           else if (length(cols)) mean(c(0, unname(coefs[cols]))) else 0
+    extra[unseen] <- extra[unseen] + ref
+  }
+  X <- .ud_newdata_matrix(terms_obj, newdata, xlev, contrasts, names(coefs))
+  as.numeric(X %*% coefs) + extra
+}
+
+## A hurdle's participation probability in new data before its limits (.part_at_limit()): the glm's own prediction,
+## or, where newdata holds a unit the fit has not seen (or no fixed-effects column), .ud_dummy_eta() at the
+## participation equation's reference unit
+.ud_part_prob <- function(object, newdata, all_factors = FALSE) {
+  pg <- object$participation
+  if (is.null(newdata) || !.ud_has_unseen(pg$xlevels, newdata, object$part_fe, all_factors))
+    return(.ud_glm_predict(pg, newdata))
+  eta <- .ud_dummy_eta(stats::delete.response(stats::terms(pg)), pg$xlevels, stats::coef(pg), newdata,
+                       pg$contrasts, object$part_xref, object$part_fe, all_factors)
+  as.numeric(stats::family(pg)$linkinv(eta))
+}
+
+## --- several fixed-effects columns -----------------------------------------------------------------------------
+## the levels, over every column of `fe`, with no positive count (their dummies at minus infinity)
+.ud_fe_zero_levels <- function(y, data, fe) {
+  z <- unlist(lapply(fe, function(f) .ud_zero_levels(y, data[[f]])))
+  if (is.null(z)) character(0) else z
+}
+## the levels whose every count is positive, for a single fixed-effects column (predicted at the limit, which
+## .part_at_limit() and .zero_at_limit() apply to one column)
+.ud_fe_one_levels <- function(y, data, fe) if (length(fe) == 1L) .ud_one_levels(y, data[[fe]]) else character(0)
+## the groups of the separation check's count of extreme probabilities: the fixed-effects units, or their
+## combinations when there are several columns
+.ud_fe_group <- function(data, fe)
+  if (is.null(fe)) NULL else if (length(fe) == 1L) data[[fe]] else interaction(data[fe], drop = TRUE)
+
 ## a hurdle's degrees of freedom: the stored count, or for an object without one the count of its two parts
 .ud_twopart_df <- function(m) {
   if (!is.null(m$df)) return(m$df)
@@ -121,7 +223,7 @@
 ## The participation equation of a fitted hurdle: its covariance (model-based, robust, or clustered on `cl`) and
 ## separation check, as fields of the fit
 .part_fields <- function(pfit, part_fe, data, type, cl, fun) {
-  sep <- .part_separation(pfit, part_fe, if (!is.null(part_fe)) data[[part_fe]])
+  sep <- .part_separation(pfit, part_fe, .ud_fe_group(data, part_fe))
   .part_warn_separation(sep, fun)
   list(part_vcov = .part_fit_vcov(pfit, type, cl), part_vcov_type = type,
        part_n_clusters = if (type == "cluster") length(unique(cl)) else NA_integer_, part_separation = sep)

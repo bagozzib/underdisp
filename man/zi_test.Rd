@@ -8,8 +8,8 @@ zi_test(object, object2 = NULL, data = NULL, ...)
 }
 \arguments{
 \item{object}{Either a model formula --- then \code{data} is required and the
-nested pair is fit internally --- or a fitted model (\code{cpb}, \code{cpb_fe}, or
-\code{zi_cpb}).}
+nested pair is fit internally --- or a fitted model (\code{cpb}, \code{gec},
+\code{zi_cpb}, or \code{zi_gec}).}
 
 \item{object2}{The second argument: the data frame when \code{object} is a formula
 (so \code{zi_test(y ~ x, mydata)} works), or the second fitted model when
@@ -36,10 +36,12 @@ The test uses an intercept-only structural-zero probability, so it is a clean
 single-parameter boundary test. Given two fitted models it refuses the cases
 where that reference distribution does not hold: a covariate-dependent
 structural-zero probability (several parameters on their boundary), a
-fixed-effects \code{zi_cpb()} (whose unit effects are a first-stage plug-in or a
-fill value, so its log-likelihood is not the joint maximum), a separated zero
-equation, models fit to different data, a zero-truncated nest, and CPB
-models on different supports. Compare those with \code{\link[=compare_models]{compare_models()}}.
+fixed-effects \code{zi_cpb()} (one count effect per unit, whose number grows with
+the panel, so the statistic has no fixed-dimension boundary reference), a
+separated zero equation, models fit to different data, a zero-truncated
+nest, and CPB models on different supports. It is not a test of a hurdle
+against a mixture, which are not nested. Compare those with
+\code{\link[=compare_models]{compare_models()}}.
 }
 \examples{
 \donttest{

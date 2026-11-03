@@ -279,8 +279,10 @@ ud_screen(contributions ~ democracy + lgdppc + lpop + milper + factor(iso3),
 
 That is the case for a two-part model with an underdispersed intensity.
 `hurdle_cpb()` joins a participation logit to a zero-truncated CPB, and
-`zi_cpb()` fits the structural-zero mixture; `zi_test()` and `compare_models()`
-adjudicate between them.
+`zi_cpb()` fits the structural-zero mixture. The two are not nested, so
+`compare_models()` adjudicates between them, on information criteria and
+proper scores (`cv_score()` holds them out); `zi_test()` tests a mixture with
+intercept-only inflation against its non-inflated nest.
 
 ```{r hurdle}
 z <- rnorm(n)

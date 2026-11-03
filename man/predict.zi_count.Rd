@@ -18,7 +18,12 @@
 \arguments{
 \item{object}{A \code{"zi_count"} object.}
 
-\item{newdata}{Optional data frame of covariate profiles.}
+\item{newdata}{Optional data frame of covariate profiles. A fixed-effects
+unit an equation has not seen, or every row when its column is absent,
+enters that equation at the reference unit. A \code{zero_fe} unit with no
+positive count gets the structural-zero probability one and one whose every
+count is positive zero, and an \code{fe} unit with no positive count a count
+mean of zero (see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
 
 \item{type}{\code{"response"} (marginal E(Y)), \code{"count"} (equivalently
 \code{"intensity"}; the count component's mean E(Y) of that component), or

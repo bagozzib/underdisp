@@ -18,8 +18,11 @@
 \arguments{
 \item{object}{A \code{"hurdle_cpb"} object.}
 
-\item{newdata}{Data frame of covariate profiles (must contain both the
-intensity and participation covariates).}
+\item{newdata}{Data frame of covariate profiles (the intensity and participation
+covariates). A row of a fixed-effects unit the fit has not seen, or every row
+when the \code{fe} or \code{part_fe} column is absent, enters that equation at the
+reference unit, and a unit at a limit (no positive count, or no zero) at
+that limit (see \code{part_fe} in \code{\link[=hurdle_cpb]{hurdle_cpb()}}).}
 
 \item{type}{\code{"response"} for the marginal expected count E(Y) (zeros
 included), \code{"participation"} for P(Y > 0), or \code{"intensity"} for

@@ -106,7 +106,14 @@ rhurdle_cpb <- function(n, lambda, alpha, p, support = c("ceiling", "floor")) {
 #'   quantities of interest use the dummy logit's unit effects. On King's
 #'   support the dummy of a unit that never participates, at minus infinity, is
 #'   not counted in the degrees of freedom (see [compare_models()], Degrees of
-#'   freedom).
+#'   freedom). In new data ([predict.hurdle_cpb()], [score()], [cv_score()]) such
+#'   a unit's rows get the participation probability at that limit, zero, and
+#'   those of a unit whose every count is positive (`part_one_units`) one; a unit
+#'   the fit has not seen, or every row of `newdata` without the `part_fe`
+#'   column, enters at the reference unit of the units the data identify. The
+#'   participation equation is checked for separation by [zi_cpb()]'s rule
+#'   (Separation; component `part_separation`). The floor support counts and
+#'   predicts these units as before 0.2.0.
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`. Positive participation coefficients raise the probability of
 #'   a positive count.
@@ -206,9 +213,9 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
     int_xref <- colMeans(Xcov)
   }
   ## a unit that never participates has its participation dummy at minus infinity; not counted (.ud_zero_levels)
-  zl <- if (is.null(part_fe) || .cpb_fl(.cpb_support(ifit))) character(0) else .ud_zero_levels(y, data[[part_fe]])
+  zl <- if (is.null(part_fe) || .cpb_fl(.cpb_support(ifit))) character(0) else .ud_fe_zero_levels(y, data, part_fe)
   ## one whose every count is positive has it at plus infinity; counted, but predicted at that limit in new data
-  ol <- if (is.null(part_fe) || .cpb_fl(.cpb_support(ifit))) character(0) else .ud_one_levels(y, data[[part_fe]])
+  ol <- if (is.null(part_fe) || .cpb_fl(.cpb_support(ifit))) character(0) else .ud_fe_one_levels(y, data, part_fe)
 
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), Zpart = stats::model.matrix(pfit),
@@ -251,8 +258,11 @@ print.hurdle_cpb <- function(x, ...) {
 #' Predict from a hurdle-CPB fit
 #'
 #' @param object A `"hurdle_cpb"` object.
-#' @param newdata Data frame of covariate profiles (must contain both the
-#'   intensity and participation covariates).
+#' @param newdata Data frame of covariate profiles (the intensity and participation
+#'   covariates). A row of a fixed-effects unit the fit has not seen, or every row
+#'   when the `fe` or `part_fe` column is absent, enters that equation at the
+#'   reference unit, and a unit at a limit (no positive count, or no zero) at
+#'   that limit (see `part_fe` in [hurdle_cpb()]).
 #' @param type `"response"` for the marginal expected count E(Y) (zeros
 #'   included), `"participation"` for P(Y > 0), or `"intensity"` for
 #'   E(Y | Y > 0).
@@ -277,10 +287,10 @@ predict.hurdle_cpb <- function(object, newdata = NULL,
   if (isTRUE(se.fit) || match.arg(interval) != "none")
     return(.ud_predict_ci(object, newdata, type, se.fit, match.arg(interval), level, offset = offset))
   if (!is.null(newdata)) {
-    need <- setdiff(all.vars(stats::delete.response(stats::terms(object$participation))), names(newdata))
+    need <- setdiff(all.vars(stats::delete.response(stats::terms(object$participation))), c(names(newdata), object$part_fe))
     if (length(need)) stop("'newdata' is missing participation variable(s): ", paste(need, collapse = ", "), ".")
   }
-  p <- .part_at_limit(.ud_glm_predict(object$participation, newdata), object, newdata)
+  p <- .part_at_limit(.ud_part_prob(object, newdata), object, newdata)
   if (type == "participation") return(as.numeric(p))
   ## newdata = NULL: use the stored FULL-length intensity (lambda_full, one per
   ## observation), NOT predict(intensity) which returns only the positives-only

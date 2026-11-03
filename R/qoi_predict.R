@@ -429,6 +429,8 @@ ame <- function(object, variable, newdata, from = NULL, to = NULL, type = "respo
     stop("ame(B > 0) refits the model from its call, whose arguments must still be available where ame() is called: ",
          conditionMessage(e), call. = FALSE))
   args <- lapply(args, ev); ccl <- if (!is.null(ccl)) ev(ccl)
+  ## the fit's own CPB support (an object saved before 0.2.0 is a floor-support fit whose call has no `support`)
+  if (inherits(object, c("cpb", "cpb_fe", "hurdle_cpb", "zi_cpb"))) args$support <- .cpb_support(object)
   ## a replicate skips the jackknife's gate, so it follows the fit's own outcome (no correction when the gate refused)
   bc <- if (!is.null(object$bias_correct)) object$bias_correct else object$intensity$bias_correct
   if (!is.null(args$bias_correct) && !is.null(bc)) args$bias_correct <- bc

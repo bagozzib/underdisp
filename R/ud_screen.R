@@ -138,7 +138,7 @@
 #'   package default at a boundary null (see [dispersion_test()]). `NULL`
 #'   (default) bootstraps it when `ztp_threshold = "bootstrap"` and the mean
 #'   model is within `comp_max_par` and `comp_max_n`; otherwise the p-value is
-#'   the asymptotic boundary mixture, which is conservative for this test. The
+#'   the asymptotic boundary mixture, whose size for this test the package has not simulated. The
 #'   bootstrap restores the random-number state, so every other result is the
 #'   same with or without it.
 #' @return An object of class `"ud_screen"` with `verdict_marginal`, `verdict_atrisk`,
@@ -156,7 +156,8 @@
 #'   From restrictive assumptions to a generalized estimator.
 #'   \emph{AJPS} 33(3):762-784.
 #'
-#'   Bagozzi, B. E. (2026). Revisiting underdispersion in political science.
+#'   Bagozzi, B. E. (2026). Revisiting Underdispersion in Political Science:
+#'   Diagnostics and a Typology for Count Data.
 #'   Companion manuscript.
 #' @examples
 #' set.seed(1); x <- rnorm(250)
@@ -193,7 +194,7 @@ ud_screen <- function(formula, data, run_cpb = TRUE, cpb_max_n = 3000,
   ## In bootstrap mode the NB p-value is a parametric bootstrap under the fitted
   ## Poisson, the package default at a boundary null (dispersion_test()), when the
   ## mean model is within the comparator gates; otherwise it is the asymptotic
-  ## mixture above, which is conservative for this test. The bootstrap restores the
+  ## mixture above (its size for the NB test not simulated by the package). The bootstrap restores the
   ## random-number state, so every other result is the same with or without it.
   p_nb_method <- "asymptotic"; nb_B_ok <- NA_integer_
   if (is.null(nb_boot)) nb_boot <- identical(ztp_threshold, "bootstrap")
@@ -395,7 +396,7 @@ print.ud_screen <- function(x, ...) {
               format.pval(x$dd$p, digits = 2)))
   if (!is.na(x$p_nb)) {
     how <- if (identical(x$p_nb_method, "parametric bootstrap")) "by parametric bootstrap"
-           else "asymptotic, conservative at this boundary"
+           else "asymptotic boundary mixture"
     if (round(x$lr_nb, 2) > 0)
       cat("   NB vs Poisson LR =", round(x$lr_nb, 2), "(p=", format.pval(x$p_nb, digits = 2), how,
           "; sig => overdispersion)\n")

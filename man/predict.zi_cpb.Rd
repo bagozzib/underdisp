@@ -18,7 +18,10 @@
 \arguments{
 \item{object}{A \code{"zi_cpb"} object.}
 
-\item{newdata}{Data frame of covariate profiles.}
+\item{newdata}{Data frame of covariate profiles. A \code{zero_fe} unit the fit has
+not seen, or every row when that column is absent, enters at the zero
+equation's reference unit, and a unit at a limit at that limit (see
+\code{zero_fe} in \code{\link[=zi_cpb]{zi_cpb()}}); for the count equation's \code{fe}, see \code{offset}.}
 
 \item{type}{\code{"response"} for the marginal expected count E(Y), \code{"zero"} for
 the structural-zero probability, or \code{"intensity"} for the CPB mean (on the

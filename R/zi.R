@@ -35,11 +35,15 @@ rzicpb <- function(n, lambda, alpha, pi, support = c("ceiling", "floor")) {
 #' with an untruncated CPB for the count, so a zero can arise either structurally
 #' or as a sampling zero from the CPB. Unlike [hurdle_cpb()], the likelihood does
 #' not factorize, so the parameters are estimated by direct joint maximum
-#' likelihood, seeded from separate fits (a zero-truncated CPB on the positives
-#' and a logit of the zero indicator) and cross-checked against an
-#' expectation-maximization climb of the same observed-data likelihood, keeping
-#' the better optimum. An EM-only path (`method = "em"`) is retained for
-#' comparison.
+#' likelihood. The mixture likelihood's optima differ with the structural share
+#' of zeros, so the search starts from points that span it: separate fits (a
+#' zero-truncated CPB on the positives and a logit of the zero indicator), the
+#' zero-inflated Poisson's coefficients, and a low-inflation start (a constant
+#' structural-zero probability of 0.02), followed by a BFGS pass; it is
+#' cross-checked against an expectation-maximization climb of the same
+#' observed-data likelihood, keeping the better optimum. The separation check
+#' (Separation) restarts the final polish from any better point it finds. An
+#' EM-only path (`method = "em"`) is retained for comparison.
 #'
 #' The inflation equation uses a logit link. For a probit or cloglog inflation
 #' link, use [zi_count()] (Poisson/NB/COM-Poisson count), whose `link` argument
@@ -76,10 +80,14 @@ rzicpb <- function(n, lambda, alpha, pi, support = c("ceiling", "floor")) {
 #' @param zero_fe Optional column name for fixed effects in the zero-inflation
 #'   equation, entered as factor dummies (opt-in). On King's support the dummy
 #'   of a unit with no positive count is not counted in the degrees of freedom
-#'   (see [compare_models()], Degrees of freedom).
-#' @param method Estimation method: `"ml"` (default) is robust direct joint
-#'   maximum likelihood seeded from separate fits; `"em"` is expectation-
-#'   maximization, retained for comparison but prone to a degenerate
+#'   (see [compare_models()], Degrees of freedom), and in new data such a unit's
+#'   rows get the structural-zero probability one and those of a unit whose
+#'   every count is positive (`zero_fe_one_units`) zero; a unit the fit has not
+#'   seen, or every row when `newdata` lacks the column, enters at the zero
+#'   equation's reference unit.
+#' @param method Estimation method: `"ml"` (default) is direct joint maximum
+#'   likelihood from the starts described above; `"em"` is
+#'   expectation-maximization, retained for comparison but prone to a degenerate
 #'   structural-zero-probability collapse under heavy zero-inflation.
 #' @param se Coefficient inference: `"none"` (default) or `"bootstrap"`.
 #' @param B Bootstrap resamples when `se = "bootstrap"`.
@@ -261,8 +269,13 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   res <- chk$fit; res$separation <- chk$separation
   ## on King's support, a zero_fe level with no positive count among the rows fitted has its dummy at the limit: not
   ## counted (.ud_zero_levels); the units left out above have no rows here, so none is counted twice
-  zl <- if (is.null(zero_fe) || .cpb_fl(support)) character(0) else .ud_zero_levels(res$y, res$zero_group)
+  zl <- if (is.null(zero_fe) || .cpb_fl(support)) character(0)
+        else if (length(zero_fe) == 1L) .ud_zero_levels(res$y, res$zero_group)
+        else .ud_fe_zero_levels(res$y, data, zero_fe)              # res rows are in the data's order
   res$df <- res$df - length(zl); res$zero_fe_zero_units <- zl
+  ## and one whose every count is positive has it at the other limit (counted; predicted there in new data)
+  res$zero_fe_one_units <- if (is.null(zero_fe) || .cpb_fl(support) || length(zero_fe) != 1L) character(0)
+                           else .ud_one_levels(res$y, res$zero_group)
   res
 }
 
@@ -290,7 +303,9 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   lam <- exp(ue[as.character(dz[[res$fe]])] + xb)
   p0 <- cpb_lp0_cpp(c(1, stats::qlogis(res$alpha)), matrix(1, m, 1), integer(m), log(lam) - 1, res$max.support,
                     FALSE, .cpb_fl(res$support))[, 2]
-  seen <- if (is.null(zero_fe)) rep(TRUE, m) else as.character(dz[[zero_fe]]) %in% as.character(res$zero_group)
+  seen <- if (is.null(zero_fe)) rep(TRUE, m)
+          else if (length(zero_fe) == 1L) as.character(dz[[zero_fe]]) %in% as.character(res$zero_group)
+          else Reduce(`&`, lapply(zero_fe, function(f) as.character(dz[[f]]) %in% as.character(data[[f]][est])))
   Zz <- matrix(NA_real_, m, ncol(res$Z), dimnames = list(NULL, colnames(res$Z)))
   if (any(seen)) {
     Zs <- tryCatch(.ud_newdata_matrix(res$zero_terms, dz[seen, , drop = FALSE], res$zero_xlev, res$zero_contrasts,
@@ -311,7 +326,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   res$pi_full <- put(res$pi_full, as.numeric(stats::plogis(Zz %*% res$zero_coef)))
   res$ceiling <- put(res$ceiling, lam / (1 - res$alpha))
   res$Z <- Zf
-  if (!is.null(zero_fe)) res$zero_group <- data[[zero_fe]]
+  if (!is.null(zero_fe)) res$zero_group <- .ud_fe_group(data, zero_fe)
   res$zero_units <- zu; res$n_zero_units <- length(zu); res$n_zero_rows <- m; res$fit_rows <- est
   res
 }
@@ -556,20 +571,21 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
   int_contrasts <- attr(X, "contrasts"); zero_contrasts <- attr(Z, "contrasts")   # the fit's factor coding
   n  <- length(y); kmax <- max(y); is0 <- y == 0
 
-  ## fixed-effects path. The default ("ml") is a fast TWO-STEP estimator: the unit
+  ## fixed-effects path. The default ("ml") starts as a TWO-STEP estimator: the unit
   ## count intercepts are taken from a first-stage zero-truncated FE-CPB fit to the
   ## positive counts and held fixed as an offset, after which the observed-data
-  ## mixture likelihood is maximized over (beta, alpha, gamma). Because the offset
-  ## is estimated from the positives alone it does not use the zeros, and the
-  ## inflation equation carries only the terms in `zero` (a global pi unless
-  ## `zero_fe` adds unit dummies, which the outer optimizer then fits directly).
-  ## method = "em" is a seeded classification-EM that instead re-estimates the unit
-  ## count effects from the FULL data (positives and sampling zeros) and fits the
-  ## inflation fixed effects (`zero_fe`) cheaply via glm at each step; seeding it
-  ## from the separate-stage fits avoids the degenerate pi -> 0 basin that an
-  ## unseeded EM can fall into on heavily-zero panels. Use "em" when the inflation
-  ## equation needs its own unit fixed effects (a comparison symmetric to a hurdle
-  ## with participation fixed effects).
+  ## mixture likelihood is maximized over (beta, alpha, gamma), the inflation
+  ## equation carrying the terms in `zero` (and `zero_fe`'s unit dummies, which the
+  ## outer optimizer fits directly). On King's support that plug-in fit then starts
+  ## the observed-data polish (.zi_fe_polish), which frees every unit's count effect
+  ## with the other parameters, so the fit is a joint maximum that uses the zeros;
+  ## the floor support keeps the plug-in, as before 0.2.0.
+  ## method = "em" is a seeded classification-EM that re-estimates the unit count
+  ## effects from the FULL data (positives and sampling zeros) and fits the
+  ## inflation fixed effects (`zero_fe`) cheaply via glm at each step, then polishes
+  ## on the observed-data likelihood; seeding it from the separate-stage fits avoids
+  ## the degenerate pi -> 0 basin that an unseeded EM can fall into on heavily-zero
+  ## panels.
   if (!is.null(fe)) {
     ord  <- order(data[[fe]]); data <- data[ord, , drop = FALSE]
     y    <- y[ord]; is0 <- is0[ord]; Z <- Z[ord, , drop = FALSE]; w <- w[ord]
@@ -652,8 +668,9 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
       ## the zeros), then jointly maximize the observed-data mixture likelihood over
       ## (beta, alpha, gamma) with that offset fixed. The likelihood is the vectorized
       ## non-FE mixture nll (cpb_lp0_cpp with the offset folded in as a unit-coefficient
-      ## column), so this is fast. For an estimator whose unit effects use the zeros,
-      ## or for per-unit inflation fixed effects, use method = "em".
+      ## column), so this is fast. On King's support the polish below then frees the
+      ## unit effects, so they use the zeros; on the floor support they stay at the
+      ## plug-in (method = "em" re-estimates them there).
       ## On King's support the second stage also frees a common shift of the plug-in
       ## effects (k0 = 1): the first stage's effects absorb x-bar times ITS slopes, so
       ## without the shift a second-stage slope that differs from the first-stage one
@@ -691,7 +708,9 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
       b <- best$par[k0 + seq_len(pcov)] / sx; a <- stats::plogis(best$par[kb + 1]); g <- best$par[(kb + 2):(kb + 1 + pg)] / sz
       ll <- -best$value; iters <- as.integer(best$counts[1]); conv_fe <- isTRUE(best$convergence == 0)
       fe_hat <- off_lvl + (if (k0) best$par[1] else 0)      # the plug-in effects with the common shift
-      fe_df <- sum(tapply(y > 0, uf, any))          # the plug-in levels the first stage estimated
+      ## every level of the fit: on King's support the units with no positive count were left out before
+      ## (.zi_zero_units), and the floor support counts its fill levels, as versions before 0.2.0 did
+      fe_df <- length(fe_hat)
       ## On King's support the plug-in fit then starts the observed-data polish of the EM path, which frees every
       ## unit's count effect with the other parameters, so the fit is a joint maximum of the mixture likelihood.
       ## The plug-in alone is not: the first stage sees only the positive counts, and a unit whose positive
@@ -712,11 +731,10 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
         df = length(b) + fe_df + 1L + length(g), n = length(y), y = y, converged = conv_fe,
         weights = if (is.null(weights)) NULL else w, nobs_weighted = if (is.null(weights)) length(y) else sum(w),
         pi_full = as.numeric(stats::plogis(Z %*% g)), lambda_full = lambda_full, p0_full = p0_full,
-        zero_group = if (!is.null(zero_fe)) data[[zero_fe]], fe_estimated = if (method == "em") estimated,
+        zero_group = .ud_fe_group(data, zero_fe), fe_estimated = if (method == "em") estimated,
         ceiling = lambda_full / (1 - a), fe = fe, fe_hat = fe_hat, Z = Z, support = support,
         int_beta = b, int_xref = colMeans(Xcov),
-        int_fe_ref = .fe_mean_identified(fe_hat, if (method == "em") estimated else {
-          ym <- tapply(y, uf, max); if (fl) ym > 0 else ym >= 2 }),
+        int_fe_ref = .fe_mean_identified(fe_hat, if (method == "em") estimated else tapply(y, uf, max) > 0),
         max.support = ms,
         zero_beta = g, zero_xref = .fe_dummy_ref(colMeans(Z), Z, y, zero_fe, .ident_binary),
         int_terms = int_terms0, zero_terms = Zt, int_xlev = int_xlev, zero_xlev = zero_xlev,
@@ -887,7 +905,7 @@ zi_cpb <- function(formula, data, zero = NULL, fe = NULL, zero_fe = NULL, method
                  iterations = it, offset = off, df = length(b) + 1L + length(g), n = n, y = y, converged = conv,
                  weights = if (is.null(weights)) NULL else w, nobs_weighted = if (is.null(weights)) n else sum(w),
                  pi_full = as.numeric(stats::plogis(Z %*% g)), lambda_full = lambda_full, p0_full = p0_full,
-                 zero_group = if (!is.null(zero_fe)) data[[zero_fe]],
+                 zero_group = .ud_fe_group(data, zero_fe),
                  ceiling = lambda_full / (1 - a), X = X, Z = Z, fe = NULL, support = support,
                  int_beta = b, int_xref = colMeans(X), int_fe_ref = mean(off), max.support = ms,
                  zero_beta = g, zero_xref = .fe_dummy_ref(colMeans(Z), Z, y, zero_fe, .ident_binary),
@@ -927,7 +945,10 @@ print.zi_cpb <- function(x, ...) {
 #' Predict from a zi_cpb fit
 #'
 #' @param object A `"zi_cpb"` object.
-#' @param newdata Data frame of covariate profiles.
+#' @param newdata Data frame of covariate profiles. A `zero_fe` unit the fit has
+#'   not seen, or every row when that column is absent, enters at the zero
+#'   equation's reference unit, and a unit at a limit at that limit (see
+#'   `zero_fe` in [zi_cpb()]); for the count equation's `fe`, see `offset`.
 #' @param type `"response"` for the marginal expected count E(Y), `"zero"` for
 #'   the structural-zero probability, or `"intensity"` for the CPB mean (on the
 #'   floor support, the rate lambda, as before version 0.2.0), or `"rate"` for the
@@ -960,36 +981,44 @@ predict.zi_cpb <- function(object, newdata = NULL, type = c("response", "zero", 
   if (is.null(newdata)) {
     pit <- object$pi_full; lam <- object$lambda_full
   } else {
-    miss <- setdiff(unique(c(all.vars(object$int_terms), all.vars(object$zero_terms))), names(newdata))
+    miss <- setdiff(unique(c(all.vars(object$int_terms), all.vars(object$zero_terms))),
+                    c(names(newdata), .ud_zero_fe(object)))
     if (length(miss))
       stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
     Xn <- .ud_newdata_matrix(object$int_terms, newdata, object$int_xlev, object$int_contrasts, names(object$coefficients))
-    zn <- .zi_cpb_newdata_zero(object, newdata); Zn <- zn$Z
+    zn <- .zi_cpb_newdata_zero(object, newdata)
     off <- if (is.null(object$fe)) .ud_newdata_offset(object, newdata, offset, nrow(Xn))
            else .fe_newdata_effect(newdata, object$fe, object$fe_hat, object$int_fe_ref)
-    bad <- .ud_na_rows(Xn, off) | .ud_na_rows(Zn)                # a missing covariate or offset predicts NA
-    if (any(bad)) { Xn[bad, ] <- 0; Zn[bad, ] <- 0; off[bad] <- 0 }
+    bad <- .ud_na_rows(Xn, off) | is.na(zn$eta)                # a missing covariate or offset predicts NA
+    if (any(bad)) { Xn[bad, ] <- 0; off[bad] <- 0 }
     lam <- as.numeric(exp(off + Xn[, names(object$coefficients), drop = FALSE] %*% object$coefficients))
-    pit <- as.numeric(stats::plogis(Zn %*% object$zero_coef)); pit[zn$lack] <- NA
+    pit <- .zero_at_limit(as.numeric(stats::plogis(zn$eta)), object, newdata); pit[zn$lack] <- NA
   }
-  out <- switch(type, zero = pit, rate = lam, {
-    m <- .zi_cpb_cmean(object, lam)
+  at0 <- .count_at_limit(object, newdata)                        # a unit left out for having no positive count
+  out <- switch(type, zero = pit, rate = replace(lam, at0, 0), {
+    m <- replace(.zi_cpb_cmean(object, lam), at0, 0)
     if (type == "intensity") m else (1 - .zi_pi0(pit)) * m })
   .ud_mask(out, bad)
 }
 
-## The zero-equation design of `newdata` rows. A row of a unit the fit left out for having no positive count (see
-## zi_cpb(), `fe`) whose own zero_fe dummy the fit lacks is built at a level the fit has and flagged in `lack`, so
-## that its structural-zero probability is reported as NA.
-.zi_cpb_newdata_zero <- function(object, newdata) {
-  zfe <- object$refit_args$zero_fe; lack <- rep(FALSE, nrow(newdata))
-  if (length(object$zero_units) && !is.null(zfe) && zfe %in% names(newdata) && object$fe %in% names(newdata)) {
+## The zero equation's linear predictor at `newdata` rows. A row of a unit the fit left out for having no positive
+## count (see zi_cpb(), `fe`) whose own zero_fe dummy the fit lacks is built at a level the fit has and flagged in
+## `lack`, so that its structural-zero probability is reported as NA. Any other zero_fe unit the fit has not seen
+## (or every row, when `newdata` lacks the zero_fe column) enters at the zero equation's reference unit
+## (`zero_xref`), and with `all_factors` (held-out scoring on King's support) an unseen level of any factor.
+.zi_cpb_newdata_zero <- function(object, newdata, all_factors = FALSE) {
+  zfe <- .ud_zero_fe(object); lack <- rep(FALSE, nrow(newdata))
+  if (length(object$zero_units) && length(zfe) == 1L && zfe %in% names(newdata) && object$fe %in% names(newdata)) {
     have <- unique(as.character(object$zero_group[object$fit_rows]))
     lack <- as.character(newdata[[object$fe]]) %in% object$zero_units & !(as.character(newdata[[zfe]]) %in% have)
     if (any(lack)) { v <- as.character(newdata[[zfe]]); v[lack] <- have[1L]; newdata[[zfe]] <- v }
   }
-  list(Z = .ud_newdata_matrix(object$zero_terms, newdata, object$zero_xlev, object$zero_contrasts,
-                              names(object$zero_coef)), lack = lack)
+  eta <- if (!.ud_has_unseen(object$zero_xlev, newdata, zfe, all_factors))
+           as.numeric(.ud_newdata_matrix(object$zero_terms, newdata, object$zero_xlev, object$zero_contrasts,
+                                         names(object$zero_coef)) %*% object$zero_coef)
+         else .ud_dummy_eta(object$zero_terms, object$zero_xlev, object$zero_coef, newdata, object$zero_contrasts,
+                            object$zero_xref, zfe, all_factors)
+  list(eta = eta, lack = lack)
 }
 
 ## the count component's mean at rate lam: the exact mean of King's CPB; on the

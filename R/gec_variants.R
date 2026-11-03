@@ -2,8 +2,8 @@
 ## Hurdle and zero-inflated variants of the generalized event count (GEC / Katz)
 ## model. The count component's dispersion delta is estimated freely, so these
 ## two-part models span under-, equi-, and overdispersed intensities. The zero-
-## inflated fit uses the same robust direct-ML estimation as zi_cpb (seeded from
-## separate fits, then joint maximization), not coordinate-wise EM.
+## inflated fit uses the same robust direct-ML estimation as zi_cpb (several starts that span the structural share
+## of zeros, then joint maximization), not coordinate-wise EM.
 ## ---------------------------------------------------------------------------
 
 #' Hurdle GEC (Katz-family) regression
@@ -20,7 +20,11 @@
 #'   model (added as factor dummies), whose slopes carry the dummy logit's
 #'   incidental-parameters bias in short panels (see [hurdle_cpb()]). The dummy
 #'   of a unit that never participates is not counted in the degrees of freedom
-#'   (see [compare_models()], Degrees of freedom).
+#'   (see [compare_models()], Degrees of freedom). In new data such a unit, and
+#'   one whose every count is positive, get the participation probability at
+#'   their limits (zero and one), and an unseen unit enters at the reference
+#'   unit, as in [hurdle_cpb()]; the participation equation is checked for
+#'   separation (`part_separation`).
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`.
 #' @param offset Optional offset (log scale) for the intensity: a numeric vector
@@ -98,8 +102,8 @@ hurdle_gec <- function(formula, data, participation = NULL, part_fe = NULL,
   beta <- ifit$coefficients
   off_all <- if (is.null(offset)) 0 else if (is.character(offset)) as.numeric(data[[offset]]) else as.numeric(offset)
   lambda_full <- as.numeric(exp(off_all + Xall %*% beta))
-  zl <- .ud_zero_levels(y, if (!is.null(part_fe)) data[[part_fe]])   # never participate: not counted (.ud_zero_levels)
-  ol <- .ud_one_levels(y, if (!is.null(part_fe)) data[[part_fe]])    # always participate: predicted at the limit
+  zl <- .ud_fe_zero_levels(y, data, part_fe)   # never participate: not counted (.ud_zero_levels)
+  ol <- .ud_fe_one_levels(y, data, part_fe)    # always participate: predicted at the limit
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), Zpart = stats::model.matrix(pfit),
                  y = as.integer(y), p_full = as.numeric(stats::fitted(pfit)),
@@ -137,7 +141,10 @@ print.hurdle_gec <- function(x, ...) {
 #' Predict from a hurdle-GEC fit
 #'
 #' @param object A `"hurdle_gec"` object.
-#' @param newdata Optional covariate profiles (intensity and participation).
+#' @param newdata Optional covariate profiles (intensity and participation). A
+#'   `part_fe` unit the fit has not seen, or every row when that column is
+#'   absent, enters at the reference unit, and a unit at a limit at that limit
+#'   (see `part_fe` in [hurdle_gec()]).
 #' @param type `"response"` (marginal E(Y)), `"participation"` (P(Y>0)), or
 #'   `"intensity"` (E(Y | Y>0)).
 #' @param offset Optional offset (log scale) of the intensity for the `newdata`
@@ -160,7 +167,7 @@ predict.hurdle_gec <- function(object, newdata = NULL,
   if (isTRUE(se.fit) || match.arg(interval) != "none")
     return(.ud_predict_ci(object, newdata, type, se.fit, match.arg(interval), level, offset = offset))
   if (is.null(newdata)) { p <- object$p_full; lam <- object$lambda_full } else {
-    p <- .part_at_limit(.ud_glm_predict(object$participation, newdata), object, newdata)
+    p <- .part_at_limit(.ud_part_prob(object, newdata), object, newdata)
     Terms <- stats::delete.response(stats::terms(object$formula))
     miss <- setdiff(all.vars(Terms), names(newdata))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
@@ -170,7 +177,7 @@ predict.hurdle_gec <- function(object, newdata = NULL,
   }
   bad <- is.na(lam) | is.na(p); lam[bad] <- 1                 # a missing covariate predicts NA
   p0    <- gec_pmf_cpp(lam, object$delta, 0L, object$max.support)[, 1]
-  tmean <- gec_mean_cpp(lam, object$delta, object$max.support) / pmax(1 - p0, 1e-8)   # exact E(Y | Y > 0)
+  tmean <- gec_mean_cpp(lam, object$delta, object$max.support) / pmax(1 - p0, 1e-12)   # exact E(Y | Y > 0)
   .ud_mask(as.numeric(switch(type, participation = p, intensity = tmean, response = p * tmean)), bad)
 }
 
@@ -202,7 +209,9 @@ nobs.hurdle_gec <- function(object, ...) if (is.null(object$nobs_weighted)) obje
 #' @param zero_fe Optional column name for fixed effects in the zero-inflation
 #'   equation, entered as factor dummies (opt-in). The dummy of a unit with no
 #'   positive count is not counted in the degrees of freedom (see
-#'   [compare_models()], Degrees of freedom).
+#'   [compare_models()], Degrees of freedom); in new data such a unit gets the
+#'   structural-zero probability one, and one whose every count is positive
+#'   zero.
 #' @param se Coefficient inference: `"none"` (default) or `"bootstrap"`.
 #' @param B Bootstrap resamples.
 #' @param cluster Optional cluster (column name or vector) for the bootstrap.
@@ -329,7 +338,7 @@ zi_gec <- function(formula, data, zero = NULL, zero_fe = NULL, se = c("none", "b
     r <- fitfun(dat)
     chk <- .zi_restart(r,
       check = function(r) .zi_separation(r$Z, r$g, r$y, p0_of(r), if (is.null(weights)) NULL else r$w,
-                                         if (!is.null(zero_fe)) dat[[zero_fe]], .zi_fe_cols(r$Z, zero_fe)),
+                                         .ud_fe_group(dat, zero_fe), .zi_fe_cols(r$Z, zero_fe)),
       refit = function(r, g) fitfun(dat, start = c(r$b, log(r$delta), g)),
       loglik = function(r) r$ll)
     r <- chk$fit; r$separation <- chk$separation
@@ -353,9 +362,11 @@ zi_gec <- function(formula, data, zero = NULL, zero_fe = NULL, se = c("none", "b
     se.zero[zcov] <- .ud_boot_stats(boot, paste0("zero:", zcov), r$g[zcov], normal = TRUE)$se
   }
   Ti0 <- stats::delete.response(stats::terms(formula))
-  zl <- .ud_zero_levels(r$y, if (!is.null(zero_fe)) data[[zero_fe]])   # their zero dummies at the limit: not counted
+  zl <- .ud_fe_zero_levels(r$y, data, zero_fe)   # their zero dummies at the limit: not counted
+  ol <- .ud_fe_one_levels(r$y, data, zero_fe)    # every count positive: the dummy at the other limit, in new data
   structure(list(coefficients = r$b, delta = r$delta, dispersion = r$delta, zero_coef = r$g, zero.coefficients = r$g,
                  loglik = r$ll, iterations = r$it, df = r$pb + 1L + r$pg - length(zl), zero_fe_zero_units = zl,
+                 zero_fe_one_units = ol,
                  n = r$n, y = r$y,
                  offset = r$off, offset_name = offset_name,
                  pi_full = as.numeric(stats::plogis(r$Z %*% r$g)), lambda_full = lambda_full, p0_full = p0_full,
@@ -395,7 +406,11 @@ print.zi_gec <- function(x, ...) {
 #' Predict from a zi_gec fit
 #'
 #' @param object A `"zi_gec"` object.
-#' @param newdata Optional covariate profiles.
+#' @param newdata Optional covariate profiles. A `zero_fe` unit the fit has not
+#'   seen, or every row when that column is absent, enters at the zero
+#'   equation's reference unit; a unit with no positive count gets the
+#'   structural-zero probability one, and one whose every count is positive
+#'   zero (see [compare_models()], Degrees of freedom).
 #' @param type `"response"` (marginal E(Y)), `"zero"` (structural-zero
 #'   probability), or `"intensity"` (the count mean E of the GEC component).
 #' @param offset Optional offset (log scale) of the count component for the
@@ -418,16 +433,27 @@ predict.zi_gec <- function(object, newdata = NULL, type = c("response", "zero", 
     return(.ud_predict_ci(object, newdata, type, se.fit, match.arg(interval), level, offset = offset))
   if (is.null(newdata)) { pit <- object$pi_full; lam <- object$lambda_full } else {
     Ti <- stats::delete.response(object$int_terms); Tz <- object$zero_terms
-    miss <- setdiff(unique(c(all.vars(Ti), all.vars(Tz))), names(newdata))
+    miss <- setdiff(unique(c(all.vars(Ti), all.vars(Tz))), c(names(newdata), object$zero_fe))
     if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
     off <- .ud_newdata_offset(object, newdata, offset)
     lam <- as.numeric(exp(off + .ud_newdata_matrix(Ti, newdata, object$int_xlev, object$int_contrasts,
                                                    names(object$coefficients)) %*% object$coefficients))
-    pit <- as.numeric(stats::plogis(.ud_newdata_matrix(Tz, newdata, object$zero_xlev, object$zero_contrasts, names(object$zero_coef)) %*% object$zero_coef))
+    pit <- as.numeric(stats::plogis(.zi_gec_zero_eta(object, newdata)))
+    pit <- .zero_at_limit(pit, object, newdata)
   }
   bad <- is.na(lam) | is.na(pit); lam[bad] <- 1               # a missing covariate predicts NA
   cmean <- gec_mean_cpp(lam, object$delta, object$max.support)
   .ud_mask(switch(type, zero = pit, intensity = cmean, response = (1 - pit) * cmean), bad)
+}
+
+## the zero equation's linear predictor in new data; a zero_fe unit the fit has not seen (or no zero_fe column)
+## enters at the reference unit, and with `all_factors` (held-out scoring) an unseen level of any factor
+.zi_gec_zero_eta <- function(object, newdata, all_factors = FALSE) {
+  if (!.ud_has_unseen(object$zero_xlev, newdata, object$zero_fe, all_factors))
+    return(as.numeric(.ud_newdata_matrix(object$zero_terms, newdata, object$zero_xlev, object$zero_contrasts,
+                                         names(object$zero_coef)) %*% object$zero_coef))
+  .ud_dummy_eta(object$zero_terms, object$zero_xlev, object$zero_coef, newdata, object$zero_contrasts,
+                object$zref, object$zero_fe, all_factors)
 }
 
 #' @method logLik zi_gec

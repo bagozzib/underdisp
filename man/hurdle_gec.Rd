@@ -31,7 +31,11 @@ to the intensity's right-hand side.}
 model (added as factor dummies), whose slopes carry the dummy logit's
 incidental-parameters bias in short panels (see \code{\link[=hurdle_cpb]{hurdle_cpb()}}). The dummy
 of a unit that never participates is not counted in the degrees of freedom
-(see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
+(see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom). In new data such a unit, and
+one whose every count is positive, get the participation probability at
+their limits (zero and one), and an unseen unit enters at the reference
+unit, as in \code{\link[=hurdle_cpb]{hurdle_cpb()}}; the participation equation is checked for
+separation (\code{part_separation}).}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}.}

@@ -444,7 +444,7 @@ cpb <- function(formula, data, truncated = TRUE, se = c("none", "bootstrap"),
 ## profile is a saw-tooth, so the set above a cut need not be connected),
 ## located by uniroot between the last trace point above the cut and the next
 ## one out. The interval is one-sided (`boundary`) only when the profile has not
-## dropped to the cut by alpha = 0.005.
+## dropped to the cut by the trace's lower end (alpha = 1e-6 on King's support, 0.005 on the floor).
 ## The profile machinery of the pooled fit. `.cpb_prof_at()` maximizes the
 ## slopes at a fixed alpha with the fit's own effort (BFGS, Nelder-Mead polish,
 ## feasibility-repaired perturbation restarts, since a single simplex can stop

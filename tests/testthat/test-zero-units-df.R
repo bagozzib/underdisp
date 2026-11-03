@@ -58,8 +58,8 @@ test_that("in new data the hurdles give such a unit's rows the participation pro
   hf <- hurdle_cpb(y ~ x, p$full, participation = ~ x, fe = "unit", part_fe = "unit", se = "none", support = "floor")
   expect_identical(predict(hf, newdata = nd, type = "participation"),
                    as.numeric(predict(hf$participation, newdata = nd, type = "response")))
-  ## (hurdle_count's intensity dummies cannot predict a unit it never saw positive, so its intensity is pooled here)
-  hc <- hurdle_count(y ~ x, p$full, family = "poisson", participation = ~ x, part_fe = "unit", se = "none")
+  ## hurdle_count with intensity dummies too: its intensity never saw such a unit, which enters it at the reference
+  hc <- hurdle_count(y ~ x, p$full, family = "poisson", participation = ~ x, fe = "unit", part_fe = "unit", se = "none")
   expect_identical(predict(hc, newdata = nd, type = "participation")[zu], rep(0, sum(zu)))
   expect_identical(underdisp:::.pmf_and_y_newdata(hc, nd, kmax = 5L)$P[zu, 1], rep(1, sum(zu)))
 })

@@ -170,9 +170,12 @@ estimate the same pseudo-true parameter (time-homogeneity; Dhaene & Jochmans
 2015, Review of Economic Studies). On trending or time-heterogeneous panels
 the correction is invalid, so the function REFUSES it -- returning the
 uncorrected maximum-likelihood fit with a warning naming the failed check --
-whenever the corrected dispersion leaves its feasible space or the two
-half-panel dispersion estimates disagree beyond what the 1/T bias can
-explain. A refusal is diagnostic information about the panel, not an error.
+whenever the full fit's residuals trend with time (correlation with the
+within-unit time index, p < 0.01), the two half-panel dispersion estimates
+disagree by more than 2.5 times the noise of five placebo splits of the
+units (and by more than 0.05 of the estimate's scale), or the corrected
+dispersion leaves its feasible space. A refusal is diagnostic information
+about the panel, not an error.
 The gate is deliberately powered over sized: in the package's calibration
 Monte Carlo it refuses 9 to 13 percent of genuinely time-homogeneous panels
 (a conservative nuisance; the returned fit is exactly the ordinary

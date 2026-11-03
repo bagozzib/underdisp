@@ -58,7 +58,9 @@ criterion for comparing models that differ in the number of parameters (for
 example a hurdle with per-unit participation fixed effects against a
 zero-inflated model). Per-observation held-out scores are returned so two
 models fit on the \emph{same} folds can be compared with a paired, cluster-robust
-test.
+test. Each fold is scored as \code{\link[=score]{score()}} scores \code{newdata}: a unit, or a level
+of any factor, that the training folds lack enters at the reference unit,
+and a unit a two-part fit holds at a limit is scored at that limit.
 }
 \examples{
 \donttest{

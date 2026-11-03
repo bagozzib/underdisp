@@ -73,10 +73,12 @@ reference:
       - calibrate_alpha
       - vcov.cpb_fe
       - fitted.underdisp
+      - residuals.count_reg
   - title: Predictions
     contents:
       - predict.cpb
       - predict.cpb_fe
+      - predict.gec_fe
       - predict.gec
       - predict.count_reg
       - predict.hurdle_cpb

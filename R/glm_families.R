@@ -524,7 +524,12 @@ count_reg <- function(formula, data, family = c("poisson", "negbin", "compois", 
 #'   slopes carry the dummy logit's incidental-parameters bias in short panels
 #'   (see [hurdle_cpb()]). The participation dummy of a unit that never
 #'   participates is not counted in the degrees of freedom (see
-#'   [compare_models()], Degrees of freedom).
+#'   [compare_models()], Degrees of freedom). In new data such a unit, and one
+#'   whose every count is positive, get the participation probability at their
+#'   limits (zero and one; with one `part_fe` column), and a unit either
+#'   equation has not seen (the intensity never sees a unit with no positive
+#'   count) enters that equation at its reference unit, as in [hurdle_cpb()];
+#'   the participation equation is checked for separation (`part_separation`).
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`. Positive participation coefficients raise the probability of
 #'   a *positive count* (participation).
@@ -590,8 +595,8 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
   off_all <- if (is.null(offset)) 0 else if (is.character(offset)) as.numeric(data[[offset]]) else as.numeric(offset)
   lambda_full <- exp(off_all + as.numeric(mm[, common, drop = FALSE] %*% beta[common]))
   llh <- as.numeric(stats::logLik(pfit)) + ifit$loglik
-  zl <- .ud_zero_levels(y, if (!is.null(part_fe)) data[[part_fe]])   # never participate: not counted (.ud_zero_levels)
-  ol <- .ud_one_levels(y, if (!is.null(part_fe)) data[[part_fe]])    # always participate: predicted at the limit
+  zl <- .ud_fe_zero_levels(y, data, part_fe)   # never participate: not counted (.ud_zero_levels)
+  ol <- .ud_fe_one_levels(y, data, part_fe)    # always participate: predicted at the limit
   dfh <- length(stats::coef(pfit)) - length(zl) + ifit$df
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), y = as.integer(y),
@@ -647,7 +652,11 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
 #' @param zero_fe Optional fixed-effects column for the inflation equation
 #'   (factor dummies); zero-equation fixed effects are opt-in. In either
 #'   equation the dummy of a unit with no positive count is not counted in the
-#'   degrees of freedom (see [compare_models()], Degrees of freedom).
+#'   degrees of freedom (see [compare_models()], Degrees of freedom). In new
+#'   data (with one column each) such a unit gets the structural-zero
+#'   probability one through `zero_fe` and a count mean of zero through `fe`,
+#'   and a unit whose every count is positive the structural-zero probability
+#'   zero.
 #' @param link Link for the inflation probability: `"logit"` (default),
 #'   `"probit"`, or `"cloglog"`. Positive inflation coefficients raise the
 #'   probability of a *structural zero*.
@@ -767,7 +776,7 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
     check = function(o) {
       th <- if (fam$nshape) unname(fam$shape_inv(o$par[pc + pz + seq_len(fam$nshape)])) else NA_real_
       .zi_separation(Zz, o$par[pc + seq_len(pz)], Y, fam$p0(as.numeric(exp(rep_len(off, n) + Xc %*% o$par[seq_len(pc)])), th),
-                     w, if (!is.null(zero_fe)) data[[zero_fe]][rows], .zi_fe_cols(Zz, zero_fe), link = link)
+                     w, .ud_fe_group(data[rows, , drop = FALSE], zero_fe), .zi_fe_cols(Zz, zero_fe), link = link)
     },
     refit = function(o, g) run(list(c(o$par[seq_len(pc)], g, o$par[pc + pz + seq_len(fam$nshape)]))),
     loglik = function(o) -o$value)
@@ -779,7 +788,8 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
   ## the count effects and zero-equation dummies of units with no positive count are at their limits; not counted
   ## (.ud_zero_levels)
   zl_fe <- unlist(lapply(fe, function(f) .ud_zero_levels(Y, data[[f]][rows])))
-  zl_zero <- .ud_zero_levels(Y, if (!is.null(zero_fe)) data[[zero_fe]][rows])
+  zl_zero <- .ud_fe_zero_levels(Y, data[rows, , drop = FALSE], zero_fe)
+  ol_zero <- .ud_fe_one_levels(Y, data[rows, , drop = FALSE], zero_fe)   # the dummy at its other limit, in new data
   df <- pc + pz + fam$nshape - length(zl_fe) - length(zl_zero)
   se.beta <- setNames(rep(NA_real_, pc), colnames(Xc)); se.zero <- setNames(rep(NA_real_, pz), colnames(Zz))
   vcv <- NULL; vcv_full <- NULL
@@ -802,7 +812,8 @@ zi_count <- function(formula, data, family = c("poisson", "negbin", "compois", "
   }
   structure(list(coefficients = beta, zero.coefficients = gamma, zero_coef = gamma, theta = theta, family = family,
                  se.beta = se.beta, se.zero = se.zero, vcov = vcv, vcov_full = vcv_full,
-                 loglik = -o$value, df = df, fe_zero_units = zl_fe, zero_fe_zero_units = zl_zero, n = n,
+                 loglik = -o$value, df = df, fe_zero_units = zl_fe, zero_fe_zero_units = zl_zero,
+                 zero_fe_one_units = ol_zero, n = n,
                  nobs_weighted = if (is.null(w)) n else sum(w),
                  weights = w, link = link,
                  pi_full = as.numeric(linkinv(Zz %*% gamma)), separation = sep,
@@ -890,14 +901,7 @@ predict.count_reg <- function(object, newdata = NULL, type = c("response", "link
   type <- match.arg(type); fam <- .count_fam(object$family)
   if (isTRUE(se.fit) || match.arg(interval) != "none")
     return(.ud_predict_ci(object, newdata, type, se.fit, match.arg(interval), level, offset = offset, at = at))
-  if (is.null(newdata)) { eta <- object$linear.predictors }
-  else {
-    Terms <- stats::delete.response(object$terms)
-    miss <- setdiff(all.vars(Terms), names(newdata))
-    if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
-    X <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
-    eta <- .ud_newdata_offset(object, newdata, offset, nrow(X)) + as.numeric(X %*% object$coefficients)
-  }
+  eta <- if (is.null(newdata)) object$linear.predictors else .count_reg_eta(object, newdata, offset)
   bad <- if (is.null(newdata)) FALSE else is.na(eta)          # a missing covariate or offset predicts NA
   if (any(bad)) eta[bad] <- 0
   mu <- exp(eta)
@@ -915,6 +919,25 @@ predict.count_reg <- function(object, newdata = NULL, type = c("response", "link
   if (isTRUE(object$truncated)) m <- m / pmax(1 - fam$p0(mu, object$theta), 1e-12)   # E(Y | Y > 0)
   .ud_mask(m, bad)
 }
+## The linear predictor of a count_reg() fit in new data, offset included. A unit of an `fe` column the fit has not
+## seen (or every row, when `newdata` lacks the column) enters at the reference unit `xref` (by default the fit's own,
+## the units its data identify; a hurdle passes its intensity's), and with `all_factors` (held-out scoring) an unseen
+## level of any factor; the rows the fit can evaluate are computed as before.
+.count_reg_eta <- function(object, newdata, offset = NULL, xref = NULL, all_factors = FALSE) {
+  Terms <- stats::delete.response(object$terms)
+  miss <- setdiff(all.vars(Terms), c(names(newdata), object$fe))
+  if (length(miss)) stop("'newdata' is missing required variable(s): ", paste(miss, collapse = ", "), ".")
+  if (!.ud_has_unseen(object$levels, newdata, object$fe, all_factors)) {
+    X <- .ud_newdata_matrix(Terms, newdata, object$levels, object$contrasts, names(object$coefficients))
+    return(.ud_newdata_offset(object, newdata, offset, nrow(X)) + as.numeric(X %*% object$coefficients))
+  }
+  if (is.null(xref) && !is.null(object$X))
+    xref <- .fe_dummy_ref(colMeans(object$X), object$X, object$Y, object$fe,
+                          if (isTRUE(object$truncated)) .ident_trunc else .ident_count)
+  .ud_newdata_offset(object, newdata, offset, nrow(newdata)) +
+    .ud_dummy_eta(Terms, object$levels, object$coefficients, newdata, object$contrasts, xref, object$fe, all_factors)
+}
+
 #' @method summary count_reg
 #' @export
 summary.count_reg <- function(object, ...) {

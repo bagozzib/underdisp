@@ -46,7 +46,14 @@ the probit) reduces it to second order; the hurdle's predictions and
 quantities of interest use the dummy logit's unit effects. On King's
 support the dummy of a unit that never participates, at minus infinity, is
 not counted in the degrees of freedom (see \code{\link[=compare_models]{compare_models()}}, Degrees of
-freedom).}
+freedom). In new data (\code{\link[=predict.hurdle_cpb]{predict.hurdle_cpb()}}, \code{\link[=score]{score()}}, \code{\link[=cv_score]{cv_score()}}) such
+a unit's rows get the participation probability at that limit, zero, and
+those of a unit whose every count is positive (\code{part_one_units}) one; a unit
+the fit has not seen, or every row of \code{newdata} without the \code{part_fe}
+column, enters at the reference unit of the units the data identify. The
+participation equation is checked for separation by \code{\link[=zi_cpb]{zi_cpb()}}'s rule
+(Separation; component \code{part_separation}). The floor support counts and
+predicts these units as before 0.2.0.}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}. Positive participation coefficients raise the probability of

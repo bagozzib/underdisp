@@ -52,6 +52,14 @@ test_that("EM FE-ZI handles units with no positive counts (all-zero units)", {
   expect_true(is.finite(AIC(em)))
   full_count <- length(em$coefficients) + nu + 1L + length(em$zero_coef)
   expect_lt(em$df, full_count)                             # df excludes never-estimated unit effects
+  ## On King's support (above) those units are left out before the EM runs (.zi_zero_units); the EM's own
+  ## mean-effect expansion is the floor support's path, as before 0.2.0
+  ef <- suppressWarnings(zi_cpb(y ~ x, d, zero = ~ 1, fe = "u", zero_fe = "u", method = "em", se = "none",
+                                support = "floor"))
+  expect_length(ef$fe_hat, nu)
+  expect_true(all(is.finite(ef$fe_hat)))
+  expect_false(any(ef$fe_estimated[1:5]))
+  expect_lt(ef$df, length(ef$coefficients) + nu + 1L + length(ef$zero_coef))
 })
 
 test_that("the EM reports convergence as it happened on King's support", {

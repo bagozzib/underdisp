@@ -34,7 +34,12 @@ participation models (entered as factor dummies). The participation
 slopes carry the dummy logit's incidental-parameters bias in short panels
 (see \code{\link[=hurdle_cpb]{hurdle_cpb()}}). The participation dummy of a unit that never
 participates is not counted in the degrees of freedom (see
-\code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
+\code{\link[=compare_models]{compare_models()}}, Degrees of freedom). In new data such a unit, and one
+whose every count is positive, get the participation probability at their
+limits (zero and one; with one \code{part_fe} column), and a unit either
+equation has not seen (the intensity never sees a unit with no positive
+count) enters that equation at its reference unit, as in \code{\link[=hurdle_cpb]{hurdle_cpb()}};
+the participation equation is checked for separation (\code{part_separation}).}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}. Positive participation coefficients raise the probability of

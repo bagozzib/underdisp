@@ -59,11 +59,15 @@ effect under \code{"em"}).}
 \item{zero_fe}{Optional column name for fixed effects in the zero-inflation
 equation, entered as factor dummies (opt-in). On King's support the dummy
 of a unit with no positive count is not counted in the degrees of freedom
-(see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom).}
+(see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom), and in new data such a unit's
+rows get the structural-zero probability one and those of a unit whose
+every count is positive (\code{zero_fe_one_units}) zero; a unit the fit has not
+seen, or every row when \code{newdata} lacks the column, enters at the zero
+equation's reference unit.}
 
-\item{method}{Estimation method: \code{"ml"} (default) is robust direct joint
-maximum likelihood seeded from separate fits; \code{"em"} is expectation-
-maximization, retained for comparison but prone to a degenerate
+\item{method}{Estimation method: \code{"ml"} (default) is direct joint maximum
+likelihood from the starts described above; \code{"em"} is
+expectation-maximization, retained for comparison but prone to a degenerate
 structural-zero-probability collapse under heavy zero-inflation.}
 
 \item{se}{Coefficient inference: \code{"none"} (default) or \code{"bootstrap"}.}
@@ -108,11 +112,15 @@ Fits the zero-inflated CPB. The model mixes a structural-zero process
 with an untruncated CPB for the count, so a zero can arise either structurally
 or as a sampling zero from the CPB. Unlike \code{\link[=hurdle_cpb]{hurdle_cpb()}}, the likelihood does
 not factorize, so the parameters are estimated by direct joint maximum
-likelihood, seeded from separate fits (a zero-truncated CPB on the positives
-and a logit of the zero indicator) and cross-checked against an
-expectation-maximization climb of the same observed-data likelihood, keeping
-the better optimum. An EM-only path (\code{method = "em"}) is retained for
-comparison.
+likelihood. The mixture likelihood's optima differ with the structural share
+of zeros, so the search starts from points that span it: separate fits (a
+zero-truncated CPB on the positives and a logit of the zero indicator), the
+zero-inflated Poisson's coefficients, and a low-inflation start (a constant
+structural-zero probability of 0.02), followed by a BFGS pass; it is
+cross-checked against an expectation-maximization climb of the same
+observed-data likelihood, keeping the better optimum. The separation check
+(Separation) restarts the final polish from any better point it finds. An
+EM-only path (\code{method = "em"}) is retained for comparison.
 }
 \details{
 The inflation equation uses a logit link. For a probit or cloglog inflation
