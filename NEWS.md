@@ -239,6 +239,14 @@
   near one, where the zero-inflated fits gave the same rows zero. Fitted values,
   likelihoods and degrees of freedom are unchanged. CPB fits on the floor
   support predict as before.
+* Likewise the rows, in new data, of a unit whose every count is positive get
+  the participation probability at its limit, one, so a zero of such a unit is
+  impossible for the hurdle. Before, the glm's finite stopping value for the
+  unit's dummy gave that zero a probability of about 1e-8 instead of zero, and
+  with a covariate far from its fitted range it could give any probability.
+  The fits record the units
+  (`part_one_units`); their dummies are counted in the degrees of freedom as
+  before.
 * The participation equation of `hurdle_cpb()`, `hurdle_gec()` and
   `hurdle_count()` is checked for separation by the zero-inflated fits' rule.
   With `cluster` its standard errors are cluster-robust (`hurdle_count()`

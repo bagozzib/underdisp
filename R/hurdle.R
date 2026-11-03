@@ -207,6 +207,8 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
   }
   ## a unit that never participates has its participation dummy at minus infinity; not counted (.ud_zero_levels)
   zl <- if (is.null(part_fe) || .cpb_fl(.cpb_support(ifit))) character(0) else .ud_zero_levels(y, data[[part_fe]])
+  ## one whose every count is positive has it at plus infinity; counted, but predicted at that limit in new data
+  ol <- if (is.null(part_fe) || .cpb_fl(.cpb_support(ifit))) character(0) else .ud_one_levels(y, data[[part_fe]])
 
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), Zpart = stats::model.matrix(pfit),
@@ -220,8 +222,8 @@ hurdle_cpb <- function(formula, data, participation = NULL, fe = NULL, part_fe =
                  weights = w_all, nobs_weighted = if (is.null(w_all)) length(y) else sum(w_all),
                  cluster = if (is.character(cluster)) cluster else NULL,
                  loglik = as.numeric(stats::logLik(pfit)) + ifit$loglik,
-                 df = length(stats::coef(pfit)) - length(zl) + ifit$df, part_zero_units = zl, se.type = se,
-                 formula = formula, part_formula = participation, refit_args = refit_args, call = match.call()), pf),
+                 df = length(stats::coef(pfit)) - length(zl) + ifit$df, part_zero_units = zl, part_one_units = ol,
+                 se.type = se, formula = formula, part_formula = participation, refit_args = refit_args, call = match.call()), pf),
             class = "hurdle_cpb")
 }
 

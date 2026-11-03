@@ -50,8 +50,13 @@ in \code{\link[=zi_count]{zi_count()}}; \code{zero_fe_zero_units} in \code{\link
 methods give the number. In new data (\code{predict()}, \code{\link[=score]{score()}}, \code{\link[=cv_score]{cv_score()}})
 the hurdles give such a unit's rows the participation probability at that
 limit, zero, as the zero-inflated fits give them a count effect at its limit.
-CPB fits on the floor support (\code{support = "floor"}) count these parameters,
-and predict, as versions before 0.2.0 did.
+A unit whose every count is positive has its hurdle participation dummy at
+the other limit, plus infinity; that dummy is counted, as the zero-inflated
+fits count their zero-equation dummy for the unit, and in new data the
+hurdles give the unit's rows the participation probability one (the fits
+record these units in \code{part_one_units}). CPB fits on the floor support
+(\code{support = "floor"}) count these parameters, and predict, as versions before
+0.2.0 did.
 }
 
 \examples{

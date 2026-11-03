@@ -32,14 +32,27 @@
   if (!any(pos)) character(0) else names(pos)[!pos]
 }
 
-## The participation probability of a hurdle in new data, at the limit for the units .ud_zero_levels() found. The
-## dummy of a unit with no positive count is at minus infinity, but the glm stops at a finite value there, and that
-## value plus the covariates can give the unit's new rows any probability; the limit gives them zero, whatever the
-## covariates, as the zero-inflated fits' count effect at its limit does.
+## The levels of a hurdle's participation fixed-effects column whose rows are all positive. Such a unit's dummy is at
+## plus infinity, as in any fixed-effects logit; unlike the dummy of a unit with no positive count it stays counted in
+## the degrees of freedom, as the zero-inflated fits count their zero-equation dummy for the unit, which sits at its
+## own limit (pi = 0) there. The fit records the units so that new data can be predicted at the limit (.part_at_limit).
+.ud_one_levels <- function(y, unit) {
+  if (is.null(unit)) return(character(0))
+  allpos <- tapply(y > 0, as.character(unit), all)
+  names(allpos)[allpos]
+}
+
+## The participation probability of a hurdle in new data, at the limit for the units .ud_zero_levels() and
+## .ud_one_levels() found. The dummy of a unit with no positive count is at minus infinity, and that of a unit whose
+## every count is positive at plus infinity, but the glm stops at a finite value for either, and that value plus the
+## covariates can give the unit's new rows any probability; the limit gives them zero or one, whatever the
+## covariates. The zero-inflated fits' count effect at its limit gives the first kind of unit the same zero.
 .part_at_limit <- function(p, object, newdata) {
-  zl <- object$part_zero_units; pf <- object$part_fe
-  if (is.null(newdata) || !length(zl) || length(pf) != 1L || is.null(newdata[[pf]])) return(p)
-  p[as.character(newdata[[pf]]) %in% zl] <- 0
+  zl <- object$part_zero_units; ol <- object$part_one_units; pf <- object$part_fe
+  if (is.null(newdata) || !(length(zl) || length(ol)) || length(pf) != 1L || is.null(newdata[[pf]])) return(p)
+  u <- as.character(newdata[[pf]])
+  p[u %in% zl] <- 0
+  p[u %in% ol] <- 1
   p
 }
 

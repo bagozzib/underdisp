@@ -591,11 +591,13 @@ hurdle_count <- function(formula, data, family = c("poisson", "negbin", "compois
   lambda_full <- exp(off_all + as.numeric(mm[, common, drop = FALSE] %*% beta[common]))
   llh <- as.numeric(stats::logLik(pfit)) + ifit$loglik
   zl <- .ud_zero_levels(y, if (!is.null(part_fe)) data[[part_fe]])   # never participate: not counted (.ud_zero_levels)
+  ol <- .ud_one_levels(y, if (!is.null(part_fe)) data[[part_fe]])    # always participate: predicted at the limit
   dfh <- length(stats::coef(pfit)) - length(zl) + ifit$df
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), y = as.integer(y),
                  p_full = as.numeric(stats::fitted(pfit)), lambda_full = lambda_full,
-                 theta = ifit$theta, family = family, loglik = llh, df = dfh, part_zero_units = zl, link = link,
+                 theta = ifit$theta, family = family, loglik = llh, df = dfh, part_zero_units = zl,
+                 part_one_units = ol, link = link,
                  int_fe_ref = mean(off_all),
                  int_beta = beta,
                  int_xref = .fe_dummy_ref(colMeans(mm[, common, drop = FALSE]), mm[, common, drop = FALSE], y, fe,

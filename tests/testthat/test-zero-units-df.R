@@ -64,6 +64,38 @@ test_that("in new data the hurdles give such a unit's rows the participation pro
   expect_identical(underdisp:::.pmf_and_y_newdata(hc, nd, kmax = 5L)$P[zu, 1], rep(1, sum(zu)))
 })
 
+test_that("in new data the hurdles give a unit whose every count is positive the participation probability one", {
+  p <- zero_df_panel(); d <- p$full; ou <- c("u03", "u07")
+  d$y[d$unit %in% ou & d$y == 0L] <- 1L
+  ## a covariate far out: glm's finite dummy for such a unit plus a large negative slope term would give its row a
+  ## probability near zero
+  nd <- d[d$t == 1, ]; nd$x <- -100; nd$y <- 0L
+  o <- nd$unit %in% ou
+  h <- hurdle_cpb(y ~ x, d, participation = ~ x, fe = "unit", part_fe = "unit", se = "none")
+  expect_setequal(h$part_one_units, ou)
+  ph <- predict(h, newdata = nd, type = "participation")
+  expect_identical(ph[o], rep(1, sum(o)))
+  expect_true(all(ph[!o] < 0.5))
+  ## the held-out scorers read the same probability: a zero of such a unit is impossible
+  expect_identical(underdisp:::.pmf_and_y_newdata(h, nd, kmax = 5L)$P[o, 1], rep(0, sum(o)))
+  ## the fit is unchanged: fitted values are the glm's, and the dummies are counted
+  expect_identical(h$p_full, as.numeric(fitted(h$participation)))
+  expect_identical(h$df, length(coef(h$participation)) - length(h$part_zero_units) + h$intensity$df)
+  ## the floor support predicts as before 0.2.0
+  hf <- hurdle_cpb(y ~ x, d, participation = ~ x, fe = "unit", part_fe = "unit", se = "none", support = "floor")
+  expect_length(hf$part_one_units, 0L)
+  expect_identical(predict(hf, newdata = nd, type = "participation"),
+                   as.numeric(predict(hf$participation, newdata = nd, type = "response")))
+  hc <- hurdle_count(y ~ x, d, family = "poisson", participation = ~ x, part_fe = "unit", se = "none")
+  expect_setequal(hc$part_one_units, ou)
+  expect_identical(predict(hc, newdata = nd, type = "participation")[o], rep(1, sum(o)))
+  expect_identical(underdisp:::.pmf_and_y_newdata(hc, nd, kmax = 5L)$P[o, 1], rep(0, sum(o)))
+  g <- hurdle_gec(y ~ x, d, participation = ~ x, part_fe = "unit")
+  expect_setequal(g$part_one_units, ou)
+  expect_identical(predict(g, newdata = nd, type = "participation")[o], rep(1, sum(o)))
+  expect_identical(underdisp:::.pmf_and_y_newdata(g, nd, kmax = 5L)$P[o, 1], rep(0, sum(o)))
+})
+
 test_that("hurdle_gec, zi_gec, zi_count and zi_cpb(zero_fe) do not count them either", {
   skip_on_cran()
   p <- zero_df_panel()

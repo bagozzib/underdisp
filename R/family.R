@@ -190,8 +190,13 @@ compare_dispersion <- function(formula, data, max.support = NULL, hurdle = FALSE
 #' methods give the number. In new data (`predict()`, [score()], [cv_score()])
 #' the hurdles give such a unit's rows the participation probability at that
 #' limit, zero, as the zero-inflated fits give them a count effect at its limit.
-#' CPB fits on the floor support (`support = "floor"`) count these parameters,
-#' and predict, as versions before 0.2.0 did.
+#' A unit whose every count is positive has its hurdle participation dummy at
+#' the other limit, plus infinity; that dummy is counted, as the zero-inflated
+#' fits count their zero-equation dummy for the unit, and in new data the
+#' hurdles give the unit's rows the participation probability one (the fits
+#' record these units in `part_one_units`). CPB fits on the floor support
+#' (`support = "floor"`) count these parameters, and predict, as versions before
+#' 0.2.0 did.
 #' @seealso [zi_test()], [compare_dispersion()]
 #' @examples
 #' \donttest{

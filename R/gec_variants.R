@@ -99,6 +99,7 @@ hurdle_gec <- function(formula, data, participation = NULL, part_fe = NULL,
   off_all <- if (is.null(offset)) 0 else if (is.character(offset)) as.numeric(data[[offset]]) else as.numeric(offset)
   lambda_full <- as.numeric(exp(off_all + Xall %*% beta))
   zl <- .ud_zero_levels(y, if (!is.null(part_fe)) data[[part_fe]])   # never participate: not counted (.ud_zero_levels)
+  ol <- .ud_one_levels(y, if (!is.null(part_fe)) data[[part_fe]])    # always participate: predicted at the limit
   structure(c(list(participation = pfit, intensity = ifit,
                  converged = isTRUE(pfit$converged) && isTRUE(ifit$converged), Zpart = stats::model.matrix(pfit),
                  y = as.integer(y), p_full = as.numeric(stats::fitted(pfit)),
@@ -108,8 +109,8 @@ hurdle_gec <- function(formula, data, participation = NULL, part_fe = NULL,
                  part_xref = .fe_dummy_ref(colMeans(stats::model.matrix(pfit)), stats::model.matrix(pfit), d, part_fe,
                                            .ident_binary),
                  loglik = as.numeric(stats::logLik(pfit)) + ifit$loglik,
-                 df = length(stats::coef(pfit)) - length(zl) + ifit$df, part_zero_units = zl, se.type = se,
-                 cluster = if (is.character(cluster)) cluster else NULL, max.support = ifit$max.support,
+                 df = length(stats::coef(pfit)) - length(zl) + ifit$df, part_zero_units = zl, part_one_units = ol,
+                 se.type = se, cluster = if (is.character(cluster)) cluster else NULL, max.support = ifit$max.support,
                  link = link, part_fe = part_fe,
                  weights = w_all, nobs_weighted = if (is.null(w_all)) length(y) else sum(w_all),
                  formula = formula, part_formula = participation, call = match.call()), pf),
