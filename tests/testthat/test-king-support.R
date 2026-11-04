@@ -143,6 +143,7 @@ test_that("fits store the support, and objects saved before 0.2.0 read as floor"
 })
 
 test_that("a King's zi_cpb predicts with the exact count mean; the floor support keeps the rate", {
+  skip_on_cran()
   set.seed(34); n <- 400; x <- rnorm(n)
   d <- data.frame(y = rzicpb(n, exp(0.9 + 0.4 * x), 0.5, 0.25), x = x)
   zk <- zi_cpb(y ~ x, d, zero = ~ 1)

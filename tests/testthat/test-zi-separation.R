@@ -16,6 +16,7 @@ zi_sep_designs <- function() {
 }
 
 test_that("the check flags the coefficients with no finite estimate and only those", {
+  skip_on_cran()
   d <- zi_sep_designs()
   sep <- function(dd, zero) {
     f <- suppressWarnings(zi_count(y ~ x, dd, family = "poisson", zero = zero, se = "none"))

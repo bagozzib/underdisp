@@ -3,6 +3,7 @@
 ## parameters held at the family's limits.
 
 test_that("implied_ceiling() reports the largest feasible count on each support", {
+  skip_on_cran()
   set.seed(41); x <- rnorm(300); d <- data.frame(y = rcpb(300, exp(1.2 + 0.4 * x), 0.5), x = x)
   for (s in c("ceiling", "floor")) {
     f <- cpb(y ~ x, d, truncated = FALSE, se = "none", support = s)

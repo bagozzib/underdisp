@@ -1,8 +1,8 @@
 ## New data, and the fixed-effects units a fit has not seen or holds at a limit (?score, ?compare_models, Degrees of
 ## freedom): every two-part class predicts and scores such rows, an unseen unit at the reference unit of the units the
-## data identify and a unit at a limit at that limit. Also the fixes of the 2026-11 audit that touch the same
-## machinery: several fixed-effects columns, the floor support's zi_cpb(fe) df, the ML mixture's reference unit, the
-## support of ame()'s refits, the dispersion test's fixed-effects null, the 1e5-term cap, and compare_models()'s note.
+## data identify and a unit at a limit at that limit. Also other paths through the same machinery: several
+## fixed-effects columns, the floor support's zi_cpb(fe) df, the ML mixture's reference unit, the support of ame()'s
+## refits, the dispersion test's fixed-effects null, the 1e5-term cap, and compare_models()'s note.
 
 ## 14 units x 6 periods: u01 (the dummies' reference level) and u07 have no positive count, u02 has every count positive
 nd_panel <- function(seed = 1) {
@@ -20,6 +20,7 @@ nd_panel <- function(seed = 1) {
 q <- function(expr) suppressWarnings(suppressMessages(expr))
 
 test_that("a unit the fit has not seen, or newdata without the unit column, enters at the reference unit", {
+  skip_on_cran()
   d <- nd_panel(); nd <- data.frame(unit = "u99", t = 7L, x = 0.3, z = 0, y = 1L)
   fits <- list(
     hurdle_cpb = q(hurdle_cpb(y ~ x, d, participation = ~ z, fe = "unit", part_fe = "unit")),
@@ -65,6 +66,7 @@ test_that("hurdle_count(fe =) predicts and scores the rows of a unit its intensi
 })
 
 test_that("the mixtures give a zero_fe unit at a limit its structural-zero probability there", {
+  skip_on_cran()
   d <- nd_panel()
   ## covariates far out, where the optimizer's finite dummies would give either unit the opposite probability
   nd <- data.frame(unit = c("u07", "u02"), t = 7L, x = 0, z = c(40, -40), y = 0L)
@@ -88,6 +90,7 @@ test_that("the mixtures give a zero_fe unit at a limit its structural-zero proba
 })
 
 test_that("several fixed-effects columns enter the binary equations, as in 0.1.x", {
+  skip_on_cran()
   d <- nd_panel(); d$per <- factor(d$t)
   hc <- q(hurdle_count(y ~ x, d, family = "poisson", participation = ~ z, part_fe = c("unit", "per"), se = "none"))
   expect_setequal(hc$part_zero_units, c("u01", "u07"))
@@ -121,6 +124,7 @@ test_that("King's zi_cpb(fe, method = 'ml') averages its reference unit over eve
 })
 
 test_that("ame(B > 0) refits an object saved before 0.2.0 on the floor support", {
+  skip_on_cran()
   set.seed(2); x <- rnorm(150)
   dd <- data.frame(y = rcpb(150, exp(1.2 + 0.3 * x), 0.5, truncated = TRUE, support = "floor"), x = x)
   fo <- q(cpb(y ~ x, dd, support = "floor"))

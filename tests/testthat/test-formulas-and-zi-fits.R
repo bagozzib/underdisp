@@ -35,6 +35,7 @@ test_that("a character covariate predicts on new data holding one of its values"
 })
 
 test_that("the zero-inflated EM fits report the observed-data log-likelihood", {
+  skip_on_cran()
   set.seed(13); pz <- do.call(rbind, lapply(1:20, function(i) data.frame(u = i, x = rnorm(10))))
   pz$y <- ifelse(runif(200) < .3, 0L, rcpb(200, exp(2.7 + .1 * pz$x + rep(rnorm(20, 0, .2), each = 10)), .06))
   ze <- suppressWarnings(zi_cpb(y ~ x, pz, zero = ~ 1, fe = "u", method = "em"))
@@ -57,6 +58,7 @@ test_that("predict.zi_cpb returns NA for a row with a missing covariate", {
 })
 
 test_that("zi_test() refuses nests on other data, truncated nests and other supports", {
+  skip_on_cran()
   set.seed(14); x <- rnorm(300); d <- data.frame(y = rcpb(300, exp(.4 + .3 * x), .3), x = x)
   zk <- suppressWarnings(zi_cpb(y ~ x, d, zero = ~ 1))
   expect_error(zi_test(zk, cpb(y ~ x, d, truncated = FALSE, support = "floor")), "different CPB supports")

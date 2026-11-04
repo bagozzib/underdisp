@@ -41,6 +41,7 @@ test_that("two-part first differences hold the offset at its mean", {
 })
 
 test_that("score() and cv_score() take the held-out rows' offset", {
+  skip_on_cran()
   fc <- cpb(y ~ x, d_off[1:300, ], truncated = FALSE, offset = "lexpo", se = "none")
   fv <- cpb(y ~ x, d_off[1:300, ], truncated = FALSE, offset = d_off$lexpo[1:300], se = "none")
   expect_error(score(fv, newdata = d_off[301:400, ]), "fitted with an offset")

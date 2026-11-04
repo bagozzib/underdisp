@@ -16,6 +16,7 @@ test_that("hurdle_cpb's first difference uses the participation link it was fitt
 })
 
 test_that("first_difference() refuses a variable that also enters a transformed or interaction column", {
+  skip_on_cran()
   cr <- count_reg(y ~ x + I(x^2), d_g, family = "poisson")
   expect_error(first_difference(cr, "x", 0, 2), "also enters the term")
   cl <- count_reg(y ~ x + log(x + 5), d_g, family = "poisson")
