@@ -112,8 +112,10 @@ rhurdle_cpb <- function(n, lambda, alpha, p, support = c("ceiling", "floor")) {
 #'   the fit has not seen, or every row of `newdata` without the `part_fe`
 #'   column, enters at the reference unit of the units the data identify. The
 #'   participation equation is checked for separation by [zi_cpb()]'s rule
-#'   (Separation; component `part_separation`). The floor support counts and
-#'   predicts these units as before 0.2.0.
+#'   (Separation; component `part_separation`). On the floor support these
+#'   dummies are counted in the degrees of freedom, new rows of these units are
+#'   evaluated at the dummies' fitted values, and an unseen unit enters at the
+#'   mean of all the unit dummies.
 #' @param link Link for the participation model: `"logit"` (default), `"probit"`,
 #'   or `"cloglog"`. Positive participation coefficients raise the probability of
 #'   a positive count.

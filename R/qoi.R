@@ -126,10 +126,9 @@ predict.cpb <- function(object, newdata = NULL,
 #' `alpha` it is fixed by the CPB's variance-mean link, so it is a bound on the
 #' counts only when the CPB is the data's process. On counts with a common
 #' hard bound from another process (binomial counts out of six trials, say),
-#' the fitted ceiling follows the mean and the dispersion instead: in the
-#' package's check it ran from 3 where the mean was low to 12 where it was
-#' high, below the true bound in the first case and well above it in the
-#' second.
+#' the fitted ceiling follows the mean and the dispersion instead: in one
+#' simulation it ran from 3 where the mean was low to 12 where it was high,
+#' below the true bound in the first case and well above it in the second.
 #'
 #' @param object A `"cpb"` object.
 #' @param newdata Optional covariate profiles.
@@ -302,7 +301,7 @@ alpha_confint <- function(object, level = 0.95) {
 #' \donttest{
 #' set.seed(8); x <- rnorm(200)
 #' N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(200, N, 0.5)
-#' fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 40)
+#' fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 100)
 #' irr(fit)
 #' }
 #' @export
@@ -354,7 +353,7 @@ irr.cpb <- function(object, level = 0.95, ...) .ud_irr_draws(object, object$coef
 #' \donttest{
 #' set.seed(1); x <- rnorm(250)
 #' N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1); y <- rbinom(250, N, 0.5)
-#' fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 60)
+#' fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 100)
 #' first_difference(fit, "x", from = -1, to = 1, quantity = "mean")
 #' }
 #' @export

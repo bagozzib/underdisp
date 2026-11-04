@@ -27,8 +27,7 @@
 #' @param formula A model formula.
 #' @param data A data frame.
 #' @param max.support Passed to the CPB and GEC fits; the default `NULL` lets
-#'   each set its own (see [cpb()]), and on the floor support it is 500, as
-#'   before version 0.2.0.
+#'   each set its own (see [cpb()]); on the floor support it is 500.
 #' @param hurdle If `TRUE` and the data contain zeros, also fit and score a
 #'   [hurdle_cpb()].
 #' @param zi If `TRUE` and the data contain zeros, also fit and score a
@@ -200,12 +199,12 @@ compare_dispersion <- function(formula, data, max.support = NULL, hurdle = FALSE
 #' `zero_fe` unit's rows the structural-zero probability at its limit in the
 #' same way: one for a unit with no positive count, zero for a unit whose every
 #' count is positive (`zero_fe_one_units`). CPB fits on the floor support
-#' (`support = "floor"`) count these parameters, and predict, as versions before
-#' 0.2.0 did.
+#' (`support = "floor"`) count these parameters, and in new data evaluate these
+#' units at the coefficients the fit stopped at.
 #'
 #' The rule is the two-part fits'. The single-equation fixed-effects fits
 #' ([cpb_fe()], [gec_fe()], `count_reg(fe = )`) count every unit's effect, a
-#' unit with no positive count included, as their estimators have always done;
+#' unit with no positive count included;
 #' set beside a two-part fit to the same panel, such a fit is charged two AIC
 #' points per unit with no positive count that the two-part fit is not, and
 #' `compare_models()` says so in a message.

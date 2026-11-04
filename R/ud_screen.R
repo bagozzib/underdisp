@@ -138,7 +138,7 @@
 #'   package default at a boundary null (see [dispersion_test()]). `NULL`
 #'   (default) bootstraps it when `ztp_threshold = "bootstrap"` and the mean
 #'   model is within `comp_max_par` and `comp_max_n`; otherwise the p-value is
-#'   the asymptotic boundary mixture, whose size for this test the package has not simulated. The
+#'   the asymptotic boundary mixture. The
 #'   bootstrap restores the random-number state, so every other result is the
 #'   same with or without it.
 #' @return An object of class `"ud_screen"` with `verdict_marginal`, `verdict_atrisk`,

@@ -99,26 +99,16 @@ qcpb <- function(p, lambda, alpha, truncated = FALSE, lower.tail = TRUE, log.p =
   }, numeric(1)))
 }
 
-## --- zero-truncated Poisson / negative binomial ---------------------------
-## Inverse-CDF sampling: draw U on (F(0), 1) and invert the base quantile, which
-## is exact and vectorized (no rejection loop).
+## --- zero-truncated Poisson / negative binomial densities -------------------
 
 dztpois <- function(x, lambda, log = FALSE) {
   d <- ifelse(x < 1 | x != floor(x), 0, stats::dpois(x, lambda) / -expm1(-lambda))  # -expm1 avoids 1-1 cancellation
   if (log) log(d) else d
 }
-rztpois <- function(n, lambda) {
-  lambda <- rep_len(lambda, n); p0 <- exp(-lambda)
-  stats::qpois(p0 + stats::runif(n) * (1 - p0), lambda)
-}
 dztnbinom <- function(x, mu, size, log = FALSE) {
   logp0 <- size * (log(size) - log(size + mu))                       # log P(0), stable for tiny mu
   d <- ifelse(x < 1 | x != floor(x), 0, stats::dnbinom(x, mu = mu, size = size) / -expm1(logp0))
   if (log) log(d) else d
-}
-rztnbinom <- function(n, mu, size) {
-  mu <- rep_len(mu, n); p0 <- stats::dnbinom(0, mu = mu, size = size)
-  stats::qnbinom(p0 + stats::runif(n) * (1 - p0), mu = mu, size = size)
 }
 
 ## --- generalized event count (Katz) family: density, CDF, quantile, random --

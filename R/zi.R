@@ -58,10 +58,10 @@ rzicpb <- function(n, lambda, alpha, pi, support = c("ceiling", "floor")) {
 #'   from a first-stage fit to the positive counts, and on King's support the
 #'   fit is then polished on the observed-data likelihood with every unit's
 #'   effect free, so that it is a joint maximum of the mixture likelihood (on
-#'   the floor support the plug-in is kept, as before version 0.2.0: it is not
-#'   such a maximum, and a unit whose positive counts are all 1 takes an
-#'   arbitrary point of the first stage's flat set, so the inflation equation
-#'   and the log-likelihood can depend on the order of the rows); under
+#'   the floor support the fit keeps the plug-in effects, which are not a joint
+#'   maximum: a unit whose positive counts are all 1 takes an arbitrary point of
+#'   the first stage's flat set, so the inflation equation and the
+#'   log-likelihood can depend on the order of the rows); under
 #'   `method = "em"` a classification (hard-assignment) step handles the
 #'   structural zeros before the same polish. A unit with no
 #'   positive count is left out of the estimation, as fixest leaves such units
@@ -74,9 +74,9 @@ rzicpb <- function(n, lambda, alpha, pi, support = c("ceiling", "floor")) {
 #'   the units in `zero_units` and their number in `n_zero_units`. Their
 #'   structural-zero probability is `NA` where the zero equation would give
 #'   them their own dummy (`zero_fe`), which their zeros cannot identify. On the
-#'   floor support such units keep the fill values of versions before 0.2.0
-#'   (the rate at the smallest estimated effect minus 2 under `"ml"`, the mean
-#'   effect under `"em"`).
+#'   floor support such units stay in the estimation with a filled-in count
+#'   effect (the smallest estimated effect minus 2 under `"ml"`, the mean effect
+#'   under `"em"`).
 #' @param zero_fe Optional column name for fixed effects in the zero-inflation
 #'   equation, entered as factor dummies (opt-in). On King's support the dummy
 #'   of a unit with no positive count is not counted in the degrees of freedom
@@ -95,16 +95,15 @@ rzicpb <- function(n, lambda, alpha, pi, support = c("ceiling", "floor")) {
 #'   under fixed effects the units are resampled by default. The mixture EM makes
 #'   the bootstrap costly, so keep `B` modest.
 #' @param max.support Guard on the evaluated support of the count component; see
-#'   [cpb()]. The default `NULL` sets `max(500, 10 * max(y))`, and on the floor
-#'   support 500, as before version 0.2.0. It is kept with the fit for
-#'   [simulate()].
+#'   [cpb()]. The default `NULL` sets `max(500, 10 * max(y))` (500 on the floor
+#'   support). It is kept with the fit for [simulate()].
 #' @param maxit Optimizer iteration budget (scaled internally for the joint
 #'   maximization; also the EM iteration cap under `method = "em"`).
 #' @param offset Optional exposure offset (log scale) for the count component:
 #'   a numeric vector or the name of a column in `data`, making the count a
-#'   rate model. Supported for `method = "ml"` without `fe` (the fixed-effects
-#'   path's plug-in unit effects have no offset handling yet, and errors
-#'   loudly). The bootstrap carries the offset through every replicate.
+#'   rate model. Supported for `method = "ml"` without `fe`; with `fe`, an
+#'   offset is refused with an error. The bootstrap carries the offset through
+#'   every replicate.
 #' @param tol Relative convergence tolerance on the observed-data log-likelihood.
 #' @param weights Optional frequency weights (a numeric vector or a column name);
 #'   see [cpb()]. Supported for `method = "ml"`.
@@ -950,9 +949,9 @@ print.zi_cpb <- function(x, ...) {
 #'   equation's reference unit, and a unit at a limit at that limit (see
 #'   `zero_fe` in [zi_cpb()]); for the count equation's `fe`, see `offset`.
 #' @param type `"response"` for the marginal expected count E(Y), `"zero"` for
-#'   the structural-zero probability, or `"intensity"` for the CPB mean (on the
-#'   floor support, the rate lambda, as before version 0.2.0), or `"rate"` for the
-#'   count component's rate lambda.
+#'   the structural-zero probability, `"intensity"` for the mean of the CPB
+#'   component (on the floor support, its rate lambda), or `"rate"` for the
+#'   component's rate lambda.
 #' @param offset Optional offset (log scale) of the count component for the
 #'   `newdata` rows; see [predict.cpb()]. With `fe`, a row whose `fe` column
 #'   names a unit of the fit enters at that unit's count effect, a row of an

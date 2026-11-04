@@ -19,8 +19,7 @@ compare_dispersion(
 \item{data}{A data frame.}
 
 \item{max.support}{Passed to the CPB and GEC fits; the default \code{NULL} lets
-each set its own (see \code{\link[=cpb]{cpb()}}), and on the floor support it is 500, as
-before version 0.2.0.}
+each set its own (see \code{\link[=cpb]{cpb()}}); on the floor support it is 500.}
 
 \item{hurdle}{If \code{TRUE} and the data contain zeros, also fit and score a
 \code{\link[=hurdle_cpb]{hurdle_cpb()}}.}

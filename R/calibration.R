@@ -330,9 +330,9 @@
 #' was fit to, as means weighted by its frequency weights). Supply `newdata` to
 #' score a fitted model on **held-out**
 #' observations, or use [cv_score()] for a cross-validated score; an in-sample
-#' log score equals `-logLik/n` and does not penalize model complexity, so for
-#' comparing models of different size the held-out or cross-validated score is
-#' the honest criterion.
+#' log score equals `-logLik/n` and does not penalize model complexity, so
+#' models of different size are better compared on the held-out or
+#' cross-validated score.
 #'
 #' @param fit A fitted `underdisp` count model (`cpb`, `cpb_fe`, `hurdle_cpb`,
 #'   `zi_cpb`, `count_reg`, `hurdle_count`, `zi_count`, `gec`, `gec_fe`,
@@ -344,8 +344,8 @@
 #'   or years), enters at the reference unit: the effect, or the dummies'
 #'   average, of the units the data identify, the reference that
 #'   [first_difference()] uses (on the floor support, the participation and
-#'   zero equations of [hurdle_cpb()] and [zi_cpb()] keep the mean dummy of
-#'   versions before 0.2.0). A unit the hurdles or mixtures hold at a limit is
+#'   zero equations of [hurdle_cpb()] and [zi_cpb()] enter such a unit at the
+#'   mean of all their unit dummies). A unit the hurdles or mixtures hold at a limit is
 #'   scored at that limit: a positive count of a unit with no positive count in
 #'   the fitted data, and a hurdle's zero of a unit whose every count was
 #'   positive, are impossible (see [compare_models()], Degrees of freedom). A
@@ -402,8 +402,8 @@ score <- function(fit, newdata = NULL, kmax = NULL, weights = NULL, offset = NUL
 #'
 #' K-fold cross-validated log score and RPS: the data are split into `k` folds,
 #' the model is refit on each training set via `fitfun`, and its predicted
-#' distribution is scored on the held-out fold. Because the score is genuinely
-#' out of sample it penalizes over-parameterization, so it is the honest
+#' distribution is scored on the held-out fold. Because the score is out of
+#' sample it penalizes over-parameterization, so it is the appropriate
 #' criterion for comparing models that differ in the number of parameters (for
 #' example a hurdle with per-unit participation fixed effects against a
 #' zero-inflated model). Per-observation held-out scores are returned so two

@@ -326,7 +326,7 @@
 #'   x <- rnorm(8); data.frame(unit = i, x = x, y = rcpb(8, exp(rnorm(1, 0, 0.5) + 0.4 * x), 0.5))
 #' }))
 #' ffit <- cpb_fe(y ~ x, data = pd, fe = "unit")
-#' ame(ffit, "x", pd, B = 50)
+#' ame(ffit, "x", pd, B = 100)
 #' }
 #' @export
 ame <- function(object, variable, newdata, from = NULL, to = NULL, type = "response", eps = NULL, level = 0.95,

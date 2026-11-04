@@ -71,7 +71,7 @@ with neither gets the point estimate with \code{method = "none"}.
 \donttest{
 set.seed(1); x <- rnorm(250)
 N <- pmax(round(exp(1.6 + 0.5 * x) / 0.5), 1); y <- rbinom(250, N, 0.5)
-fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 60)
+fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 100)
 first_difference(fit, "x", from = -1, to = 1, quantity = "mean")
 }
 }

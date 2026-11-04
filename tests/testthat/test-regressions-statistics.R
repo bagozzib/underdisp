@@ -103,7 +103,7 @@ test_that("the Katz recursion reaches far-tail counts of an unbounded member", {
   expect_equal(dgec(20, 1, 1), dpois(20, 1), tolerance = 1e-10)
   expect_equal(dgec(25, 2, 1.5), dnbinom(25, mu = 2, size = 2 / 0.5), tolerance = 1e-10)
   X <- matrix(1, 5, 1); Y <- c(0L, 1L, 1L, 2L, 30L)
-  expect_lt(underdisp:::gec_nll_cpp(c(log(1.5), 0), X, Y, rep(0, 5), 500L), 1e9)
+  expect_lt(underdisp:::gec_wnll_cpp(c(log(1.5), 0), X, Y, rep(1, 5), rep(0, 5), 500L), 1e9)
 })
 
 test_that("column scaling and restarts make the fits invariant to units and contrasts", {

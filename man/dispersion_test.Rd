@@ -89,8 +89,8 @@ reference errs. For the CPB it errs toward rejection: in the package's
 simulations from the Poisson the asymptotic boundary mixture rejected 7 to
 10 percent of 5\% tests with 60 to 200 observations, and 54 to 92 percent
 with unit fixed effects, whose intercepts bias the dispersion estimate toward
-underdispersion by an amount of order 1/T. The package has not simulated the
-negative binomial's boundary test, whose p-value the same rule bootstraps.
+underdispersion by an amount of order 1/T. The same rule bootstraps the
+negative binomial's boundary test.
 Where the Poisson value is interior, the
 asymptotic distribution is used unless the estimated mean parameters shift
 it too far: to first order they move the signed root toward

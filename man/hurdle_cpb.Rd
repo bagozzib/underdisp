@@ -52,8 +52,10 @@ those of a unit whose every count is positive (\code{part_one_units}) one; a uni
 the fit has not seen, or every row of \code{newdata} without the \code{part_fe}
 column, enters at the reference unit of the units the data identify. The
 participation equation is checked for separation by \code{\link[=zi_cpb]{zi_cpb()}}'s rule
-(Separation; component \code{part_separation}). The floor support counts and
-predicts these units as before 0.2.0.}
+(Separation; component \code{part_separation}). On the floor support these
+dummies are counted in the degrees of freedom, new rows of these units are
+evaluated at the dummies' fitted values, and an unseen unit enters at the
+mean of all the unit dummies.}
 
 \item{link}{Link for the participation model: \code{"logit"} (default), \code{"probit"},
 or \code{"cloglog"}. Positive participation coefficients raise the probability of

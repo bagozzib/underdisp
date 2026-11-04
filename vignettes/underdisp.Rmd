@@ -108,8 +108,8 @@ ceiling lies just above an integer carries information about its rate that grows
 without bound as the ceiling approaches the integer (see `?cpb`). Coefficient
 inference uses a cold-multistart pairs bootstrap. In simulations from King's CPB at n = 300, its 95% interval for a
 slope covers 0.91 at `alpha` = 0.3, 0.95 at 0.5 and 0.94 at 0.7 (0.95 on the
-floor support). Neither a parametric bootstrap (0.918) nor 999 replicates
-(0.924) brings it to the nominal level. The
+floor support). At `alpha` = 0.3, neither a parametric bootstrap (0.918) nor
+999 replicates (0.924) brings it to the nominal level. The
 dispersion parameter carries a profile-likelihood interval. That interval is
 first-order by default. On King's support it covers close to its level in
 simulations (0.940 to 0.956). On the floor support it does not: the estimate of
@@ -130,7 +130,7 @@ draw, the dispersion parameter included, and report its percentile interval;
 a fit without draws uses the delta method where its family has a covariance.
 
 ```{r boot}
-fit_b <- cpb(y ~ x, data = d, truncated = FALSE, se = "bootstrap", B = 49)   # a small B keeps the vignette quick
+fit_b <- cpb(y ~ x, data = d, truncated = FALSE, se = "bootstrap", B = 200)
 summary(fit_b)
 irr(fit_b)             # rate ratios with percentile intervals
 confint(fit_b)         # coefficients (percentile) and alpha (first-order profile likelihood)

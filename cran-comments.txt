@@ -1,39 +1,43 @@
 ## underdisp 0.2.0
 
-DRAFT: the check results below are to be filled in from the final checks when
-the release is submitted.
-
-This is a feature release with one changed default. The continuous parameter
-binomial now follows King's (1989) definition, on the support
-0, ..., ceiling(lambda / (1 - alpha)); the definition of earlier versions stays
-available through `support = "floor"`, which reproduces their estimates. The
-release also adds the hyper-Poisson and exponentially weighted Poisson
-families, average marginal effects (`ame()`), held-out ceiling checks
-(`ceiling_exceedance()`), and separation checks for the zero-inflation and
-participation equations. NEWS.md lists the changes.
+This is a feature release. It changes one default: the continuous parameter
+binomial (CPB) now follows King's (1989) definition, on the support
+0, ..., ceiling(lambda / (1 - alpha)). The definition used by earlier versions
+remains available through `support = "floor"`, which reproduces their
+estimates. The release also adds the hyper-Poisson and exponentially weighted
+Poisson families, average marginal effects (`ame()`), confidence intervals for
+predictions, a held-out check of the CPB's ceiling (`ceiling_exceedance()`),
+and separation checks for the binary equations of the hurdle and zero-inflated
+models. NEWS.md lists the changes.
 
 ## Test environments
 
-* GitHub Actions: ubuntu-latest (R release, devel, oldrel-1), macOS-latest and
-  windows-latest (R release), and windows-latest (R devel), with
-  NOT_CRAN = true so the full test suite runs
-* GitHub Actions: the clang-ubsan and clang-asan sanitizer containers used for
-  0.1.2
+* win-builder: R-devel, R-release, R-oldrelease
+* macOS builder (mac.R-project.org)
+* R-hub containers: gcc-asan, valgrind, nold, rchk
+* GitHub Actions: macOS and Windows (R release), Ubuntu (R devel, release and
+  oldrel-1), with NOT_CRAN = true so the full test suite runs
+* GitHub Actions: clang AddressSanitizer and UndefinedBehaviorSanitizer
+  (r-hub clang-asan and clang-ubsan containers)
 
 ## R CMD check results
 
-0 errors | 0 warnings | notes: to be filled in.
+[TO FILL IN from the final runs: 0 errors | 0 warnings | N notes, with one
+line per note.]
+
+[TO FILL IN: the result of the sanitizer, valgrind and rchk runs, e.g. "No
+sanitizer, valgrind or rchk issues."]
 
 ## Reverse dependencies
 
 None.
 
-## Notes for the reviewer
+## Notes
 
-* The package compiles a small amount of C++ (Rcpp); no system requirements
-  beyond a C++11 compiler.
-* Long-running test batteries are gated behind testthat::skip_on_cran() so the
-  check stays inside the ten-minute budget; they run in continuous integration.
-* Tests and examples comparing against glmmTMB, gamlss.dist, rmutil,
-  COMPoissonReg, DGLMExtPois, ewp and the Ecdat/wooldridge data sets are
-  guarded by requireNamespace() and skip when those Suggests are unavailable.
+* The package compiles C++ code through Rcpp and has no system requirements
+  beyond a C++ compiler.
+* Long-running tests are skipped on CRAN with testthat::skip_on_cran(), so the
+  check stays within the time limit; they run in continuous integration.
+* Tests that compare against suggested packages (DGLMExtPois, ewp,
+  gamlss.dist, glmmTMB, rmutil, pscl, sandwich, broom, texreg, DHARMa) skip
+  when those packages are not installed.

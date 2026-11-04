@@ -320,7 +320,7 @@ predict.gec <- function(object, newdata = NULL, type = c("response", "link", "pr
 #' values re-concentrated at the corrected parameters and `logLik`/`AIC` kept at
 #' the maximum-likelihood fit (uncorrected estimates in `$uncorrected`). The
 #' same time-homogeneity validity gate applies: on panels where the two halves
-#' do not estimate a common parameter the correction is REFUSED with a warning
+#' do not estimate a common parameter the correction is refused with a warning
 #' and the maximum-likelihood fit is returned (see [cpb_fe()], Details). As
 #' there, the covariate coefficients are corrected too, and with
 #' `se = "bootstrap"` each replicate is corrected the same way, so the standard

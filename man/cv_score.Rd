@@ -52,8 +52,8 @@ the \code{folds} used.
 \description{
 K-fold cross-validated log score and RPS: the data are split into \code{k} folds,
 the model is refit on each training set via \code{fitfun}, and its predicted
-distribution is scored on the held-out fold. Because the score is genuinely
-out of sample it penalizes over-parameterization, so it is the honest
+distribution is scored on the held-out fold. Because the score is out of
+sample it penalizes over-parameterization, so it is the appropriate
 criterion for comparing models that differ in the number of parameters (for
 example a hurdle with per-unit participation fixed effects against a
 zero-inflated model). Per-observation held-out scores are returned so two

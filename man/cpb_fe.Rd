@@ -161,14 +161,13 @@ corrected the same way (its two half-panel refits; the validity gate below is
 a check on the data, made once), so the standard errors include that variance
 and the bootstrap takes about three times as long. In the same simulations the
 corrected slope's 95\% interval covered 0.91 at T = 6 and 0.94 at T = 12 (0.85
-and 0.89 with uncorrected replicates). On the floor support the replicates stay
-uncorrected and the interval is centered on the corrected estimate, as before
-version 0.2.0.
+and 0.89 with uncorrected replicates). On the floor support the replicates are
+not corrected, and the interval is centered on the corrected estimate.
 
 Validity gate: the split-panel identity requires the two half-panels to
 estimate the same pseudo-true parameter (time-homogeneity; Dhaene & Jochmans
 2015, Review of Economic Studies). On trending or time-heterogeneous panels
-the correction is invalid, so the function REFUSES it -- returning the
+the correction is invalid, so the function refuses it -- returning the
 uncorrected maximum-likelihood fit with a warning naming the failed check --
 whenever the full fit's residuals trend with time (correlation with the
 within-unit time index, p < 0.01), the two half-panel dispersion estimates

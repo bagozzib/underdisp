@@ -36,10 +36,10 @@ component. Under \code{method = "ml"} the unit effects enter as plug-in offsets
 from a first-stage fit to the positive counts, and on King's support the
 fit is then polished on the observed-data likelihood with every unit's
 effect free, so that it is a joint maximum of the mixture likelihood (on
-the floor support the plug-in is kept, as before version 0.2.0: it is not
-such a maximum, and a unit whose positive counts are all 1 takes an
-arbitrary point of the first stage's flat set, so the inflation equation
-and the log-likelihood can depend on the order of the rows); under
+the floor support the fit keeps the plug-in effects, which are not a joint
+maximum: a unit whose positive counts are all 1 takes an arbitrary point of
+the first stage's flat set, so the inflation equation and the
+log-likelihood can depend on the order of the rows); under
 \code{method = "em"} a classification (hard-assignment) step handles the
 structural zeros before the same polish. A unit with no
 positive count is left out of the estimation, as fixest leaves such units
@@ -52,9 +52,9 @@ predictor), with fitted means of zero, and the fit records
 the units in \code{zero_units} and their number in \code{n_zero_units}. Their
 structural-zero probability is \code{NA} where the zero equation would give
 them their own dummy (\code{zero_fe}), which their zeros cannot identify. On the
-floor support such units keep the fill values of versions before 0.2.0
-(the rate at the smallest estimated effect minus 2 under \code{"ml"}, the mean
-effect under \code{"em"}).}
+floor support such units stay in the estimation with a filled-in count
+effect (the smallest estimated effect minus 2 under \code{"ml"}, the mean effect
+under \code{"em"}).}
 
 \item{zero_fe}{Optional column name for fixed effects in the zero-inflation
 equation, entered as factor dummies (opt-in). On King's support the dummy
@@ -79,9 +79,8 @@ under fixed effects the units are resampled by default. The mixture EM makes
 the bootstrap costly, so keep \code{B} modest.}
 
 \item{max.support}{Guard on the evaluated support of the count component; see
-\code{\link[=cpb]{cpb()}}. The default \code{NULL} sets \code{max(500, 10 * max(y))}, and on the floor
-support 500, as before version 0.2.0. It is kept with the fit for
-\code{\link[=simulate]{simulate()}}.}
+\code{\link[=cpb]{cpb()}}. The default \code{NULL} sets \code{max(500, 10 * max(y))} (500 on the floor
+support). It is kept with the fit for \code{\link[=simulate]{simulate()}}.}
 
 \item{maxit}{Optimizer iteration budget (scaled internally for the joint
 maximization; also the EM iteration cap under \code{method = "em"}).}
@@ -90,9 +89,9 @@ maximization; also the EM iteration cap under \code{method = "em"}).}
 
 \item{offset}{Optional exposure offset (log scale) for the count component:
 a numeric vector or the name of a column in \code{data}, making the count a
-rate model. Supported for \code{method = "ml"} without \code{fe} (the fixed-effects
-path's plug-in unit effects have no offset handling yet, and errors
-loudly). The bootstrap carries the offset through every replicate.}
+rate model. Supported for \code{method = "ml"} without \code{fe}; with \code{fe}, an
+offset is refused with an error. The bootstrap carries the offset through
+every replicate.}
 
 \item{weights}{Optional frequency weights (a numeric vector or a column name);
 see \code{\link[=cpb]{cpb()}}. Supported for \code{method = "ml"}.}

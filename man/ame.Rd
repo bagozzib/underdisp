@@ -120,7 +120,7 @@ pd <- do.call(rbind, lapply(1:30, function(i) {
   x <- rnorm(8); data.frame(unit = i, x = x, y = rcpb(8, exp(rnorm(1, 0, 0.5) + 0.4 * x), 0.5))
 }))
 ffit <- cpb_fe(y ~ x, data = pd, fe = "unit")
-ame(ffit, "x", pd, B = 50)
+ame(ffit, "x", pd, B = 100)
 }
 }
 \seealso{

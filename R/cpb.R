@@ -146,7 +146,7 @@
 #' \eqn{Y \ge 1}, appropriate when underdispersion lives among the positive counts of
 #' an otherwise zero-inflated outcome.
 #'
-#' The rate is modelled log-linearly, \eqn{\lambda_i = \exp(x_i'\beta)}. The
+#' The rate is modeled log-linearly, \eqn{\lambda_i = \exp(x_i'\beta)}. The
 #' probabilities follow the Katz recursion
 #' \eqn{P(Y = k+1)/P(Y = k) = (\lambda_i - k(1-\alpha))/(\alpha(k+1))} on the
 #' support \eqn{0, \ldots, \lceil \lambda_i/(1-\alpha) \rceil}, King's
@@ -174,7 +174,7 @@
 #' depend on the covariates' units), and the reported maximum is the maximum of
 #' the fit's own profile in `alpha`: the profile is traced by continuation on both
 #' sides of the estimate (the slopes re-maximized at each step from the
-#' neighbouring solution) until it has dropped four log-likelihood units, and a
+#' neighboring solution) until it has dropped four log-likelihood units, and a
 #' trace point above the multistart's value restarts the fit from there. The same
 #' trace gives the profile interval of [confint.cpb()]. Unit intercepts belong in
 #' the fixed-effects estimator [cpb_fe()], which solves each of them exactly (a

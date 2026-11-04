@@ -113,7 +113,7 @@ close to a fraction of the conditional mean,
 an otherwise zero-inflated outcome.
 }
 \details{
-The rate is modelled log-linearly, \eqn{\lambda_i = \exp(x_i'\beta)}. The
+The rate is modeled log-linearly, \eqn{\lambda_i = \exp(x_i'\beta)}. The
 probabilities follow the Katz recursion
 \eqn{P(Y = k+1)/P(Y = k) = (\lambda_i - k(1-\alpha))/(\alpha(k+1))} on the
 support \eqn{0, \ldots, \lceil \lambda_i/(1-\alpha) \rceil}, King's
@@ -141,7 +141,7 @@ unit standard deviation (the coefficients are mapped back, so the fit does not
 depend on the covariates' units), and the reported maximum is the maximum of
 the fit's own profile in \code{alpha}: the profile is traced by continuation on both
 sides of the estimate (the slopes re-maximized at each step from the
-neighbouring solution) until it has dropped four log-likelihood units, and a
+neighboring solution) until it has dropped four log-likelihood units, and a
 trace point above the multistart's value restarts the fit from there. The same
 trace gives the profile interval of \code{\link[=confint.cpb]{confint.cpb()}}. Unit intercepts belong in
 the fixed-effects estimator \code{\link[=cpb_fe]{cpb_fe()}}, which solves each of them exactly (a

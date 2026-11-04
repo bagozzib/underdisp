@@ -73,7 +73,7 @@ under the fitted Poisson (\code{ztp_boot_B} replicates over \code{cores}), the
 package default at a boundary null (see \code{\link[=dispersion_test]{dispersion_test()}}). \code{NULL}
 (default) bootstraps it when \code{ztp_threshold = "bootstrap"} and the mean
 model is within \code{comp_max_par} and \code{comp_max_n}; otherwise the p-value is
-the asymptotic boundary mixture, whose size for this test the package has not simulated. The
+the asymptotic boundary mixture. The
 bootstrap restores the random-number state, so every other result is the
 same with or without it.}
 

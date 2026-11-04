@@ -58,12 +58,12 @@ record these units in \code{part_one_units}). The zero-inflated fits give a
 \code{zero_fe} unit's rows the structural-zero probability at its limit in the
 same way: one for a unit with no positive count, zero for a unit whose every
 count is positive (\code{zero_fe_one_units}). CPB fits on the floor support
-(\code{support = "floor"}) count these parameters, and predict, as versions before
-0.2.0 did.
+(\code{support = "floor"}) count these parameters, and in new data evaluate these
+units at the coefficients the fit stopped at.
 
 The rule is the two-part fits'. The single-equation fixed-effects fits
 (\code{\link[=cpb_fe]{cpb_fe()}}, \code{\link[=gec_fe]{gec_fe()}}, \code{count_reg(fe = )}) count every unit's effect, a
-unit with no positive count included, as their estimators have always done;
+unit with no positive count included;
 set beside a two-part fit to the same panel, such a fit is charged two AIC
 points per unit with no positive count that the two-part fit is not, and
 \code{compare_models()} says so in a message.

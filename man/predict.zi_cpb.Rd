@@ -24,9 +24,9 @@ equation's reference unit, and a unit at a limit at that limit (see
 \code{zero_fe} in \code{\link[=zi_cpb]{zi_cpb()}}); for the count equation's \code{fe}, see \code{offset}.}
 
 \item{type}{\code{"response"} for the marginal expected count E(Y), \code{"zero"} for
-the structural-zero probability, or \code{"intensity"} for the CPB mean (on the
-floor support, the rate lambda, as before version 0.2.0), or \code{"rate"} for the
-count component's rate lambda.}
+the structural-zero probability, \code{"intensity"} for the mean of the CPB
+component (on the floor support, its rate lambda), or \code{"rate"} for the
+component's rate lambda.}
 
 \item{offset}{Optional offset (log scale) of the count component for the
 \code{newdata} rows; see \code{\link[=predict.cpb]{predict.cpb()}}. With \code{fe}, a row whose \code{fe} column

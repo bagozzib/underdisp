@@ -277,21 +277,6 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
-// gec_nll_cpp
-double gec_nll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, NumericVector offset, int max_support);
-RcppExport SEXP _underdisp_gec_nll_cpp(SEXP paramsSEXP, SEXP XSEXP, SEXP YSEXP, SEXP offsetSEXP, SEXP max_supportSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< NumericVector >::type params(paramsSEXP);
-    Rcpp::traits::input_parameter< NumericMatrix >::type X(XSEXP);
-    Rcpp::traits::input_parameter< IntegerVector >::type Y(YSEXP);
-    Rcpp::traits::input_parameter< NumericVector >::type offset(offsetSEXP);
-    Rcpp::traits::input_parameter< int >::type max_support(max_supportSEXP);
-    rcpp_result_gen = Rcpp::wrap(gec_nll_cpp(params, X, Y, offset, max_support));
-    return rcpp_result_gen;
-END_RCPP
-}
 // gec_wnll_cpp
 double gec_wnll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, NumericVector w, NumericVector offset, int max_support);
 RcppExport SEXP _underdisp_gec_wnll_cpp(SEXP paramsSEXP, SEXP XSEXP, SEXP YSEXP, SEXP wSEXP, SEXP offsetSEXP, SEXP max_supportSEXP) {
@@ -405,7 +390,6 @@ static const R_CallMethodDef CallEntries[] = {
     {"_underdisp_gec_fe_nll_cpp", (DL_FUNC) &_underdisp_gec_fe_nll_cpp, 10},
     {"_underdisp_gec_fe_grad_cpp", (DL_FUNC) &_underdisp_gec_fe_grad_cpp, 10},
     {"_underdisp_gec_fe_intercepts_cpp", (DL_FUNC) &_underdisp_gec_fe_intercepts_cpp, 9},
-    {"_underdisp_gec_nll_cpp", (DL_FUNC) &_underdisp_gec_nll_cpp, 5},
     {"_underdisp_gec_wnll_cpp", (DL_FUNC) &_underdisp_gec_wnll_cpp, 6},
     {"_underdisp_gec_lp0_cpp", (DL_FUNC) &_underdisp_gec_lp0_cpp, 5},
     {"_underdisp_gec_pmf_cpp", (DL_FUNC) &_underdisp_gec_pmf_cpp, 4},

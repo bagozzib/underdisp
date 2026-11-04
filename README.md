@@ -37,7 +37,7 @@ footing.
   binomial and its zero-truncated variant, whose support ends at an
   observation-specific ceiling set by its variance-mean link; `cpb_fe()` absorbs high-dimensional unit fixed
   effects by a concentrated likelihood that scales to thousands of units.
-  (`support = "floor"` gives the package's definition before version 0.2.0.)
+  (`support = "floor"` reproduces fits from versions before 0.2.0.)
 - **The free-dispersion family** — `gec()` fits the generalized event count
   (Katz) model, whose single dispersion parameter is estimated freely and spans
   under-, equi-, and overdispersion; `gec_fe()` adds concentrated fixed effects.

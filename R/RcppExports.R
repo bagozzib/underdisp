@@ -65,10 +65,6 @@ gec_fe_intercepts_cpp <- function(params, X, Y, offset, w, ustart, n_units, max_
     .Call(`_underdisp_gec_fe_intercepts_cpp`, params, X, Y, offset, w, ustart, n_units, max_support, inner_it)
 }
 
-gec_nll_cpp <- function(params, X, Y, offset, max_support) {
-    .Call(`_underdisp_gec_nll_cpp`, params, X, Y, offset, max_support)
-}
-
 gec_wnll_cpp <- function(params, X, Y, w, offset, max_support) {
     .Call(`_underdisp_gec_wnll_cpp`, params, X, Y, w, offset, max_support)
 }

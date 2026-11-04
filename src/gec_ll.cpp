@@ -63,23 +63,6 @@ static double gec_logpmf(int y, double mu, double delta, int max_support,
   return lw[y] - logZ;
 }
 
-// [[Rcpp::export]]
-double gec_nll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, NumericVector offset, int max_support) {
-  int n = X.nrow(), p = X.ncol();
-  double delta = std::exp(params[p]);
-  if (delta <= 1e-8 || delta >= 1e8) return 1e10;
-  double ll = 0.0;
-  std::vector<double> lw;
-  for (int i = 0; i < n; i++) {
-    double eta = offset[i];
-    for (int j = 0; j < p; j++) eta += X(i, j) * params[j];
-    double lp = gec_logpmf(Y[i], std::exp(eta), delta, max_support, nullptr, lw);
-    if (lp <= -1e299) return 1e10;
-    ll += lp;
-  }
-  return -ll;
-}
-
 // Weighted GEC negative log-likelihood, -sum_i w_i log P(Y_i) (frequency weights).
 // [[Rcpp::export]]
 double gec_wnll_cpp(NumericVector params, NumericMatrix X, IntegerVector Y, NumericVector w,

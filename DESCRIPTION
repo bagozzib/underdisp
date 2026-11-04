@@ -29,8 +29,8 @@ Depends: R (>= 4.0)
 Imports: Rcpp, stats, MASS, VGAM, graphics, methods, numDeriv, parallel
 LinkingTo: Rcpp
 Suggests: sandwich, pscl, DHARMa, testthat (>= 3.0.0), knitr, rmarkdown,
-    broom, modelsummary, texreg, gamlss.dist, rmutil, glmmTMB, COMPoissonReg,
-    Ecdat, wooldridge, DGLMExtPois, ewp
+    broom, modelsummary, texreg, gamlss.dist, rmutil, glmmTMB, DGLMExtPois,
+    ewp
 VignetteBuilder: knitr
 RoxygenNote: 7.3.3
 Roxygen: list(markdown = TRUE, load = "source")

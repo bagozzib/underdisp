@@ -18,8 +18,8 @@ level of any factor its training rows lack (a held-out block's own units
 or years), enters at the reference unit: the effect, or the dummies'
 average, of the units the data identify, the reference that
 \code{\link[=first_difference]{first_difference()}} uses (on the floor support, the participation and
-zero equations of \code{\link[=hurdle_cpb]{hurdle_cpb()}} and \code{\link[=zi_cpb]{zi_cpb()}} keep the mean dummy of
-versions before 0.2.0). A unit the hurdles or mixtures hold at a limit is
+zero equations of \code{\link[=hurdle_cpb]{hurdle_cpb()}} and \code{\link[=zi_cpb]{zi_cpb()}} enter such a unit at the
+mean of all their unit dummies). A unit the hurdles or mixtures hold at a limit is
 scored at that limit: a positive count of a unit with no positive count in
 the fitted data, and a hurdle's zero of a unit whose every count was
 positive, are impossible (see \code{\link[=compare_models]{compare_models()}}, Degrees of freedom). A
@@ -55,9 +55,9 @@ By default the scores are computed \strong{in sample} (against the data the mode
 was fit to, as means weighted by its frequency weights). Supply \code{newdata} to
 score a fitted model on \strong{held-out}
 observations, or use \code{\link[=cv_score]{cv_score()}} for a cross-validated score; an in-sample
-log score equals \code{-logLik/n} and does not penalize model complexity, so for
-comparing models of different size the held-out or cross-validated score is
-the honest criterion.
+log score equals \code{-logLik/n} and does not penalize model complexity, so
+models of different size are better compared on the held-out or
+cross-validated score.
 }
 \examples{
 set.seed(1)
