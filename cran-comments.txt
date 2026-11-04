@@ -12,21 +12,30 @@ models. NEWS.md lists the changes.
 
 ## Test environments
 
-* win-builder: R-devel, R-release, R-oldrelease
-* macOS builder (mac.R-project.org)
-* R-hub containers: gcc-asan, valgrind, nold, rchk
-* GitHub Actions: macOS and Windows (R release), Ubuntu (R devel, release and
-  oldrel-1), with NOT_CRAN = true so the full test suite runs
-* GitHub Actions: clang AddressSanitizer and UndefinedBehaviorSanitizer
-  (r-hub clang-asan and clang-ubsan containers)
+* local Windows 11, R 4.6.1: R CMD check --as-cran, and again with
+  _R_CHECK_DEPENDS_ONLY_=true
+* win-builder: R-devel, R 4.6.2, R 4.5.3
+* R-hub: macos-arm64 and windows (R-devel); the Linux containers clang-asan,
+  clang-ubsan, valgrind, nold, lto, gcc16, donttest, mkl, atlas and rchk
+* GitHub Actions: macOS and Windows (R release), Windows (R devel), Ubuntu
+  (R devel, release and oldrel-1), with NOT_CRAN = true so the full test
+  suite runs
+* GitHub Actions: gcc and clang AddressSanitizer and
+  UndefinedBehaviorSanitizer (the r-hub gcc-asan, clang-asan and clang-ubsan
+  containers)
 
 ## R CMD check results
 
-[TO FILL IN from the final runs: 0 errors | 0 warnings | N notes, with one
-line per note.]
+0 errors | 0 warnings | 0 notes on win-builder R-devel, R 4.6.2 and R 4.5.3.
 
-[TO FILL IN: the result of the sanitizer, valgrind and rchk runs, e.g. "No
-sanitizer, valgrind or rchk issues."]
+An earlier R 4.5.3 run listed possibly misspelled words in DESCRIPTION: CPB,
+Katz, Underdispersed, equidispersion, rootograms, underdispersion. They are
+technical terms and a surname, spelled as intended.
+
+Check time on win-builder R-devel was 537 seconds.
+
+No sanitizer or valgrind issues. rchk reports nothing in the package's own
+code; its only reports are in Rcpp's headers.
 
 ## Reverse dependencies
 
@@ -37,7 +46,7 @@ None.
 * The package compiles C++ code through Rcpp and has no system requirements
   beyond a C++ compiler.
 * Long-running tests are skipped on CRAN with testthat::skip_on_cran(), so the
-  check stays within the time limit; they run in continuous integration.
+  check stays within the ten-minute limit; they run in continuous integration.
 * Tests that compare against suggested packages (DGLMExtPois, ewp,
   gamlss.dist, glmmTMB, rmutil, pscl, sandwich, broom, texreg, DHARMa) skip
   when those packages are not installed.
