@@ -24,6 +24,8 @@ jobs:
           - {os: ubuntu-latest,  r: 'devel', http-user-agent: 'release'}
           - {os: ubuntu-latest,  r: 'release'}
           - {os: ubuntu-latest,  r: 'oldrel-1'}
+          # Linux ARM64, where CRAN's additional check of 0.2.0 failed one test on its tolerance
+          - {os: ubuntu-24.04-arm, r: 'release'}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
