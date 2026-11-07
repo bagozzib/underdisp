@@ -1,3 +1,15 @@
+# underdisp 0.2.1
+
+## Tests
+
+* A test that `dispersion_test()` gives the same statistic for a `cpb_fe()`
+  fit whether or not a covariate is centred allowed a relative difference of
+  1e-6 and failed on CRAN's Linux ARM64 check, where the two statistics
+  differed by 1.6e-6 (4e-7 on x86_64). The gap is where the optimizer of the
+  fixed-effects fit stops; the test now allows 1e-4. It guards against the
+  error fixed in 0.2.0, which on the test's data gave the uncentred covariate
+  a statistic of 2e10. The package code is unchanged.
+
 # underdisp 0.2.0
 
 The continuous parameter binomial (CPB) now follows King's (1989) definition
