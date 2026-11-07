@@ -6,8 +6,10 @@
 <url><loc>https://bagozzib.github.io/underdisp/index.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/news/index.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/alpha_confint.html</loc></url>
+<url><loc>https://bagozzib.github.io/underdisp/reference/ame.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/augment.cpb.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/calibrate_alpha.html</loc></url>
+<url><loc>https://bagozzib.github.io/underdisp/reference/ceiling_exceedance.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/compare_dispersion.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/compare_models.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/compois-distribution.html</loc></url>
@@ -21,6 +23,7 @@
 <url><loc>https://bagozzib.github.io/underdisp/reference/dispersion_profile.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/dispersion_test.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/doublepois-distribution.html</loc></url>
+<url><loc>https://bagozzib.github.io/underdisp/reference/ewp-distribution.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/first_difference.count.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/first_difference.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/first_difference.hurdle_cpb.html</loc></url>
@@ -34,6 +37,7 @@
 <url><loc>https://bagozzib.github.io/underdisp/reference/hurdle_count.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/hurdle_cpb.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/hurdle_gec.html</loc></url>
+<url><loc>https://bagozzib.github.io/underdisp/reference/hyperpois-distribution.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/implied_ceiling.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/index.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/irr.count.html</loc></url>
@@ -45,6 +49,7 @@
 <url><loc>https://bagozzib.github.io/underdisp/reference/predict.cpb.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/predict.cpb_fe.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/predict.gec.html</loc></url>
+<url><loc>https://bagozzib.github.io/underdisp/reference/predict.gec_fe.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/predict.hurdle_count.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/predict.hurdle_cpb.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/predict.hurdle_gec.html</loc></url>
@@ -52,6 +57,7 @@
 <url><loc>https://bagozzib.github.io/underdisp/reference/predict.zi_cpb.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/predict.zi_gec.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/rcpb.html</loc></url>
+<url><loc>https://bagozzib.github.io/underdisp/reference/residuals.underdisp.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/rhurdle_cpb.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/rootogram.html</loc></url>
 <url><loc>https://bagozzib.github.io/underdisp/reference/rzicpb.html</loc></url>

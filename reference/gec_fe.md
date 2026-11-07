@@ -16,10 +16,13 @@ bracket around the unit's Poisson intercept, expanded while the maximum
 sits at an edge; a maximum at a kink is tracked in the analytic gradient
 of the concentrated likelihood, which the outer BFGS uses. The
 feasibility floor is exact: every count must lie in
-`0..ceiling(mu/(1-delta))`. Runtime: about twice that of
+`0..ceiling(mu/(1-delta))`. Runtime: about one and a half times that of
 [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md)
-on the same panel (the Katz recursion runs the whole support), so a
-2,600-row panel in 146 units takes about two minutes.
+on the same panel (the Katz recursion runs the whole support): on the
+positive counts of the bundled peacekeeping panel, 2,602 rows in 146
+units, `gec_fe()` takes about two and a half minutes and
+[`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md)
+about one and a half, and the two return the same fit.
 
 ## Usage
 
@@ -38,7 +41,8 @@ gec_fe(
   inner_it = 30L,
   maxit = 3000L,
   reltol = 1e-07,
-  bias_correct = c("none", "jackknife")
+  bias_correct = c("none", "jackknife"),
+  time = NULL
 )
 ```
 
@@ -89,7 +93,9 @@ gec_fe(
 
 - max.support:
 
-  Guard on the maximum evaluated support.
+  Guard on the evaluated support; `NULL` (default) sets
+  `max(500, 10 * max(y))`. See
+  [`gec()`](https://bagozzib.github.io/underdisp/reference/gec.md).
 
 - inner_it:
 
@@ -103,6 +109,12 @@ gec_fe(
 
   `"none"` (default) or `"jackknife"`, the split-panel jackknife
   correction for the 1/T incidental-parameters bias (see Details).
+
+- time:
+
+  Name of the column of `data` that orders each unit's rows in time;
+  required by `bias_correct = "jackknife"` (see
+  [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md)).
 
 ## Value
 
@@ -121,18 +133,21 @@ formula (feasible for moderate unit counts).
 Short panels: `delta` and the fixed effects carry the
 incidental-parameters bias of nonlinear fixed-effects estimation, of
 order 1/T; treat `delta` cautiously below about T = 30. The covariate
-coefficients are not materially affected. `bias_correct = "jackknife"`
-removes the leading 1/T term by the split-panel jackknife exactly as in
+coefficients carry a smaller bias of the same order.
+`bias_correct = "jackknife"` removes the leading 1/T term by the
+split-panel jackknife exactly as in
 [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md):
 refit on each unit's temporal halves and report
 `2 * full - mean(halves)`, with the unit effects and fitted values
 re-concentrated at the corrected parameters and `logLik`/`AIC` kept at
 the maximum-likelihood fit (uncorrected estimates in `$uncorrected`).
 The same time-homogeneity validity gate applies: on panels where the two
-halves do not estimate a common parameter the correction is REFUSED with
+halves do not estimate a common parameter the correction is refused with
 a warning and the maximum-likelihood fit is returned (see
 [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md),
-Details).
+Details). As there, the covariate coefficients are corrected too, and
+with `se = "bootstrap"` each replicate is corrected the same way, so the
+standard errors include the correction's own variance.
 
 ## See also
 

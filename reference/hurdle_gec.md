@@ -21,7 +21,7 @@ hurdle_gec(
   B = 500,
   weights = NULL,
   cores = 1L,
-  max.support = 500
+  max.support = NULL
 )
 ```
 
@@ -43,7 +43,18 @@ hurdle_gec(
 - part_fe:
 
   Optional column name for fixed effects in the participation model
-  (added as factor dummies).
+  (added as factor dummies), whose slopes carry the dummy logit's
+  incidental-parameters bias in short panels (see
+  [`hurdle_cpb()`](https://bagozzib.github.io/underdisp/reference/hurdle_cpb.md)).
+  The dummy of a unit that never participates is not counted in the
+  degrees of freedom (see
+  [`compare_models()`](https://bagozzib.github.io/underdisp/reference/compare_models.md),
+  Degrees of freedom). In new data such a unit, and one whose every
+  count is positive, get the participation probability at their limits
+  (zero and one), and an unseen unit enters at the reference unit, as in
+  [`hurdle_cpb()`](https://bagozzib.github.io/underdisp/reference/hurdle_cpb.md);
+  the participation equation is checked for separation
+  (`part_separation`).
 
 - link:
 
@@ -57,8 +68,9 @@ hurdle_gec(
 
 - cluster:
 
-  Optional cluster (column name or vector) for the intensity's cluster
-  bootstrap.
+  Optional cluster (column name or vector): cluster-robust standard
+  errors for the participation equation, and the cluster bootstrap of
+  the intensity with `se = "bootstrap"`.
 
 - se:
 
@@ -81,7 +93,9 @@ hurdle_gec(
 
 - max.support:
 
-  Guard on the maximum evaluated support.
+  Guard on the evaluated support of the intensity; `NULL` (default) sets
+  `max(500, 10 * max(y))`. See
+  [`gec()`](https://bagozzib.github.io/underdisp/reference/gec.md).
 
 ## Value
 
@@ -120,7 +134,7 @@ hurdle_gec(y ~ x, data.frame(y = y, x = x, z = z), participation = ~ z)
 #> 
 #> Intensity (zero-truncated GEC) coefficients:
 #> (Intercept)           x 
-#>      1.3504      0.2550 
+#>      1.3504      0.2551 
 #> Intensity dispersion delta: 0.683  [underdispersed (point estimate)]
 # }
 ```

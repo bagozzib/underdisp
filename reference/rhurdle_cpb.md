@@ -5,7 +5,7 @@ Simulate from the hurdle continuous parameter binomial
 ## Usage
 
 ``` r
-rhurdle_cpb(n, lambda, alpha, p)
+rhurdle_cpb(n, lambda, alpha, p, support = c("ceiling", "floor"))
 ```
 
 ## Arguments
@@ -16,7 +16,8 @@ rhurdle_cpb(n, lambda, alpha, p)
 
 - lambda:
 
-  Intensity mean for participants; scalar or length-`n`.
+  Intensity rate for participants (the CPB's `lambda`); scalar or
+  length-`n`.
 
 - alpha:
 
@@ -25,6 +26,11 @@ rhurdle_cpb(n, lambda, alpha, p)
 - p:
 
   Participation probability; scalar or length-`n`.
+
+- support:
+
+  The CPB's support, `"ceiling"` (King's CPB, the default) or `"floor"`;
+  see [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
 
 ## Value
 

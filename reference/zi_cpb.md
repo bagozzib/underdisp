@@ -6,10 +6,15 @@ zero) with an untruncated CPB for the count, so a zero can arise either
 structurally or as a sampling zero from the CPB. Unlike
 [`hurdle_cpb()`](https://bagozzib.github.io/underdisp/reference/hurdle_cpb.md),
 the likelihood does not factorize, so the parameters are estimated by
-direct joint maximum likelihood, seeded from separate fits (a
-zero-truncated CPB on the positives and a logit of the zero indicator)
-and cross-checked against an expectation-maximization climb of the same
-observed-data likelihood, keeping the better optimum. An EM-only path
+direct joint maximum likelihood. The mixture likelihood's optima differ
+with the structural share of zeros, so the search starts from points
+that span it: separate fits (a zero-truncated CPB on the positives and a
+logit of the zero indicator), the zero-inflated Poisson's coefficients,
+and a low-inflation start (a constant structural-zero probability of
+0.02), followed by a BFGS pass; it is cross-checked against an
+expectation-maximization climb of the same observed-data likelihood,
+keeping the better optimum. The separation check (Separation) restarts
+the final polish from any better point it finds. An EM-only path
 (`method = "em"`) is retained for comparison.
 
 ## Usage
@@ -25,12 +30,13 @@ zi_cpb(
   se = c("none", "bootstrap"),
   B = 500,
   cluster = NULL,
-  max.support = 500,
+  max.support = NULL,
   maxit = 200,
   tol = 1e-06,
   offset = NULL,
   weights = NULL,
-  cores = 1L
+  cores = 1L,
+  support = c("ceiling", "floor")
 )
 ```
 
@@ -53,19 +59,49 @@ zi_cpb(
 
   Optional column name for unit fixed effects in the intensity (count)
   component. Under `method = "ml"` the unit effects enter as plug-in
-  offsets from a first-stage fit; under `method = "em"` a classification
-  (hard-assignment) step handles the structural zeros.
+  offsets from a first-stage fit to the positive counts, and on King's
+  support the fit is then polished on the observed-data likelihood with
+  every unit's effect free, so that it is a joint maximum of the mixture
+  likelihood (on the floor support the fit keeps the plug-in effects,
+  which are not a joint maximum: a unit whose positive counts are all 1
+  takes an arbitrary point of the first stage's flat set, so the
+  inflation equation and the log-likelihood can depend on the order of
+  the rows); under `method = "em"` a classification (hard-assignment)
+  step handles the structural zeros before the same polish. A unit with
+  no positive count is left out of the estimation, as fixest leaves such
+  units out of a Poisson fixed-effects fit: at the maximum its count
+  effect is minus infinity, so its zeros are certain whatever its
+  structural-zero probability, and its rows add nothing to the
+  likelihood or the degrees of freedom. Its rows stay in the fit at that
+  limit (the effect at the
+  [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md)
+  sentinel, 30 log units below the unit's largest linear predictor),
+  with fitted means of zero, and the fit records the units in
+  `zero_units` and their number in `n_zero_units`. Their structural-zero
+  probability is `NA` where the zero equation would give them their own
+  dummy (`zero_fe`), which their zeros cannot identify. On the floor
+  support such units stay in the estimation with a filled-in count
+  effect (the smallest estimated effect minus 2 under `"ml"`, the mean
+  effect under `"em"`).
 
 - zero_fe:
 
   Optional column name for fixed effects in the zero-inflation equation,
-  entered as factor dummies (opt-in).
+  entered as factor dummies (opt-in). On King's support the dummy of a
+  unit with no positive count is not counted in the degrees of freedom
+  (see
+  [`compare_models()`](https://bagozzib.github.io/underdisp/reference/compare_models.md),
+  Degrees of freedom), and in new data such a unit's rows get the
+  structural-zero probability one and those of a unit whose every count
+  is positive (`zero_fe_one_units`) zero; a unit the fit has not seen,
+  or every row when `newdata` lacks the column, enters at the zero
+  equation's reference unit.
 
 - method:
 
-  Estimation method: `"ml"` (default) is robust direct joint maximum
-  likelihood seeded from separate fits; `"em"` is expectation-
-  maximization, retained for comparison but prone to a degenerate
+  Estimation method: `"ml"` (default) is direct joint maximum likelihood
+  from the starts described above; `"em"` is expectation-maximization,
+  retained for comparison but prone to a degenerate
   structural-zero-probability collapse under heavy zero-inflation.
 
 - se:
@@ -84,7 +120,11 @@ zi_cpb(
 
 - max.support:
 
-  Maximum support for the CPB pmf.
+  Guard on the evaluated support of the count component; see
+  [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md). The
+  default `NULL` sets `max(500, 10 * max(y))` (500 on the floor
+  support). It is kept with the fit for
+  [`simulate()`](https://rdrr.io/r/stats/simulate.html).
 
 - maxit:
 
@@ -99,10 +139,9 @@ zi_cpb(
 
   Optional exposure offset (log scale) for the count component: a
   numeric vector or the name of a column in `data`, making the count a
-  rate model. Supported for `method = "ml"` without `fe` (the
-  fixed-effects path's plug-in unit effects have no offset handling yet,
-  and errors loudly). The bootstrap carries the offset through every
-  replicate.
+  rate model. Supported for `method = "ml"` without `fe`; with `fe`, an
+  offset is refused with an error. The bootstrap carries the offset
+  through every replicate.
 
 - weights:
 
@@ -115,9 +154,15 @@ zi_cpb(
   Worker processes for the bootstrap; see
   [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
 
+- support:
+
+  The CPB's support, `"ceiling"` (King's CPB, the default) or `"floor"`;
+  see [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
+
 ## Value
 
-An object of class `"zi_cpb"`.
+An object of class `"zi_cpb"`. Its component `separation` holds the
+separation check (see Separation).
 
 ## Details
 
@@ -126,6 +171,87 @@ inflation link, use
 [`zi_count()`](https://bagozzib.github.io/underdisp/reference/zi_count.md)
 (Poisson/NB/COM-Poisson count), whose `link` argument covers the binary
 stage.
+
+## Separation
+
+A zero contributes `log(pi + (1 - pi) f0)` to the likelihood, which
+rises with `pi`, and a positive count contributes
+`log(1 - pi) + log f(y)`, which falls with it. So a coefficient of the
+zero-inflation equation can grow without bound, and the likelihood with
+it, under three conditions. The zeros it pushes toward `pi = 1` can go
+there freely, and so can the positives it pushes toward `pi = 0`. The
+count component's probability of a zero, `f0`, covers the zeros it
+pushes toward `pi = 0`. Unlike separation in a logistic regression, this
+needs no covariate that splits the zeros from the positives. So a
+[`hurdle_cpb()`](https://bagozzib.github.io/underdisp/reference/hurdle_cpb.md)
+whose participation logit uses the same covariates can have a finite
+maximum while the mixture has none. The optimizer then stops somewhere
+along the divergent path. The zero equation's coefficients there are not
+estimates, and the log-likelihood approximates a supremum, so likelihood
+comparisons with the fit (likelihood ratio, AIC, Vuong) lack their usual
+reference distributions.
+
+After the fit, the profile likelihood of each covariate coefficient in
+the zero equation is evaluated at the estimate. It is evaluated again at
+10 and at 100 standard deviations of its covariate further from zero.
+Each time, the other zero-equation coefficients are re-maximized with
+the count component held at its estimate. The fit warns when a
+coefficient's profile 100 standard deviations out is less than
+`qchisq(0.95, 1) / 2` below its value at the estimate. That
+coefficient's 95% profile interval then reaches past an effect of 100 on
+the log-odds per standard deviation, and the data put no useful bound on
+it. This covers a coefficient with no finite estimate and one whose
+finite maximum lies on a near-flat ridge, which a fit cannot tell apart.
+Holding the count component fixed can only lower the profile, so the
+full model's interval is at least as wide. Every profile can also reach
+the no-inflation boundary, where each structural-zero probability is
+zero and the zero equation drops out. A coefficient whose profile at the
+estimate lies within `qchisq(0.95, 1) / 2` of that limit is unbounded
+because the data show little inflation, not by separation, so it is not
+flagged, and the fit is reported as near the boundary instead
+([`zi_test()`](https://bagozzib.github.io/underdisp/reference/zi_test.md)
+tests it). The intercept and the `zero_fe` dummies are not checked.
+Their limits are the no-inflation boundary
+([`zi_test()`](https://bagozzib.github.io/underdisp/reference/zi_test.md))
+and the boundaries of single units (a unit with no positive count, whose
+structural-zero probability goes to one, as in a fixed-effects logit;
+with `fe`, such a unit is left out of the estimation, see `fe`). The
+component `separation` of the fit holds:
+
+- `diverging`: the terms the data do not bound;
+
+- `profile`: the profile steps;
+
+- `short_of_max`: how far the best point the check found lies above the
+  fit, with the count component unchanged. That point can come from the
+  re-maximization at the estimate, when the fit is not a stationary
+  point of the zero equation, or from a profile that rises above its
+  value at the estimate, since the mixture likelihood is not concave and
+  a profile can rise before it falls. A positive value means the
+  optimizer stopped at least that far below the maximum;
+
+- `best`: the zero-equation coefficients at that point (`NULL` when
+  there is none);
+
+- `restarts`, `restart_gain`: when the check finds a point at least 0.01
+  higher, the fit restarts its final polish there, with every parameter
+  it estimates free, keeps the result only if it gains, and checks
+  again, up to three times. These record the restarts kept and their
+  total gain in log-likelihood. The other components describe the final
+  fit;
+
+- `no_inflation`, `inflation_gain`: whether the best point lies within
+  `qchisq(0.95, 1) / 2` of the no-inflation limit (the count component
+  held), and its distance from it;
+
+- `n_extreme`: the number of observations whose structural-zero
+  probability is numerically 0 or 1, outside units that lie wholly at
+  one edge.
+
+[`zi_gec()`](https://bagozzib.github.io/underdisp/reference/zi_gec.md)
+and
+[`zi_count()`](https://bagozzib.github.io/underdisp/reference/zi_count.md)
+run the same check.
 
 ## Examples
 
@@ -137,17 +263,17 @@ y <- rzicpb(n, lambda = exp(1.3 + 0.5 * x), alpha = 0.5, pi = plogis(-0.5 + 0.8 
 zi_cpb(y ~ x, data = data.frame(y = y, x = x, z = z), zero = ~ z)
 #> Zero-Inflated Continuous Parameter Binomial
 #> Call:  zi_cpb(formula = y ~ x, data = data.frame(y = y, x = x, z = z),     zero = ~z)
-#> N: 800   EM iterations: 236   logLik: -1239.2
+#> N: 800   optimizer iterations: 35   logLik: -1264.1
 #> 
 #> Intensity (CPB) coefficients:
 #> (Intercept)           x 
-#>      1.2967      0.5011 
-#> Intensity alpha (shape): 0.5021 
+#>      1.2940      0.5137 
+#> Intensity alpha (shape): 0.5124 
 #> 
 #> Zero-inflation (logit link) -- positive coefficients raise P(structural zero), i.e. lower the
 #> chance of a positive count (the opposite direction from a hurdle participation model):
 #> (Intercept)           z 
-#>     -0.3674      0.7065 
-#> Mean structural-zero probability: 0.418 
+#>     -0.3891      0.7048 
+#> Mean structural-zero probability: 0.413 
 # }
 ```

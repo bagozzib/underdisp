@@ -4,7 +4,8 @@ A state-year panel of contributions to United Nations peacekeeping
 operations, the archetype of a bounded, underdispersed participation
 count: most state-years contribute to no operation, and the states that
 contribute carry a tight count held in a narrow band by a turning-over
-roster. About 42\\ hurdle-CPB.
+roster. About 42% of state-years are zero, so it is also a natural
+example for the hurdle-CPB.
 
 ## Usage
 
@@ -71,20 +72,22 @@ table(peacekeeping$contributions == 0)
 #>  2602  1846 
 # \donttest{
 some <- subset(peacekeeping, iso3 %in% unique(iso3)[1:40])   # forty states keep the example short
+## among these forty states every major power contributes, so majorpower would
+## separate the participation equation (hurdle_cpb() warns when it does)
 fit <- hurdle_cpb(contributions ~ lgdppc + milper, data = some,
-                  participation = ~ democracy + majorpower, fe = "iso3")
+                  participation = ~ democracy + lgdppc, fe = "iso3")
 fit
 #> Hurdle Continuous Parameter Binomial (intensity fixed effects on 'iso3')
-#> Call:  hurdle_cpb(formula = contributions ~ lgdppc + milper, data = some,     participation = ~democracy + majorpower, fe = "iso3")
+#> Call:  hurdle_cpb(formula = contributions ~ lgdppc + milper, data = some,     participation = ~democracy + lgdppc, fe = "iso3")
 #> Units: 1020 (588 participate, 58%)
 #> 
 #> Participation (logit link) -- positive coefficients raise P(Y > 0), i.e. participation:
-#> (Intercept)   democracy  majorpower 
-#>     -1.8477      3.8935     17.9320 
+#> (Intercept)   democracy      lgdppc 
+#>     -1.4315      3.4018     -0.0112 
 #> 
 #> Intensity (zero-truncated CPB) coefficients:
 #>  lgdppc  milper 
-#>  0.2608 -0.0012 
-#> Intensity alpha (shape): 0.6674 
+#>  0.2740 -0.0011 
+#> Intensity alpha (shape): 0.6635 
 # }
 ```

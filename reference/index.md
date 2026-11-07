@@ -34,7 +34,8 @@ One formula interface, one class per model, one set of methods.
   Generalized event count (Katz-family) regression
 - [`count_reg()`](https://bagozzib.github.io/underdisp/reference/count_reg.md)
   : Matched count regressions: Poisson, negative binomial, COM-Poisson,
-  generalized Poisson, gamma-count, double Poisson
+  generalized Poisson, gamma-count, double Poisson, hyper-Poisson,
+  exponentially weighted Poisson
 
 ## High-dimensional fixed effects
 
@@ -92,6 +93,10 @@ One formula interface, one class per model, one set of methods.
   [`fitted(`*`<zi_gec>`*`)`](https://bagozzib.github.io/underdisp/reference/fitted.underdisp.md)
   [`fitted(`*`<zi_count>`*`)`](https://bagozzib.github.io/underdisp/reference/fitted.underdisp.md)
   : Fitted means for the two-part and fixed-effects classes
+- [`residuals(`*`<count_reg>`*`)`](https://bagozzib.github.io/underdisp/reference/residuals.underdisp.md)
+  [`residuals(`*`<gec>`*`)`](https://bagozzib.github.io/underdisp/reference/residuals.underdisp.md)
+  [`residuals(`*`<cpb_fe>`*`)`](https://bagozzib.github.io/underdisp/reference/residuals.underdisp.md)
+  : Residuals of a fitted model
 
 ## Predictions
 
@@ -99,6 +104,8 @@ One formula interface, one class per model, one set of methods.
   : Predictions from a CPB fit
 - [`predict(`*`<cpb_fe>`*`)`](https://bagozzib.github.io/underdisp/reference/predict.cpb_fe.md)
   : Predictions from a fixed-effects CPB fit
+- [`predict(`*`<gec_fe>`*`)`](https://bagozzib.github.io/underdisp/reference/predict.gec_fe.md)
+  : Predictions from a fixed-effects GEC fit
 - [`predict(`*`<gec>`*`)`](https://bagozzib.github.io/underdisp/reference/predict.gec.md)
   : Predictions from a generalized event count fit
 - [`predict(`*`<count_reg>`*`)`](https://bagozzib.github.io/underdisp/reference/predict.count_reg.md)
@@ -133,8 +140,10 @@ One formula interface, one class per model, one set of methods.
   [`first_difference(`*`<zi_cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/first_difference.hurdle_cpb.md)
   : Extensive/intensive first-difference decomposition for a hurdle- or
   ZI-CPB
+- [`ame()`](https://bagozzib.github.io/underdisp/reference/ame.md) :
+  Average marginal effects
 - [`implied_ceiling()`](https://bagozzib.github.io/underdisp/reference/implied_ceiling.md)
-  : Implied ceiling with a profile-likelihood interval
+  : Implied ceiling, and the ceiling at the limits of alpha's interval
 - [`irr()`](https://bagozzib.github.io/underdisp/reference/irr.md) :
   Incidence rate ratios for a CPB fit
 - [`irr(`*`<count_reg>`*`)`](https://bagozzib.github.io/underdisp/reference/irr.count.md)
@@ -155,6 +164,8 @@ One formula interface, one class per model, one set of methods.
   Proper scoring rules for a fitted count model
 - [`cv_score()`](https://bagozzib.github.io/underdisp/reference/cv_score.md)
   : Cross-validated proper scores for a count model
+- [`ceiling_exceedance()`](https://bagozzib.github.io/underdisp/reference/ceiling_exceedance.md)
+  : Held-out ceiling exceedance of a CPB fit
 
 ## Panel tools
 
@@ -209,20 +220,30 @@ One formula interface, one class per model, one set of methods.
   [`qgenpois()`](https://bagozzib.github.io/underdisp/reference/genpois-distribution.md)
   [`rgenpois()`](https://bagozzib.github.io/underdisp/reference/genpois-distribution.md)
   : Generalized Poisson distribution functions
+- [`dhyperpois()`](https://bagozzib.github.io/underdisp/reference/hyperpois-distribution.md)
+  [`phyperpois()`](https://bagozzib.github.io/underdisp/reference/hyperpois-distribution.md)
+  [`qhyperpois()`](https://bagozzib.github.io/underdisp/reference/hyperpois-distribution.md)
+  [`rhyperpois()`](https://bagozzib.github.io/underdisp/reference/hyperpois-distribution.md)
+  : Hyper-Poisson distribution functions
+- [`dewp()`](https://bagozzib.github.io/underdisp/reference/ewp-distribution.md)
+  [`pewp()`](https://bagozzib.github.io/underdisp/reference/ewp-distribution.md)
+  [`qewp()`](https://bagozzib.github.io/underdisp/reference/ewp-distribution.md)
+  [`rewp()`](https://bagozzib.github.io/underdisp/reference/ewp-distribution.md)
+  : Exponentially weighted Poisson distribution functions
 
 ## broom methods
 
 - [`tidy(`*`<cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
   [`tidy(`*`<cpb_fe>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
-  [`tidy(`*`<hurdle_cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
-  [`tidy(`*`<zi_cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
   [`tidy(`*`<gec>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
-  [`tidy(`*`<hurdle_gec>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
-  [`tidy(`*`<zi_gec>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
   [`tidy(`*`<count_reg>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
-  [`tidy(`*`<zi_count>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
+  [`tidy(`*`<hurdle_cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
+  [`tidy(`*`<hurdle_gec>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
   [`tidy(`*`<hurdle_count>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
-  : Tidy a CPB fit (broom method)
+  [`tidy(`*`<zi_cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
+  [`tidy(`*`<zi_gec>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
+  [`tidy(`*`<zi_count>`*`)`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)
+  : Tidy a fitted model (broom method)
 - [`glance(`*`<cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/glance.cpb.md)
   [`glance(`*`<cpb_fe>`*`)`](https://bagozzib.github.io/underdisp/reference/glance.cpb.md)
   [`glance(`*`<hurdle_cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/glance.cpb.md)
@@ -233,7 +254,7 @@ One formula interface, one class per model, one set of methods.
   [`glance(`*`<count_reg>`*`)`](https://bagozzib.github.io/underdisp/reference/glance.cpb.md)
   [`glance(`*`<zi_count>`*`)`](https://bagozzib.github.io/underdisp/reference/glance.cpb.md)
   [`glance(`*`<hurdle_count>`*`)`](https://bagozzib.github.io/underdisp/reference/glance.cpb.md)
-  : Glance at a CPB fit (broom method)
+  : Glance at a fitted model (broom method)
 - [`augment(`*`<cpb>`*`)`](https://bagozzib.github.io/underdisp/reference/augment.cpb.md)
   : Augment data with CPB fitted values (broom method)
 

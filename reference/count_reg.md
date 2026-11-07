@@ -1,4 +1,4 @@
-# Matched count regressions: Poisson, negative binomial, COM-Poisson, generalized Poisson, gamma-count, double Poisson
+# Matched count regressions: Poisson, negative binomial, COM-Poisson, generalized Poisson, gamma-count, double Poisson, hyper-Poisson, exponentially weighted Poisson
 
 Fits a count regression with a log link from any of the package's count
 families, optionally zero-truncated and/or with unit fixed effects,
@@ -22,7 +22,7 @@ count_reg(
   formula,
   data,
   family = c("poisson", "negbin", "compois", "mpcmp", "genpois", "gammacount",
-    "doublepois"),
+    "doublepois", "hyperpois", "ewp3", "ewp2"),
   truncated = FALSE,
   fe = NULL,
   offset = NULL,
@@ -45,7 +45,8 @@ count_reg(
 - family:
 
   One of `"poisson"`, `"negbin"`, `"compois"`, `"mpcmp"`, `"genpois"`,
-  `"gammacount"`, `"doublepois"` (see Families).
+  `"gammacount"`, `"doublepois"`, `"hyperpois"`, `"ewp3"`, `"ewp2"` (see
+  Families).
 
 - truncated:
 
@@ -81,7 +82,24 @@ count_reg(
 
   Standard errors: `"analytic"` (inverse information, default),
   `"robust"` (heteroskedasticity-consistent sandwich), `"cluster"`
-  (cluster-robust; needs `cluster`), or `"none"`.
+  (cluster-robust; needs `cluster`), or `"none"`. A robust or clustered
+  covariance protects inference about the parameters of the best-fitting
+  member of the family; the quantities that rest on the whole
+  distribution (predicted probabilities, the mean of a truncated or
+  two-part model) are still those of the fitted family. King and
+  Roberts (2015) read a large gap between the robust and the model-based
+  standard errors as evidence of a misspecification to fix;
+  [`summary()`](https://rdrr.io/r/base/summary.html) reports their
+  ratio. For the Poisson the coefficients are consistent for the
+  conditional mean whenever \\E(Y \mid x) = \exp(x'\beta)\\, whatever
+  the distribution (Gourieroux, Monfort and Trognon 1984; Wooldridge
+  1999), and the robust or clustered errors are then valid for them: the
+  gap shows that the variance is not the Poisson's, not that the mean is
+  wrong. That makes the robust Poisson the benchmark for mean effects,
+  against which the families' own mean effects
+  ([`ame()`](https://bagozzib.github.io/underdisp/reference/ame.md)) can
+  be compared; a family that fits the distribution better estimates them
+  consistently only if it is the true model.
 
 - cluster:
 
@@ -94,7 +112,8 @@ count_reg(
 An object of class `"count_reg"`. The component `$theta` holds the
 dispersion parameter on its natural scale (the negative-binomial size,
 the COM-Poisson \\\nu\\, the generalized-Poisson \\\lambda\\, the
-gamma-count \\\alpha\\, the double-Poisson \\\theta\\; `NA` for the
+gamma-count \\\alpha\\, the double-Poisson \\\theta\\, the hyper-Poisson
+\\\gamma\\, the EWP's \\(\beta_1, \beta_2)\\ or \\\beta\\; `NA` for the
 Poisson); `$fitted.values` and `$residuals` are on the mean scale (the
 conditional mean E(Y \| Y \>= 1) for a zero-truncated fit), as
 [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) and
@@ -120,10 +139,13 @@ conditional mean E(Y \| Y \>= 1) for a zero-truncated fit), as
   coefficients are effects on the log mean and rate ratios are exact.
 
 - `"genpois"`: the Consul–Jain generalized Poisson with constant
-  dispersion \\\lambda \in (-1, 1)\\ and mean \\\mu = \exp(x'\beta)\\,
-  so \\\mathrm{Var}/\mathrm{Mean} = 1/(1-\lambda)^2\\; \\\lambda \< 0\\
-  is underdispersion, on a finite support that the pmf is renormalized
-  over (see
+  dispersion \\\lambda \in (-1, 1)\\ and \\\mu = \exp(x'\beta)\\, the
+  mean for \\\lambda \ge 0\\, with \\\mathrm{Var}/\mathrm{Mean} =
+  1/(1-\lambda)^2\\; \\\lambda \< 0\\ is underdispersion, on a finite
+  support that the pmf is renormalized over, and the mean then departs
+  from \\\mu\\ where that support is short (small \\\mu\\ at strong
+  underdispersion: about \\1.19\mu\\ at \\\lambda = -0.6\\, \\\mu =
+  0.5\\); the exact mean is reported (see
   [genpois-distribution](https://bagozzib.github.io/underdisp/reference/genpois-distribution.md)).
 
 - `"gammacount"`: Winkelmann's (1995) gamma-count renewal-process model,
@@ -136,6 +158,29 @@ conditional mean E(Y \| Y \>= 1) for a zero-truncated fit), as
   normalizing constant, \\\theta \> 1\\ underdispersed (see
   [doublepois-distribution](https://bagozzib.github.io/underdisp/reference/doublepois-distribution.md)).
 
+- `"hyperpois"`: the hyper-Poisson of Bardwell and Crow (1964) in the
+  mean parameterization of Sáez-Castillo and Conde-Sánchez (2013), mean
+  \\\mu = \exp(x'\beta)\\, \\\gamma \< 1\\ underdispersed, with one
+  \\\gamma\\ for all observations: their constant-dispersion model
+  hP\\(\mu_i, \gamma)\\. Their model with covariates in the dispersion,
+  hP\\(\mu_i, \gamma_i)\\, is fit by
+  [`DGLMExtPois::glm.hP()`](https://rdrr.io/pkg/DGLMExtPois/man/glm.hP.html).
+  Its underdispersion is bounded: as \\\gamma \to 0\\ the variance falls
+  only to \\\mu - 1\\ for \\\mu \ge 1\\ and \\\mu(1 - \mu)\\ below, so
+  Var/Mean is at least 0.5 at a mean of 2 and 0.9 at 10 (see
+  [hyperpois-distribution](https://bagozzib.github.io/underdisp/reference/hyperpois-distribution.md)).
+
+- `"ewp3"` (alias `"ewp"`): the three-parameter exponentially weighted
+  Poisson of Ridout and Besbeas (2004), a Poisson with centrality
+  \\\lambda = \exp(x'\beta)\\ reweighted by a two-sided exponential in
+  the distance from it; `$theta` holds the two dispersion parameters
+  \\(\beta_1, \beta_2)\\, one per tail, positive values underdispersed
+  (see
+  [ewp-distribution](https://bagozzib.github.io/underdisp/reference/ewp-distribution.md)).
+  `"ewp2"` is its two-parameter form, \\\beta_1 = \beta_2 = \beta\\. The
+  coefficients are effects on the log centrality, not the log mean; the
+  exact mean is reported.
+
 The Poisson is the equidispersed member of every family, so
 [`dispersion_test()`](https://bagozzib.github.io/underdisp/reference/dispersion_test.md)
 tests each family's dispersion parameter against it, and
@@ -144,23 +189,47 @@ compares the families' implied variance-to-mean curves against the data.
 
 Runtime: the Poisson, negative binomial, gamma-count, and double Poisson
 and generalized Poisson families fit in under a second at a few hundred
-rows; the COM-Poisson families evaluate a normalizing sum per
-observation (and the mean parameterization solves a root per
-observation), so they take seconds at a few hundred rows and minutes at
-several thousand; `se = "robust"` and `"cluster"` add numerical scores
-at the same cost per parameter.
+rows; the COM-Poisson families, the hyper-Poisson and the EWP evaluate a
+normalizing sum per observation (and the mean parameterizations solve a
+root per observation), so they take seconds at a few hundred rows and
+minutes at several thousand. The EWP's sum lengthens with a heavy upper
+tail (a negative upper weight), and its standard errors sum over each
+observation's support. Rows that repeat (the same count, covariates and
+offset) are evaluated once with their total weight, so an intercept-only
+or few-category design costs as many evaluations as it has distinct
+rows. `se = "robust"` and `"cluster"` add numerical scores at the same
+cost per parameter.
 
 ## References
 
-Huang, A. (2017). Mean-parametrized Conway–Maxwell–Poisson regression
-models for dispersed counts. *Statistical Modelling*, 17(6), 359-380.
-Winkelmann, R. (1995). Duration dependence and dispersion in count-data
-models. *Journal of Business & Economic Statistics*, 13(4), 467-474.
-Efron, B. (1986). Double exponential families and their use in
-generalized linear regression. *Journal of the American Statistical
-Association*, 81(395), 709-721. Consul, P. C. and Famoye, F. (1992).
-Generalized Poisson regression model. *Communications in Statistics –
-Theory and Methods*, 21(1), 89-109.
+King, G. and Roberts, M. E. (2015). How robust standard errors expose
+methodological problems they do not fix, and what to do about it.
+*Political Analysis*, 23(2), 159-179. Huang, A. (2017).
+Mean-parametrized Conway–Maxwell–Poisson regression models for dispersed
+counts. *Statistical Modelling*, 17(6), 359-380. Winkelmann, R. (1995).
+Duration dependence and dispersion in count-data models. *Journal of
+Business & Economic Statistics*, 13(4), 467-474. Efron, B. (1986).
+Double exponential families and their use in generalized linear
+regression. *Journal of the American Statistical Association*, 81(395),
+709-721. Consul, P. C. and Famoye, F. (1992). Generalized Poisson
+regression model. *Communications in Statistics – Theory and Methods*,
+21(1), 89-109. Shmueli, G., Minka, T. P., Kadane, J. B., Borle, S. and
+Boatwright, P. (2005). A useful distribution for fitting discrete data:
+revival of the Conway–Maxwell–Poisson distribution. *Journal of the
+Royal Statistical Society C*, 54(1), 127-142. Sellers, K. F. and
+Shmueli, G. (2010). A flexible regression model for count data. *Annals
+of Applied Statistics*, 4(2), 943-961. Bardwell, G. E. and Crow, E. L.
+(1964). A two-parameter family of hyper-Poisson distributions. *Journal
+of the American Statistical Association*, 59(305), 133-141.
+Sáez-Castillo, A. J. and Conde-Sánchez, A. (2013). A hyper-Poisson
+regression model for overdispersed and underdispersed count data.
+*Computational Statistics & Data Analysis*, 61, 148-157. Ridout, M. S.
+and Besbeas, P. (2004). An empirical model for underdispersed count
+data. *Statistical Modelling*, 4(1), 77-89. Gourieroux, C., Monfort, A.
+and Trognon, A. (1984). Pseudo maximum likelihood methods: applications
+to Poisson models. *Econometrica*, 52(3), 701-720. Wooldridge, J. M.
+(1999). Distribution-free estimation of some nonlinear panel data
+models. *Journal of Econometrics*, 90(1), 77-97.
 
 ## See also
 
@@ -187,9 +256,14 @@ m
 #> (Intercept)           x 
 #>      0.9847      0.4955 
 #> 
+#> Coefficients are on the log long-run rate scale, not the log mean; predict(type = 'response') and ame() are on the mean scale.
+#> 
 #> alpha (gamma-count dispersion; > 1 underdispersed): 1.9406  [Var/Mean ~ 0.515]
 compare_models(poisson = count_reg(y ~ x, d, family = "poisson"), gammacount = m)
-#>            df    logLik      AIC      BIC logscore       rps
-#> gammacount  3 -637.0878 1280.176 1292.150 1.592719 0.6721447
-#> poisson     2 -661.4718 1326.944 1334.927 1.653679 0.6905665
+#>            df    logLik      AIC      BIC logscore       rps truncated
+#> gammacount  3 -637.0878 1280.176 1292.150 1.592719 0.6721447     FALSE
+#> poisson     2 -661.4718 1326.944 1334.927 1.653679 0.6905665     FALSE
+#>            separated
+#> gammacount     FALSE
+#> poisson        FALSE
 ```

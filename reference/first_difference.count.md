@@ -2,22 +2,31 @@
 
 The discrete-change effect on the expected count E(Y) as `variable`
 moves from `from` to `to`, holding the other covariates at their sample
-means. For `count_reg` this is a single number with a delta-method
-interval; for the two-part models it is decomposed exactly into
-extensive (participation / non-structural-zero) and intensive (count)
-channels that sum to the total.
+means (or at the values `at` gives them). The interval follows the
+package's one rule (see
+[`first_difference()`](https://bagozzib.github.io/underdisp/reference/first_difference.md)):
+percentile intervals from the fit's stored bootstrap draws for the GEC,
+fixed-effects CPB and zero-inflated GEC fits, the delta method over the
+full covariance, the dispersion parameter included, for the matched
+count families and the hurdles' margins. For `count_reg` this is a
+single number; for the two-part models it is reported on each margin:
+the binary stage's probability (participation, or the structural-zero
+probability), the count stage's mean, and the marginal mean, their
+product, each at `from` and `to`. The first two are different quantities
+and their changes do not add up to the marginal change, which is
+\\\Delta(pm) = \Delta p\\ m_0 + p_0 \Delta m + \Delta p\\ \Delta m\\.
 
 ## Usage
 
 ``` r
 # S3 method for class 'gec'
-first_difference(object, variable, from, to, level = 0.95, ...)
+first_difference(object, variable, from, to, level = 0.95, at = NULL, ...)
 
 # S3 method for class 'gec_fe'
-first_difference(object, variable, from, to, level = 0.95, ...)
+first_difference(object, variable, from, to, level = 0.95, at = NULL, ...)
 
 # S3 method for class 'cpb_fe'
-first_difference(object, variable, from, to, level = 0.95, ...)
+first_difference(object, variable, from, to, level = 0.95, at = NULL, ...)
 
 # S3 method for class 'hurdle_gec'
 first_difference(
@@ -27,6 +36,7 @@ first_difference(
   to,
   level = 0.95,
   stage = c("both", "participation", "intensity", "zero", "count"),
+  at = NULL,
   ...
 )
 
@@ -38,11 +48,12 @@ first_difference(
   to,
   level = 0.95,
   stage = c("both", "participation", "intensity", "zero", "count"),
+  at = NULL,
   ...
 )
 
 # S3 method for class 'count_reg'
-first_difference(object, variable, from, to, level = 0.95, ...)
+first_difference(object, variable, from, to, level = 0.95, at = NULL, ...)
 
 # S3 method for class 'hurdle_count'
 first_difference(
@@ -52,6 +63,7 @@ first_difference(
   to,
   level = 0.95,
   stage = c("both", "participation", "intensity", "zero", "count"),
+  at = NULL,
   ...
 )
 
@@ -63,6 +75,7 @@ first_difference(
   to,
   level = 0.95,
   stage = c("both", "participation", "intensity", "zero", "count"),
+  at = NULL,
   ...
 )
 ```
@@ -84,8 +97,14 @@ first_difference(
 
 - level:
 
-  Confidence level for the delta-method intervals (all methods on this
-  page that can compute one).
+  Confidence level of the intervals.
+
+- at:
+
+  Optional named numeric vector fixing other model-matrix columns at
+  given values instead of their means (see
+  [`first_difference()`](https://bagozzib.github.io/underdisp/reference/first_difference.md));
+  in a two-part model a column of both equations is fixed in both.
 
 - ...:
 

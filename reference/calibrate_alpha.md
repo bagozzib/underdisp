@@ -7,7 +7,10 @@ distribution of the signed root of the profile likelihood ratio for
 [`confint.cpb()`](https://bagozzib.github.io/underdisp/reference/confint.cpb.md),
 [`implied_ceiling()`](https://bagozzib.github.io/underdisp/reference/implied_ceiling.md)
 and [`summary()`](https://rdrr.io/r/base/summary.html) report the
-calibrated interval instead of the first-order one.
+calibrated interval instead of the first-order one. It is the remedy for
+floor-support fits (`support = "floor"`). On King's support, the
+default, the first-order interval covers close to its level, and the
+calibration is an optional refinement.
 
 ## Usage
 
@@ -61,13 +64,22 @@ roots `r` (`NA` for a replicate that failed to fit), `B`, `B_ok` and
 ## Details
 
 The first-order interval cuts the profile log-likelihood
-`qchisq(level, 1) / 2` below its maximum on both sides. For the CPB that
-cut is not calibrated: the support `0, ..., floor(lambda / (1 - alpha))`
-moves with the parameters, the log-ceiling coefficients behave like
-endpoint parameters, and `alpha`-hat inherits a bias toward zero from
-them. In simulations from the CPB the first-order 95% interval covers
-between 0.90 and 0.94 across a grid of nine designs, and nearly all of
-its misses have the true `alpha` above the upper limit.
+`qchisq(level, 1) / 2` below its maximum on both sides. On King's
+support that cut is close to calibrated, because the probabilities
+change continuously with the parameters. The simulations from the CPB
+cover nine designs (n from 200 to 1,000, true `alpha` 0.3, 0.5 and 0.7).
+There the first-order 95% interval covers between 0.940 and 0.956, 0.947
+on average, and more of its misses fall above the upper limit than below
+the lower one. With `B = 39` replicates, the calibrated interval covers
+0.948 on average in the same simulations. It is about 12% longer, and
+its misses are more nearly balanced.
+
+On the floor support the cut is not calibrated. The support
+`0, ..., floor(lambda / (1 - alpha))` moves with the parameters, the
+log-ceiling coefficients behave like endpoint parameters, and
+`alpha`-hat inherits a bias toward zero from them. Across the same nine
+designs the first-order 95% interval covers between 0.90 and 0.94, and
+most of its misses have the true `alpha` above the upper limit.
 
 The calibration simulates `B` responses from the fitted model (the
 fitted rates, `alpha`-hat, the same truncation and offset), refits each
@@ -77,14 +89,15 @@ interval is then `{alpha : q_lo <= r(alpha) <= q_hi}`, with `q_lo` and
 `q_hi` the order statistics of the `r*` at ranks `(B + 1)(1 - level)/2`
 from each end (the 5th smallest and 5th largest of 199 at the 95%
 level), so the upper limit sits `q_lo^2 / 2` and the lower limit
-`q_hi^2 / 2` below the maximum of the profile. In the same simulations
-the calibrated 95% interval covers 0.92 to 0.96, with its misses
-balanced between the two sides. The first-order interval falls short
-only when the design has many distinct covariate patterns (the endpoint
-effect needs many distinct ceilings): with an intercept only, or a
-covariate taking ten or fewer values, it covers at or above its level,
-and the calibration, which stays close to the nominal level there too
-(0.95 with a binary covariate), is not needed.
+`q_hi^2 / 2` below the maximum of the profile. On the floor support, in
+the same simulations, the calibrated 95% interval covers 0.92 to 0.96,
+with its misses balanced between the two sides. On the floor support,
+the first-order interval falls short only when the design has many
+distinct covariate patterns (the endpoint effect needs many distinct
+ceilings): with an intercept only, or a covariate taking ten or fewer
+values, it covers at or above its level, and the calibration, which
+stays close to the nominal level there too (0.95 with a binary
+covariate), is not needed.
 
 The responses are all drawn first, on the calling process, and the
 refits use no random numbers, so the result depends on `seed` but not on
@@ -122,10 +135,10 @@ d <- data.frame(y = rcpb(100, exp(1.5 + 0.4 * x), 0.5, truncated = TRUE), x = x)
 fit <- cpb(y ~ x, d, se = "none")
 alpha_confint(fit)                       # first-order
 #>     lower     upper 
-#> 0.4170794 0.6405546 
+#> 0.3866204 0.6670207 
 #> attr(,"alpha")
 #>           
-#> 0.4639631 
+#> 0.4955812 
 #> attr(,"method")
 #> [1] "first-order profile likelihood"
 #> attr(,"boundary")
@@ -134,10 +147,10 @@ alpha_confint(fit)                       # first-order
 fit <- calibrate_alpha(fit, B = 19, seed = 1)
 alpha_confint(fit, level = 0.90)         # calibrated
 #>     lower     upper 
-#> 0.4423900 0.5889076 
+#> 0.4185265 0.6310002 
 #> attr(,"alpha")
 #>           
-#> 0.4639631 
+#> 0.4955812 
 #> attr(,"method")
 #> [1] "profile likelihood, signed root calibrated by parametric bootstrap (19 of 19 replicates)"
 #> attr(,"boundary")

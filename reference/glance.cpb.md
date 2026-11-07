@@ -1,6 +1,16 @@
-# Glance at a CPB fit (broom method)
+# Glance at a fitted model (broom method)
 
-Glance at a CPB fit (broom method)
+One row of fit statistics for every model class of the package:
+`logLik`, `AIC`, `BIC`, `df` and `nobs` (the weight total of a weighted
+fit), the dispersion parameter as `dispersion` with its name
+(`dispersion_parameter`) and the direction its estimate points
+(`dispersion_direction`; the families' parameters point different ways,
+so the CPB's `alpha` below 1 and the gamma-count's `alpha` above 1 are
+both underdispersion), `coef_scale`, the scale of the count equation's
+coefficients (see
+[`tidy.cpb()`](https://bagozzib.github.io/underdisp/reference/tidy.cpb.md)),
+and the class's own columns (`alpha` for the CPB family, `family` for
+the matched count families, `n.units` for the fixed-effects fits).
 
 ## Usage
 
@@ -40,7 +50,7 @@ glance(x, ...)
 
 - x:
 
-  A `"cpb"` object.
+  A fitted model from this package.
 
 - ...:
 

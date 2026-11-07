@@ -7,32 +7,22 @@ only the covariate coefficients and the dispersion parameter. This
 avoids an explicit unit-dummy design matrix and scales to thousands of
 units, where dummy-based fitting exhausts memory. The concentrated
 log-likelihood equals the full-dummy log-likelihood to the tolerance of
-the inner search, which is solved exactly. Each unit's objective is a
-saw-tooth in its intercept: whenever the intercept crosses
-\\\log(k(1-\alpha)) - o\_{it}\\ for an integer \\k\\ the support of
-observation \\t\\ gains the point \\k\\, its normalizing constant grows,
-and the objective drops by about \\(1-\alpha)^k\\; between such
-breakpoints it is smooth and unimodal. Its supremum is therefore
-attained at an interior critical point of one tooth or as the left limit
-at a breakpoint, and the inner search evaluates every breakpoint within
-a window of the envelope's peak (located on a coarse grid around the
-unit's Poisson intercept) and refines inside whole teeth by golden
-section; every evaluation of the concentrated likelihood searches each
-unit afresh, so the objective is a function of the parameters alone.
-Solving the inner problem to its supremum makes the concentrated
-likelihood continuous in `alpha` (with kinks where a unit's maximizing
-tooth switches) but not in the slopes: where a unit's supremum sits on
-its feasibility floor (an observation whose count equals its ceiling)
-the intercept cannot retreat, so when another observation's breakpoint
-crosses that floor the concentrated likelihood drops by about
-\\(1-\alpha)^k\\, a cliff in the slopes on whose edge the maximizer can
-rest with a non-zero one-sided gradient. The outer optimizer is
-therefore a deterministic multistart: BFGS with the analytic envelope
-gradient from the Poisson slopes and two dispersion starts, a
-Nelder-Mead polish, and two perturbed restarts; alternative local optima
-differ by the order of the jumps (a few hundredths of a log-likelihood
-unit on a 12-unit panel), far inside the bootstrap variability of the
-estimates.
+the inner search, which is solved exactly. On King's support (the
+default) each unit's objective is continuous in its intercept: when the
+intercept carries observation \\t\\'s ceiling across an integer the
+support point that enters carries mass growing from zero, so the
+crossing is a kink, and the objective falls to minus infinity at the
+feasibility floor, where some count would exceed \\\lceil
+\lambda\_{it}/(1-\alpha) \rceil\\. As for the GEC (the same distribution
+at \\\delta = \alpha\\; see
+[`gec_fe()`](https://bagozzib.github.io/underdisp/reference/gec_fe.md)),
+the smooth part is unimodal and the kinks only lower the slope, so the
+inner search is a golden section on a bracket around the unit's Poisson
+intercept, expanded while the maximum sits at an edge; a maximum at a
+kink is tracked in the analytic gradient of the concentrated likelihood,
+which the outer BFGS uses. The outer optimizer is a deterministic
+multistart: BFGS with that gradient from the Poisson slopes and two
+dispersion starts, a Nelder-Mead polish, and two perturbed restarts.
 
 ## Usage
 
@@ -52,7 +42,9 @@ cpb_fe(
   inner_it = 30L,
   maxit = 3000L,
   reltol = 1e-07,
-  bias_correct = c("none", "jackknife")
+  bias_correct = c("none", "jackknife"),
+  time = NULL,
+  support = c("ceiling", "floor")
 )
 ```
 
@@ -133,6 +125,19 @@ cpb_fe(
   `"none"` (default) or `"jackknife"`, the split-panel jackknife
   correction for the 1/T incidental-parameters bias (see Details).
 
+- time:
+
+  Name of the column of `data` that orders each unit's rows in time.
+  Required by `bias_correct = "jackknife"`, which splits each unit's
+  series into its first and second halves (and checks the residuals for
+  a time trend); the fit itself does not depend on it.
+
+- support:
+
+  The CPB's support, `"ceiling"` (King's CPB, the default) or `"floor"`
+  (the definition before version 0.2.0); see
+  [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
+
 ## Value
 
 An object of class `"cpb_fe"` with `coefficients`, `alpha`, `loglik`,
@@ -141,39 +146,88 @@ per-observation `ceiling`.
 
 ## Details
 
+On the floor support (`support = "floor"`, the definition before version
+0.2.0) each unit's objective is a saw-tooth in its intercept: whenever
+the intercept crosses \\\log(k(1-\alpha)) - o\_{it}\\ for an integer
+\\k\\ the support of observation \\t\\ gains the point \\k\\, its
+normalizing constant grows, and the objective drops by about
+\\(1-\alpha)^k\\; between such breakpoints it is smooth and unimodal.
+Its supremum is therefore attained at an interior critical point of one
+tooth or as the left limit at a breakpoint, and the inner search
+evaluates every breakpoint within a window of the envelope's peak
+(located on a coarse grid around the unit's Poisson intercept) and
+refines inside whole teeth by golden section; every evaluation of the
+concentrated likelihood searches each unit afresh, so the objective is a
+function of the parameters alone. Solving the inner problem to its
+supremum makes the concentrated likelihood continuous in `alpha` (with
+kinks where a unit's maximizing tooth switches) but not in the slopes:
+where a unit's supremum sits on its feasibility floor (an observation
+whose count equals its ceiling) the intercept cannot retreat, so when
+another observation's breakpoint crosses that floor the concentrated
+likelihood drops by about \\(1-\alpha)^k\\, a cliff in the slopes on
+whose edge the maximizer can rest with a non-zero one-sided gradient,
+which the perturbed restarts of the outer multistart are there to
+escape; alternative local optima differ by the order of the jumps (a few
+hundredths of a log-likelihood unit on a 12-unit panel), far inside the
+bootstrap variability of the estimates.
+
 Short panels: the dispersion parameter `alpha` and the fixed effects are
 subject to the incidental-parameters bias of nonlinear fixed-effects
 estimation. The bias in `alpha` is downward and of order 1/T, where T is
 the per-unit number of observations. It is small for T at least about 30
 and should be treated cautiously for short panels. The covariate
-coefficients are not materially affected. `bias_correct = "jackknife"`
-removes the leading 1/T term by the split-panel (half-panel) jackknife:
-the model is refit on the first and second temporal halves of every
-unit's series (rows are split in the order supplied, which should be
-temporal order) and the corrected estimate is `2 * full - mean(halves)`.
-In the package's fixed-effects bias Monte Carlo (150 units, alpha = 0.5)
-the alpha bias at T = 6/10/20/40 falls from -0.153/-0.100/-0.057/-0.033
-to -0.046/-0.024/-0.013/-0.009. With correction on, `coefficients` and
-`alpha` are the corrected estimates (the maximum-likelihood values are
-kept in `$uncorrected`), the unit effects and fitted values are
-re-concentrated at the corrected parameters, and `logLik`/`AIC` continue
-to refer to the maximum-likelihood fit.
+coefficients carry a smaller bias of the same order, which can matter in
+very short panels (a few positive counts per unit, as in a
+zero-truncated intensity). `bias_correct = "jackknife"` removes the
+leading 1/T term by the split-panel (half-panel) jackknife: the model is
+refit on the first and second temporal halves of every unit's series
+(each unit's rows ordered by `time`, which the correction requires) and
+the corrected estimate is `2 * full - mean(halves)`. In the package's
+fixed-effects bias Monte Carlo (150 units, alpha = 0.5) the alpha bias
+at T = 6/10/20/40 falls from -0.122/-0.071/-0.036/-0.018 (T times the
+bias is -0.71 to -0.73 throughout) to +0.008/+0.004/+0.000/-0.001. On
+the floor support the bias is larger (-0.153/-0.100/-0.057/-0.033), and
+the correction leaves 23 to 30 percent of it. With correction on,
+`coefficients` and `alpha` are the corrected estimates (the
+maximum-likelihood values are kept in `$uncorrected`), the unit effects
+and fitted values are re-concentrated at the corrected parameters, and
+`logLik`/`AIC` continue to refer to the maximum-likelihood fit. The
+covariate coefficients are corrected too: unlike the Poisson's, whose
+slopes carry no first-order bias, the CPB's can carry one (see Short
+panels above). The correction leaves the estimator's asymptotic variance
+unchanged (Dhaene and Jochmans 2015) but adds variance in short panels.
+In the package's simulations (40 units, alpha = 0.5, a slope with no
+bias to remove) the corrected slope's standard deviation was 19 percent
+above the uncorrected slope's at T = 6 and 13 percent at T = 12, while
+alpha's bias fell from -0.13 and -0.06 to +0.011 and +0.004; where the
+slopes' own bias is small next to their standard error, the uncorrected
+fit (`bias_correct = "none"`) estimates them more precisely. With
+`se = "bootstrap"` each replicate is corrected the same way (its two
+half-panel refits; the validity gate below is a check on the data, made
+once), so the standard errors include that variance and the bootstrap
+takes about three times as long. In the same simulations the corrected
+slope's 95% interval covered 0.91 at T = 6 and 0.94 at T = 12 (0.85 and
+0.89 with uncorrected replicates). On the floor support the replicates
+are not corrected, and the interval is centered on the corrected
+estimate.
 
 Validity gate: the split-panel identity requires the two half-panels to
 estimate the same pseudo-true parameter (time-homogeneity; Dhaene &
 Jochmans 2015, Review of Economic Studies). On trending or
 time-heterogeneous panels the correction is invalid, so the function
-REFUSES it – returning the uncorrected maximum-likelihood fit with a
-warning naming the failed check – whenever the corrected dispersion
-leaves its feasible space or the two half-panel dispersion estimates
-disagree beyond what the 1/T bias can explain. A refusal is diagnostic
-information about the panel, not an error. The gate is deliberately
-powered over sized: in the package's calibration Monte Carlo it refuses
-about 7 percent of genuinely time-homogeneous panels (a conservative
-nuisance; the returned fit is exactly the ordinary maximum-likelihood
-estimate) while catching 98 percent of dispersion regime changes and 100
-percent of smooth unmodeled trends – the cases where an uncaught
-correction would be silently wrong.
+refuses it – returning the uncorrected maximum-likelihood fit with a
+warning naming the failed check – whenever the full fit's residuals
+trend with time (correlation with the within-unit time index, p \<
+0.01), the two half-panel dispersion estimates disagree by more than 2.5
+times the noise of five placebo splits of the units (and by more than
+0.05 of the estimate's scale), or the corrected dispersion leaves its
+feasible space. A refusal is diagnostic information about the panel, not
+an error. The gate is deliberately powered over sized: in the package's
+calibration Monte Carlo it refuses 9 to 13 percent of genuinely
+time-homogeneous panels (a conservative nuisance; the returned fit is
+exactly the ordinary maximum-likelihood estimate) while catching 98.5
+percent of dispersion regime changes and 100 percent of smooth unmodeled
+trends – the cases where an uncaught correction would be silently wrong.
 
 One set of fixed effects is concentrated out. For two-way (e.g. unit and
 time) fixed effects, add `factor(time)` to `formula` (entered as
@@ -201,9 +255,9 @@ fit
 #> CPB regression with 25 unit fixed effects (concentrated likelihood)
 #> Coefficients:
 #>      x 
-#> 0.3069 
+#> 0.4683 
 #> 
-#> alpha (shape parameter): 0.4767   median implied bound: 2.56 
+#> alpha (shape parameter): 0.3846   median largest feasible count: 2 
 #> Note: alpha is subject to incidental-parameters bias for short panels; see ?cpb_fe.
 # }
 ```

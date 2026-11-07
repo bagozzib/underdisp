@@ -18,7 +18,7 @@ hurdle_count(
   formula,
   data,
   family = c("poisson", "negbin", "compois", "mpcmp", "genpois", "gammacount",
-    "doublepois"),
+    "doublepois", "hyperpois", "ewp3", "ewp2"),
   participation = NULL,
   fe = NULL,
   part_fe = NULL,
@@ -53,7 +53,21 @@ hurdle_count(
 - fe, part_fe:
 
   Optional fixed-effects column names for the intensity and
-  participation models (entered as factor dummies).
+  participation models (entered as factor dummies). The participation
+  slopes carry the dummy logit's incidental-parameters bias in short
+  panels (see
+  [`hurdle_cpb()`](https://bagozzib.github.io/underdisp/reference/hurdle_cpb.md)).
+  The participation dummy of a unit that never participates is not
+  counted in the degrees of freedom (see
+  [`compare_models()`](https://bagozzib.github.io/underdisp/reference/compare_models.md),
+  Degrees of freedom). In new data such a unit, and one whose every
+  count is positive, get the participation probability at their limits
+  (zero and one; with one `part_fe` column), and a unit either equation
+  has not seen (the intensity never sees a unit with no positive count)
+  enters that equation at its reference unit, as in
+  [`hurdle_cpb()`](https://bagozzib.github.io/underdisp/reference/hurdle_cpb.md);
+  the participation equation is checked for separation
+  (`part_separation`).
 
 - link:
 
@@ -74,8 +88,10 @@ hurdle_count(
 
 - se, cluster:
 
-  Standard-error type and optional cluster for the intensity; see
+  Standard-error type and optional cluster; see
   [`count_reg()`](https://bagozzib.github.io/underdisp/reference/count_reg.md).
+  They apply to both margins: the participation equation's standard
+  errors are model-based, robust or cluster-robust with the intensity's.
 
 ## Value
 

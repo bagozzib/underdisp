@@ -84,5 +84,5 @@ fit <- cpb(y ~ x, data = data.frame(y = y, x = x)[y > 0, ], se = "none")
 sims <- simulate(fit, nsim = 5)
 colMeans(sims)
 #>    sim_1    sim_2    sim_3    sim_4    sim_5 
-#> 4.808081 4.565657 4.550505 4.853535 4.479798 
+#> 4.797980 4.570707 4.671717 4.929293 4.388889 
 ```

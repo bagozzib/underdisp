@@ -55,7 +55,36 @@ hurdle_cpb(
 
   Optional column name for fixed effects in the participation model
   (added as factors). Units with no within-unit variation in
-  participation are uninformative for a fixed-effects logit.
+  participation are uninformative for a fixed-effects logit, and the
+  dummy logit's coefficients carry the incidental-parameters bias of
+  order 1/T (in short panels the slopes are inflated, roughly toward
+  twice their value at T = 2); the split-panel jackknife
+  (`bias_correct`) corrects only the intensity. The hurdle's likelihood
+  separates its two parts, so for the logit link a conditional logit on
+  the same data
+  ([`survival::clogit()`](https://rdrr.io/pkg/survival/man/clogit.html))
+  gives participation slopes free of that bias, and an analytical
+  correction (the bife package, for the logit and the probit) reduces it
+  to second order; the hurdle's predictions and quantities of interest
+  use the dummy logit's unit effects. On King's support the dummy of a
+  unit that never participates, at minus infinity, is not counted in the
+  degrees of freedom (see
+  [`compare_models()`](https://bagozzib.github.io/underdisp/reference/compare_models.md),
+  Degrees of freedom). In new data
+  ([`predict.hurdle_cpb()`](https://bagozzib.github.io/underdisp/reference/predict.hurdle_cpb.md),
+  [`score()`](https://bagozzib.github.io/underdisp/reference/score.md),
+  [`cv_score()`](https://bagozzib.github.io/underdisp/reference/cv_score.md))
+  such a unit's rows get the participation probability at that limit,
+  zero, and those of a unit whose every count is positive
+  (`part_one_units`) one; a unit the fit has not seen, or every row of
+  `newdata` without the `part_fe` column, enters at the reference unit
+  of the units the data identify. The participation equation is checked
+  for separation by
+  [`zi_cpb()`](https://bagozzib.github.io/underdisp/reference/zi_cpb.md)'s
+  rule (Separation; component `part_separation`). On the floor support
+  these dummies are counted in the degrees of freedom, new rows of these
+  units are evaluated at the dummies' fitted values, and an unseen unit
+  enters at the mean of all the unit dummies.
 
 - link:
 
@@ -70,11 +99,11 @@ hurdle_cpb(
 
 - cluster:
 
-  Optional cluster identifier (a column name in `data` or a vector) for
-  cluster-robust bootstrap inference on the intensity coefficients; see
+  Optional cluster identifier (a column name in `data` or a vector). The
+  participation equation's standard errors are then cluster-robust (the
+  sandwich, with the G/(G - 1) factor), and with `se = "bootstrap"` the
+  intensity's bootstrap resamples whole clusters; see
   [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
-  Cluster-robust errors for the participation logit are available
-  directly via `sandwich::vcovCL(fit$participation, cluster = ...)`.
 
 - se:
 
@@ -99,7 +128,9 @@ hurdle_cpb(
 
   Passed to
   [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md) or
-  [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md).
+  [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md),
+  including `support` (King's CPB, `"ceiling"`, by default; see
+  [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md)).
 
 ## Value
 
@@ -126,6 +157,6 @@ fit
 #> 
 #> Intensity (zero-truncated CPB) coefficients:
 #> (Intercept)           x 
-#>      1.2828      0.5023 
-#> Intensity alpha (shape): 0.51 
+#>      1.2862      0.5043 
+#> Intensity alpha (shape): 0.5093 
 ```

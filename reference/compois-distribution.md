@@ -60,7 +60,9 @@ rcompois(n, lambda, nu, mu = NULL)
 ## Value
 
 `dcompois` a density, `pcompois` a CDF, `qcompois` a quantile,
-`rcompois` a numeric vector of count draws.
+`rcompois` a numeric vector of count draws. A rate whose normalizing sum
+the 100,000-term cap would truncate (a mean of order \\10^5\\ or more)
+gives `NA`.
 
 ## Examples
 

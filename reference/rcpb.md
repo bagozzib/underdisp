@@ -6,7 +6,7 @@ zero-truncated variant.
 ## Usage
 
 ``` r
-rcpb(n, lambda, alpha, truncated = FALSE)
+rcpb(n, lambda, alpha, truncated = FALSE, support = c("ceiling", "floor"))
 ```
 
 ## Arguments
@@ -17,7 +17,8 @@ rcpb(n, lambda, alpha, truncated = FALSE)
 
 - lambda:
 
-  Mean parameter; a scalar or a length-`n` vector.
+  Rate parameter; a scalar or a length-`n` vector (see
+  [`dcpb()`](https://bagozzib.github.io/underdisp/reference/cpb-distribution.md)).
 
 - alpha:
 
@@ -27,15 +28,21 @@ rcpb(n, lambda, alpha, truncated = FALSE)
 
   If `TRUE`, draw from the zero-truncated CPB.
 
+- support:
+
+  The CPB's support, `"ceiling"` (King's CPB, the default) or `"floor"`;
+  see [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
+
 ## Value
 
 An integer vector of counts.
 
 ## Details
 
-The support of the CPB is `0, ..., floor(lambda / (1 - alpha))`. A rate
-whose ceiling `lambda / (1 - alpha)` is below 1 has the support `{0}`,
-so its zero-truncated distribution does not exist. With
+King's CPB has the support `0, ..., ceiling(lambda / (1 - alpha))`,
+which contains 1 for every positive rate. The floor support,
+`0, ..., floor(lambda / (1 - alpha))`, is `{0}` for a rate whose ceiling
+is below 1, so its zero-truncated distribution does not exist. With
 `truncated = TRUE` such a draw is set to 1 and a warning reports how
 many there were: the stated parameters give that count probability zero,
 so data simulated this way are not data from the model (in a simulation

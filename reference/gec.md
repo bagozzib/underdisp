@@ -3,22 +3,25 @@
 Fits King's generalized event count model, a Katz-family count
 regression whose single dispersion parameter `delta` (the
 variance-to-mean ratio) is estimated freely and spans underdispersion
-(`delta < 1`, a finite-support member; the continuous parameter binomial
-is this cell), equidispersion (`delta = 1`, Poisson), and overdispersion
-(`delta > 1`, the negative binomial). Unlike
+(`delta < 1`, a finite-support member, the continuous parameter binomial
+of [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md) at
+`alpha = delta`), equidispersion (`delta = 1`, Poisson), and
+overdispersion (`delta > 1`, the negative binomial). Unlike
 [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md), which
 fixes the direction of dispersion to under, `gec()` lets the data
-choose. The Katz recursion delivers exact first and second moments—the
-Winkelmann–Signorino–King correction realized directly on an unbounded
-support—and the likelihood is evaluated in C++. For `delta < 1` the
-support is finite and the renormalized distribution's mean and variance
-equal `exp(x'b)` and `delta * exp(x'b)` only when `exp(x'b)/(1 - delta)`
-is an integer, so `exp(x'b)` is the rate parameter of the recursion, the
-fitted mean is computed exactly from the pmf, and `delta` is the Katz
-dispersion parameter (the variance-to-mean ratio on an unbounded
-support). The optimizer works on covariates scaled to unit standard
-deviation and maps the coefficients back, so the fit does not depend on
-the covariates' units.
+choose; wherever its estimate of `delta` is below one the two return the
+same fit. The Katz recursion delivers exact first and second moments,
+summed over the support (finite for `delta < 1`, where they are the
+correction of Winkelmann, Signorino and King), and the likelihood is
+evaluated in C++. For `delta < 1` the support is finite and the
+renormalized distribution's mean and variance equal `exp(x'b)` and
+`delta * exp(x'b)` only when `exp(x'b)/(1 - delta)` is an integer, so
+`exp(x'b)` is the rate parameter of the recursion, the fitted mean is
+computed exactly from the pmf, and `delta` is the Katz dispersion
+parameter (the variance-to-mean ratio on an unbounded support). The
+optimizer works on covariates scaled to unit standard deviation and maps
+the coefficients back, so the fit does not depend on the covariates'
+units.
 
 ## Usage
 
@@ -33,7 +36,7 @@ gec(
   offset = NULL,
   weights = NULL,
   cores = 1L,
-  max.support = 500,
+  max.support = NULL,
   maxit = 20000,
   reltol = 1e-08
 )
@@ -86,7 +89,12 @@ gec(
 
 - max.support:
 
-  Guard on the maximum evaluated support.
+  Guard on the evaluated support: the GEC's pmf is evaluated up to that
+  many points (on an overdispersed fit, the guard binds where the tail
+  beyond it carries mass; see
+  [`dgec()`](https://bagozzib.github.io/underdisp/reference/gec-distribution.md)).
+  The default `NULL` sets it to `max(500, 10 * max(y))`, as for
+  [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
 
 - maxit, reltol:
 
@@ -112,7 +120,7 @@ gec(y ~ x, data = data.frame(y = y, x = x), se = "none")
 #> Generalized event count (Katz family) regression
 #> Call:  gec(formula = y ~ x, data = data.frame(y = y, x = x), se = "none")
 #> (Intercept)           x 
-#>      0.9760      0.4751 
+#>      0.9760      0.4752 
 #> 
 #> dispersion delta (Katz; Var/Mean on an unbounded support) = 1.131  [equidispersion not rejected (LR p = 0.07)]
 #> logLik = -764.34,  n = 400

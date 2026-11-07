@@ -28,15 +28,19 @@ and diagnostics that treat every model on the same footing.
   p-values;
   [`dispersion_profile()`](https://bagozzib.github.io/underdisp/reference/dispersion_profile.md)
   plots the conditional variance-to-mean ratio against the fitted mean
-  next to the curve each family implies, so the mechanism (a hard
-  ceiling, regular event timing, a soft tail) can be read off the data.
+  next to the curve each family implies, so the data show which variance
+  function they follow (a hard ceiling’s, regular event timing’s, a soft
+  tail’s); a fitted distribution does not by itself identify the process
+  that generated them.
 - **The hard-ceiling family** —
   [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md) fits
   King’s continuous parameter binomial and its zero-truncated variant,
-  with an interpretable observation-specific bound;
+  whose support ends at an observation-specific ceiling set by its
+  variance-mean link;
   [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md)
   absorbs high-dimensional unit fixed effects by a concentrated
-  likelihood that scales to thousands of units.
+  likelihood that scales to thousands of units. (`support = "floor"`
+  reproduces fits from versions before 0.2.0.)
 - **The free-dispersion family** —
   [`gec()`](https://bagozzib.github.io/underdisp/reference/gec.md) fits
   the generalized event count (Katz) model, whose single dispersion
@@ -58,10 +62,10 @@ and diagnostics that treat every model on the same footing.
   and
   [`zi_count()`](https://bagozzib.github.io/underdisp/reference/zi_count.md)
   fit the Poisson, negative binomial, COM-Poisson (rate- or
-  mean-parameterized), generalized Poisson, gamma-count, and double
-  Poisson through the same interface, with fixed effects, offsets,
-  frequency weights, and analytic, robust, or cluster-robust standard
-  errors, so
+  mean-parameterized), generalized Poisson, gamma-count, double Poisson,
+  hyper-Poisson, and exponentially weighted Poisson through the same
+  interface, with fixed effects, offsets, frequency weights, and
+  analytic, robust, or cluster-robust standard errors, so
   [`compare_models()`](https://bagozzib.github.io/underdisp/reference/compare_models.md)
   and
   [`compare_dispersion()`](https://bagozzib.github.io/underdisp/reference/compare_dispersion.md)
@@ -80,12 +84,14 @@ and diagnostics that treat every model on the same footing.
   diagnostics via
   [`DHARMa::createDHARMa()`](https://rdrr.io/pkg/DHARMa/man/createDHARMa.html).
 - **Quantities of interest** — predicted count distributions, the
-  implied ceiling, incidence-rate ratios, and first differences
-  (including the exact extensive/intensive decomposition for two-part
-  models), with bootstrap, delta-method, or profile-likelihood
-  uncertainty; [`confint()`](https://rdrr.io/r/stats/confint.html) for
-  every class; parallel bootstraps via `cores =`; `broom`,
-  `modelsummary`, and `texreg` support throughout.
+  implied ceiling, incidence-rate ratios, first differences (on each
+  margin of a two-part model, extensive and intensive), predictions with
+  confidence intervals, and average marginal effects
+  ([`ame()`](https://bagozzib.github.io/underdisp/reference/ame.md)),
+  with bootstrap, delta-method, or profile-likelihood uncertainty;
+  [`confint()`](https://rdrr.io/r/stats/confint.html) for every class;
+  parallel bootstraps via `cores =`; `broom`, `modelsummary`, and
+  `texreg` support throughout.
 
 ## Installation
 
@@ -143,8 +149,9 @@ Association* 81(395): 709–721.
 Huang, Alan. 2017. “Mean-Parametrized Conway–Maxwell–Poisson Regression
 Models for Dispersed Counts.” *Statistical Modelling* 17(6): 359–380.
 
-King, Gary. 1989. “Variance Specification in Event Count Models.”
-*American Journal of Political Science* 33(3): 762–784.
+King, Gary. 1989. “Variance Specification in Event Count Models: From
+Restrictive Assumptions to a Generalized Estimator.” *American Journal
+of Political Science* 33(3): 762–784.
 
 Winkelmann, Rainer. 1995. “Duration Dependence and Dispersion in
 Count-Data Models.” *Journal of Business & Economic Statistics* 13(4):

@@ -3,12 +3,16 @@
 K-fold cross-validated log score and RPS: the data are split into `k`
 folds, the model is refit on each training set via `fitfun`, and its
 predicted distribution is scored on the held-out fold. Because the score
-is genuinely out of sample it penalizes over-parameterization, so it is
-the honest criterion for comparing models that differ in the number of
+is out of sample it penalizes over-parameterization, so it is the
+appropriate criterion for comparing models that differ in the number of
 parameters (for example a hurdle with per-unit participation fixed
 effects against a zero-inflated model). Per-observation held-out scores
 are returned so two models fit on the *same* folds can be compared with
-a paired, cluster-robust test.
+a paired, cluster-robust test. Each fold is scored as
+[`score()`](https://bagozzib.github.io/underdisp/reference/score.md)
+scores `newdata`: a unit, or a level of any factor, that the training
+folds lack enters at the reference unit, and a unit a two-part fit holds
+at a limit is scored at that limit.
 
 ## Usage
 
@@ -20,7 +24,8 @@ cv_score(
   kmax = NULL,
   folds = NULL,
   cores = 1L,
-  weights = NULL
+  weights = NULL,
+  offset = NULL
 )
 ```
 
@@ -64,6 +69,13 @@ cv_score(
   observations (the folds assign whole rows). The fold fits see the
   weights only through `fitfun`, so pass them there as well.
 
+- offset:
+
+  Optional offset (log scale) of the held-out rows: a column name of
+  `data` or a numeric vector with one value per row, split with the
+  folds. It is needed when `fitfun` gives its fit the offset as a
+  vector. The fold fits see the offset only through `fitfun`.
+
 ## Value
 
 An object of class `"cv_score"`: a list with the mean held-out
@@ -82,6 +94,6 @@ set.seed(1)
 d <- data.frame(y = rcpb(500, lambda = 3, alpha = 0.5))
 cv <- cv_score(function(tr) cpb(y ~ 1, tr, truncated = FALSE, se = "none"), d, k = 5)
 cv$logscore
-#> [1] 1.613494
+#> [1] 1.617738
 # }
 ```

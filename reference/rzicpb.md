@@ -5,7 +5,7 @@ Simulate from the zero-inflated continuous parameter binomial
 ## Usage
 
 ``` r
-rzicpb(n, lambda, alpha, pi)
+rzicpb(n, lambda, alpha, pi, support = c("ceiling", "floor"))
 ```
 
 ## Arguments
@@ -16,7 +16,7 @@ rzicpb(n, lambda, alpha, pi)
 
 - lambda:
 
-  Intensity mean; scalar or length-`n`.
+  Intensity rate (the CPB's `lambda`); scalar or length-`n`.
 
 - alpha:
 
@@ -25,6 +25,11 @@ rzicpb(n, lambda, alpha, pi)
 - pi:
 
   Structural-zero probability; scalar or length-`n`.
+
+- support:
+
+  The CPB's support, `"ceiling"` (King's CPB, the default) or `"floor"`;
+  see [`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md).
 
 ## Value
 

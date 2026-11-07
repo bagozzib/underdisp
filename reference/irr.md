@@ -1,6 +1,13 @@
 # Incidence rate ratios for a CPB fit
 
-Incidence rate ratios for a CPB fit
+The ratios are \\\exp(\beta)\\, ratios of the CPB's rate parameter
+\\\lambda\\. The CPB's mean equals \\\lambda\\ only where
+\\\lambda/(1-\alpha)\\ is an integer, and a zero-truncated fit (the
+[`cpb()`](https://bagozzib.github.io/underdisp/reference/cpb.md)
+default) models \\E(Y \mid Y \ge 1)\\, so a ratio of expected counts can
+differ from them;
+[`first_difference()`](https://bagozzib.github.io/underdisp/reference/first_difference.md)
+reports the exact mean contrast.
 
 ## Usage
 
@@ -40,10 +47,10 @@ from the stored draws.
 # \donttest{
 set.seed(8); x <- rnorm(200)
 N <- pmax(round(exp(1.5 + 0.4 * x) / 0.5), 1); y <- rbinom(200, N, 0.5)
-fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 40)
+fit <- cpb(y ~ x, data.frame(y = y, x = x)[y > 0, ], se = "bootstrap", B = 100)
 irr(fit)
 #>         term equation ratio estimate lower upper             method
-#>  (Intercept)    count   IRR    4.473 4.320 4.661 bootstrap (stored)
-#>            x    count   IRR    1.502 1.434 1.549 bootstrap (stored)
+#>  (Intercept)    count   IRR    4.447 4.277 4.619 bootstrap (stored)
+#>            x    count   IRR    1.504 1.441 1.558 bootstrap (stored)
 # }
 ```

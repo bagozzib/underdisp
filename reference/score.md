@@ -8,7 +8,7 @@ natural way to compare the calibration of competing count models.
 ## Usage
 
 ``` r
-score(fit, newdata = NULL, kmax = NULL, weights = NULL)
+score(fit, newdata = NULL, kmax = NULL, weights = NULL, offset = NULL)
 ```
 
 ## Arguments
@@ -23,8 +23,23 @@ score(fit, newdata = NULL, kmax = NULL, weights = NULL)
 
   Optional data frame of held-out observations (including the response).
   When supplied, the fitted model's predicted distribution is evaluated
-  on these rows; fixed-effect units unseen in training fall back to the
-  mean fixed effect. Offsets are assumed absent on `newdata`.
+  on these rows. A fixed-effects unit the fit has not seen, or a level
+  of any factor its training rows lack (a held-out block's own units or
+  years), enters at the reference unit: the effect, or the dummies'
+  average, of the units the data identify, the reference that
+  [`first_difference()`](https://bagozzib.github.io/underdisp/reference/first_difference.md)
+  uses (on the floor support, the participation and zero equations of
+  [`hurdle_cpb()`](https://bagozzib.github.io/underdisp/reference/hurdle_cpb.md)
+  and
+  [`zi_cpb()`](https://bagozzib.github.io/underdisp/reference/zi_cpb.md)
+  enter such a unit at the mean of all their unit dummies). A unit the
+  hurdles or mixtures hold at a limit is scored at that limit: a
+  positive count of a unit with no positive count in the fitted data,
+  and a hurdle's zero of a unit whose every count was positive, are
+  impossible (see
+  [`compare_models()`](https://bagozzib.github.io/underdisp/reference/compare_models.md),
+  Degrees of freedom). A fit made with an offset reads the rows' offset
+  from its own offset column in `newdata`, or from `offset`.
 
 - kmax:
 
@@ -41,6 +56,13 @@ score(fit, newdata = NULL, kmax = NULL, weights = NULL)
   scores are then weighted means, as the in-sample scores of a weighted
   fit are.
 
+- offset:
+
+  Optional offset (log scale) for the rows of `newdata`: a column name
+  of `newdata` or a numeric vector with one value per row. A fit whose
+  offset was given as a vector needs it here; one given as a column name
+  reads that column of `newdata` by default.
+
 ## Value
 
 A named numeric vector `c(logscore, rps)`.
@@ -52,9 +74,8 @@ model was fit to, as means weighted by its frequency weights). Supply
 `newdata` to score a fitted model on **held-out** observations, or use
 [`cv_score()`](https://bagozzib.github.io/underdisp/reference/cv_score.md)
 for a cross-validated score; an in-sample log score equals `-logLik/n`
-and does not penalize model complexity, so for comparing models of
-different size the held-out or cross-validated score is the honest
-criterion.
+and does not penalize model complexity, so models of different size are
+better compared on the held-out or cross-validated score.
 
 ## See also
 
@@ -68,5 +89,5 @@ y <- rcpb(400, lambda = 3, alpha = 0.5)
 fit <- cpb(y ~ 1, data = data.frame(y = y), truncated = FALSE, se = "none")
 score(fit)
 #>  logscore       rps 
-#> 1.6095598 0.6678597 
+#> 1.6090142 0.6676622 
 ```

@@ -20,7 +20,7 @@ zi_count(
   formula,
   data,
   family = c("poisson", "negbin", "compois", "mpcmp", "genpois", "gammacount",
-    "doublepois"),
+    "doublepois", "hyperpois", "ewp3", "ewp2"),
   zero = NULL,
   fe = NULL,
   zero_fe = NULL,
@@ -59,7 +59,14 @@ zi_count(
 - zero_fe:
 
   Optional fixed-effects column for the inflation equation (factor
-  dummies); zero-equation fixed effects are opt-in.
+  dummies); zero-equation fixed effects are opt-in. In either equation
+  the dummy of a unit with no positive count is not counted in the
+  degrees of freedom (see
+  [`compare_models()`](https://bagozzib.github.io/underdisp/reference/compare_models.md),
+  Degrees of freedom). In new data (with one column each) such a unit
+  gets the structural-zero probability one through `zero_fe` and a count
+  mean of zero through `fe`, and a unit whose every count is positive
+  the structural-zero probability zero.
 
 - link:
 
@@ -88,6 +95,15 @@ An object of class `"zi_count"`; `$fitted.values` is the marginal mean
 `(1 - pi) E(Y | count component)` that
 [`fitted()`](https://rdrr.io/r/stats/fitted.values.html) returns, and
 `$mu` the count component's natural parameter.
+
+## Separation
+
+The fit checks its zero-inflation equation for separation as
+[`zi_cpb()`](https://bagozzib.github.io/underdisp/reference/zi_cpb.md)
+does (see its Separation section), under its own `link`. It warns when
+the data put no useful bound on a covariate coefficient, and stores the
+check in the component `separation`. Such a coefficient's standard error
+is not meaningful either.
 
 ## See also
 

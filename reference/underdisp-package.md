@@ -36,9 +36,12 @@ the matched count families through one interface,
 [`hurdle_count()`](https://bagozzib.github.io/underdisp/reference/hurdle_count.md),
 [`zi_count()`](https://bagozzib.github.io/underdisp/reference/zi_count.md)
 (Poisson, negative binomial, COM-Poisson in the rate and the mean
-parameterization, generalized Poisson, gamma-count, double Poisson), all
-with offsets, frequency weights, fixed effects, and analytic, robust,
-cluster, or bootstrap inference.
+parameterization, generalized Poisson, gamma-count, double Poisson,
+hyper-Poisson, exponentially weighted Poisson), all with offsets and
+frequency weights, and with fixed effects except in the count equation
+of the GEC's two-part forms (which takes dummies in its formula); the
+CPB and GEC classes take bootstrap inference, the count families
+analytic, robust or clustered errors.
 
 ## Comparison and quantities of interest
 
@@ -47,9 +50,11 @@ cluster, or bootstrap inference.
 [`cv_score()`](https://bagozzib.github.io/underdisp/reference/cv_score.md);
 [`predict()`](https://rdrr.io/r/stats/predict.html),
 [`implied_ceiling()`](https://bagozzib.github.io/underdisp/reference/implied_ceiling.md),
+[`ceiling_exceedance()`](https://bagozzib.github.io/underdisp/reference/ceiling_exceedance.md),
 [`irr()`](https://bagozzib.github.io/underdisp/reference/irr.md),
 [`first_difference()`](https://bagozzib.github.io/underdisp/reference/first_difference.md)
 (with the extensive/intensive decomposition for the two-part models),
+[`ame()`](https://bagozzib.github.io/underdisp/reference/ame.md),
 [`confint()`](https://rdrr.io/r/stats/confint.html) for every class,
 [`simulate()`](https://rdrr.io/r/stats/simulate.html) for DHARMa
 diagnostics, and broom / texreg / modelsummary support.

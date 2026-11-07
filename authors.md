@@ -8,25 +8,25 @@
 ## Citation
 
 Source:
-[`inst/CITATION`](https://github.com/bagozzib/underdisp/blob/v0.1.2/inst/CITATION)
+[`inst/CITATION`](https://github.com/bagozzib/underdisp/blob/main/inst/CITATION)
 
 Bagozzi, B.E. (2026). underdisp: Diagnostics and Models for
-Underdispersed Count Data. R package version 0.1.1.
+Underdispersed Count Data. R package version 0.2.0.
 https://CRAN.R-project.org/package=underdisp
 
     @Manual{,
       title = {underdisp: Diagnostics and Models for Underdispersed Count Data},
       author = {Benjamin E. Bagozzi},
       year = {2026},
-      note = {R package version 0.1.1},
+      note = {R package version 0.2.0},
       url = {https://CRAN.R-project.org/package=underdisp},
     }
 
-Bagozzi, B.E. (2026). Revisiting underdispersion in political science.
-Working paper.
+Bagozzi, B.E. (2026). Revisiting Underdispersion in Political Science:
+Diagnostics and a Typology for Count Data. Working paper.
 
     @Unpublished{,
-      title = {Revisiting underdispersion in political science},
+      title = {Revisiting Underdispersion in Political Science: Diagnostics and a Typology for Count Data},
       author = {Benjamin E. Bagozzi},
       year = {2026},
       note = {Working paper},
