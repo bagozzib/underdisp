@@ -87,7 +87,7 @@ fit
 #> 
 #> Intensity (zero-truncated CPB) coefficients:
 #>  lgdppc  milper 
-#>  0.2740 -0.0011 
+#>  0.2739 -0.0011 
 #> Intensity alpha (shape): 0.6635 
 # }
 ```
