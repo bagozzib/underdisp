@@ -4,7 +4,9 @@ This is a patch release for the linux-arm64 additional check of 0.2.0, where
 one test failed. The test compared two values of a test statistic at a
 relative tolerance of 1e-6; on that platform they differed by 1.6e-6 (by 4e-7
 on x86_64), a difference set by where the optimizer of a fixed-effects fit
-stops. The test now allows 1e-4. The package code is unchanged from 0.2.0.
+stops. The test now allows 1e-4. The package code is unchanged from 0.2.0; the
+help page of ud_screen() also corrects how it describes the constant of a
+threshold.
 
 ## Test environments
 

@@ -10,6 +10,14 @@
   error fixed in 0.2.0, which on the test's data gave the uncentred covariate
   a statistic of 2e10. The package code is unchanged.
 
+## Documentation
+
+* `?ud_screen` described the constant of the calibrated at-risk threshold,
+  1 - 2.27/sqrt(n+), as an estimated standard deviation. It is a scale matched
+  to the 5% quantile of the simulated null on one calibration design, where the
+  null is right-skewed and its standard deviation somewhat larger. The
+  threshold is unchanged.
+
 # underdisp 0.2.0
 
 The continuous parameter binomial (CPB) now follows King's (1989) definition
