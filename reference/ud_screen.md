@@ -75,21 +75,22 @@ ud_screen(
 
   How to set the at-risk test's underdispersion cutoff. `"calibrated"`
   (default) uses the simulation-calibrated rule \\1 -
-  2.27/\sqrt{n\_+}\\, whose constant is an estimated standard deviation
-  fitted to one calibration grid (no fixed effects, and that grid's rate
-  profile); `"bootstrap"` calibrates the cutoff on the data at hand by a
-  parametric bootstrap of the fitted zero-truncated Poisson null
-  (simulate `ztp_boot_B` at-risk panels at the fitted rates, refit, and
-  take the empirical 5% quantile of the statistic). The calibrated rule
-  is anti-conservative in two separable regimes: when the mean model's
-  parameter count is a nontrivial share of the positive observations
-  (dummy-heavy fixed-effects screens, where the null's center drifts
-  with the parameter share), and when the fitted rates concentrate at
-  small values (roughly \\\lambda\\ below 2, and the more severely the
-  smaller the rates), where the null's spread exceeds the fitted
-  constant even without fixed effects (simulated size roughly 0.07–0.10
-  against the nominal 0.05). The bootstrap absorbs both departures by
-  construction and is the recommended choice in either regime.
+  2.27/\sqrt{n\_+}\\, whose constant is a scale matched to the simulated
+  null's 5% quantile on one calibration design (no fixed effects, and
+  that design's rate profile); `"bootstrap"` calibrates the cutoff on
+  the data at hand by a parametric bootstrap of the fitted
+  zero-truncated Poisson null (simulate `ztp_boot_B` at-risk panels at
+  the fitted rates, refit, and take the empirical 5% quantile of the
+  statistic). The calibrated rule is anti-conservative in two separable
+  regimes: when the mean model's parameter count is a nontrivial share
+  of the positive observations (dummy-heavy fixed-effects screens, where
+  the null's center drifts with the parameter share), and when the
+  fitted rates concentrate at small values (roughly \\\lambda\\ below 2,
+  and the more severely the smaller the rates), where the null's spread
+  exceeds the fitted constant even without fixed effects (simulated size
+  roughly 0.07–0.10 against the nominal 0.05). The bootstrap absorbs
+  both departures by construction and is the recommended choice in
+  either regime.
 
 - ztp_boot_B:
 

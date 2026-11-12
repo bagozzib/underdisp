@@ -27,7 +27,7 @@ respects it.)"></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">underdisp</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -54,7 +54,7 @@ respects it.)"></head><body>
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Screen a count outcome for underdispersion</h1>
-      <small class="dont-index">Source: <a href="https://github.com/bagozzib/underdisp/blob/v0.2.0/R/ud_screen.R" class="external-link"><code>R/ud_screen.R</code></a></small>
+      <small class="dont-index">Source: <a href="https://github.com/bagozzib/underdisp/blob/main/R/ud_screen.R" class="external-link"><code>R/ud_screen.R</code></a></small>
       <div class="d-none name"><code>ud_screen.Rd</code></div>
     </div>
 
@@ -133,9 +133,9 @@ generalized-Poisson and COM-Poisson comparators (defaults 30 and 5000).</p></dd>
 <dt id="arg-ztp-threshold">ztp_threshold<a class="anchor" aria-label="anchor" href="#arg-ztp-threshold"></a></dt>
 <dd><p>How to set the at-risk test's underdispersion cutoff.
 <code>"calibrated"</code> (default) uses the simulation-calibrated rule
-\(1 - 2.27/\sqrt{n_+}\), whose constant is an estimated standard
-deviation fitted to one calibration grid (no fixed effects, and that
-grid's rate profile); <code>"bootstrap"</code> calibrates the cutoff on the data at
+\(1 - 2.27/\sqrt{n_+}\), whose constant is a scale matched to the
+simulated null's 5% quantile on one calibration design (no fixed effects,
+and that design's rate profile); <code>"bootstrap"</code> calibrates the cutoff on the data at
 hand by a parametric bootstrap of the fitted zero-truncated Poisson null
 (simulate <code>ztp_boot_B</code> at-risk panels at the fitted rates, refit, and take
 the empirical 5% quantile of the statistic). The calibrated rule is

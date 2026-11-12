@@ -1,5 +1,30 @@
 # Changelog
 
+## underdisp 0.2.1
+
+### Tests
+
+- A test that
+  [`dispersion_test()`](https://bagozzib.github.io/underdisp/reference/dispersion_test.md)
+  gives the same statistic for a
+  [`cpb_fe()`](https://bagozzib.github.io/underdisp/reference/cpb_fe.md)
+  fit whether or not a covariate is centred allowed a relative
+  difference of 1e-6 and failed on CRAN’s Linux ARM64 check, where the
+  two statistics differed by 1.6e-6 (4e-7 on x86_64). The gap is where
+  the optimizer of the fixed-effects fit stops; the test now allows
+  1e-4. It guards against the error fixed in 0.2.0, which on the test’s
+  data gave the uncentred covariate a statistic of 2e10. The package
+  code is unchanged.
+
+### Documentation
+
+- [`?ud_screen`](https://bagozzib.github.io/underdisp/reference/ud_screen.md)
+  described the constant of the calibrated at-risk threshold, 1 -
+  2.27/sqrt(n+), as an estimated standard deviation. It is a scale
+  matched to the 5% quantile of the simulated null on one calibration
+  design, where the null is right-skewed and its standard deviation
+  somewhat larger. The threshold is unchanged.
+
 ## underdisp 0.2.0
 
 CRAN release: 2026-11-04

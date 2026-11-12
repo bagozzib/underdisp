@@ -7,7 +7,7 @@
 
     <a class="navbar-brand me-2" href="../index.html">underdisp</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.0</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="">0.2.1</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -34,9 +34,21 @@
   <main id="main" class="col-md-9"><div class="page-header">
 
       <h1>Changelog</h1>
-      <small>Source: <a href="https://github.com/bagozzib/underdisp/blob/v0.2.0/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
+      <small>Source: <a href="https://github.com/bagozzib/underdisp/blob/main/NEWS.md" class="external-link"><code>NEWS.md</code></a></small>
     </div>
 
+    <div class="section level2">
+<h2 class="pkg-version" data-toc-text="0.2.1" id="underdisp-021">underdisp 0.2.1<a class="anchor" aria-label="anchor" href="#underdisp-021"></a></h2>
+<div class="section level3">
+<h3 id="tests-0-2-1">Tests<a class="anchor" aria-label="anchor" href="#tests-0-2-1"></a></h3>
+<ul><li>A test that <code><a href="../reference/dispersion_test.html">dispersion_test()</a></code> gives the same statistic for a <code><a href="../reference/cpb_fe.html">cpb_fe()</a></code> fit whether or not a covariate is centred allowed a relative difference of 1e-6 and failed on CRAN’s Linux ARM64 check, where the two statistics differed by 1.6e-6 (4e-7 on x86_64). The gap is where the optimizer of the fixed-effects fit stops; the test now allows 1e-4. It guards against the error fixed in 0.2.0, which on the test’s data gave the uncentred covariate a statistic of 2e10. The package code is unchanged.</li>
+</ul></div>
+<div class="section level3">
+<h3 id="documentation-0-2-1">Documentation<a class="anchor" aria-label="anchor" href="#documentation-0-2-1"></a></h3>
+<ul><li>
+<code><a href="../reference/ud_screen.html">?ud_screen</a></code> described the constant of the calibrated at-risk threshold, 1 - 2.27/sqrt(n+), as an estimated standard deviation. It is a scale matched to the 5% quantile of the simulated null on one calibration design, where the null is right-skewed and its standard deviation somewhat larger. The threshold is unchanged.</li>
+</ul></div>
+</div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="0.2.0" id="underdisp-020">underdisp 0.2.0<a class="anchor" aria-label="anchor" href="#underdisp-020"></a></h2><p class="text-muted">CRAN release: 2026-11-04</p>
 <p>The continuous parameter binomial (CPB) now follows King’s (1989) definition by default; <code>support = "floor"</code> reproduces the CPB fits of 0.1.x. The release adds two families, average marginal effects, prediction intervals and separation checks, and fixes errors in fixed-effects, two-part and new-data computations, some of which change earlier results.</p>

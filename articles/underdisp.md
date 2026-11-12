@@ -607,6 +607,8 @@ res <- DHARMa::createDHARMa(simulatedResponse = as.matrix(sims),
                             fittedPredictedResponse = fitted(h),
                             integerResponse = TRUE)
 plot(res)
+#> Warning in newton(lsp = lsp, X = G$X, y = G$y, Eb = G$Eb, UrS = G$UrS, L = G$L,
+#> : Fitting terminated with step failure - check results carefully
 ```
 
 ![](underdisp_files/figure-html/dharma-1.png)
